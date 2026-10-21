@@ -1,0 +1,133 @@
+---
+title: "Does Tagging Penguins Harm Them?"
+subtitle: "Flipper bands vs electronic tags — Saraux et al. (2011)"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+```{python}
+#| include: false
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy import stats
+from great_tables import GT
+
+sns.set_theme(style="whitegrid")
+rng = np.random.default_rng(2026)
+df = pd.read_csv("data/penguin_banding_saraux2011.csv")
+b_surv, n_b = 10, 50
+c_surv, n_c = 18, 50
+```
+
+# Question
+
+**Does tagging penguins for identification purposes harm them?** Saraux et al.
+(2011, *Nature*) randomly fitted 100 king penguins with either steel
+**flipper bands** (n=50) or **internal electronic tags** (n=50), then monitored
+10-year survival.
+
+## Data
+
+```{python}
+#| echo: false
+GT(df).fmt_number(columns=["n", "survived"], decimals=0) \
+    .tab_header(title="10-year survival of king penguins (Saraux et al. 2011)") \
+    .cols_label(survived="Survived", n="Total")
+```
+
+# Exploratory analysis
+
+```{python}
+#| echo: false
+#| fig-cap: "10-year survival by tagging method"
+fig, ax = plt.subplots(figsize=(6, 4))
+ax.bar(["Banded", "Non-banded"], [b_surv/n_b, c_surv/n_c],
+       color=["#c76c6c", "#8fbf8f"], edgecolor="white")
+ax.set_ylabel("Survival proportion")
+ax.set_ylim(0, 0.5)
+for i, p in enumerate([b_surv/n_b, c_surv/n_c]):
+    ax.text(i, p + 0.01, f"{p:.0%}", ha="center")
+plt.tight_layout()
+plt.show()
+```
+
+Banded penguins survived at **20%** vs **36%** for electronically tagged birds —
+a 16 percentage-point gap.
+
+# Hypothesis tests
+
+**H₀:** p_banded − p_nonbanded = 0 **Hₐ:** banded penguins survive at a *lower* rate
+
+```{python}
+#| echo: false
+tab = np.array([[b_surv, n_b - b_surv], [c_surv, n_c - c_surv]])
+odds, p_f = stats.fisher_exact(tab, alternative="less")
+pooled = (b_surv + c_surv) / (n_b + n_c)
+se = np.sqrt(pooled * (1 - pooled) * (1/n_b + 1/n_c))
+z = (b_surv/n_b - c_surv/n_c) / se
+p_z = stats.norm.cdf(z)
+print(f"Fisher exact: OR = {odds:.3f}, p = {p_f:.4f}")
+print(f"Two-proportion z (one-sided): z = {z:.3f}, p = {p_z:.4f}")
+```
+
+## Randomization test
+
+```{python}
+#| echo: false
+nperm = 100_000
+surv_pool = np.array([1]*(b_surv + c_surv) + [0]*(n_b - b_surv + n_c - c_surv))
+obs = b_surv/n_b - c_surv/n_c
+perm = np.empty(nperm)
+for i in range(nperm):
+    g = surv_pool[rng.permutation(len(surv_pool))]
+    perm[i] = g[:n_b].mean() - g[n_b:].mean()
+p_perm = np.mean(perm <= obs)
+print(f"Permutation test: p = {p_perm:.4f}")
+```
+
+```{python}
+#| echo: false
+#| fig-cap: "Randomization distribution of difference in survival proportions"
+fig, ax = plt.subplots(figsize=(7, 4))
+ax.hist(perm, bins=50, color="#7b9fc7", edgecolor="white")
+ax.axvline(obs, color="crimson", lw=2, label=f"observed diff = {obs:+.2f}")
+ax.legend(); ax.set_xlabel("p_banded − p_nonbanded")
+plt.tight_layout()
+plt.show()
+```
+
+# Interval estimate
+
+```{python}
+#| echo: false
+boot = np.empty(nperm)
+for i in range(nperm):
+    bb = rng.choice([1]*b_surv + [0]*(n_b-b_surv), n_b)
+    bc = rng.choice([1]*c_surv + [0]*(n_c-c_surv), n_c)
+    boot[i] = bb.mean() - bc.mean()
+ci = np.percentile(boot, [2.5, 97.5])
+print(f"Bootstrap 95% CI: ({ci[0]:.3f}, {ci[1]:.3f})")
+```
+
+# Decision
+
+| Method | Result |
+|---|---|
+| Two-proportion z (one-sided) | z = −1.78, **p = 0.037** |
+| Fisher exact test | OR = 0.44, **p = 0.059** |
+| Randomization test (100k shuffles) | **p = 0.057** |
+| Bootstrap 95% CI | (−0.340, +0.020) — includes 0 |
+
+**Conclusion:** The evidence is **borderline** at the 5% level. The z-test
+suggests harm (p ≈ 0.04), but the exact/permutation tests sit just above 0.05
+and the bootstrap CI includes zero. With only 100 birds and 8 fewer survivors
+in the banded group, this sample alone gives *suggestive but not decisive*
+evidence. Note the original paper combined this with breeding-success effects
+(~40% fewer chicks) and a multi-year analysis to reach its stronger conclusion.
+
+**Decision: act cautiously — flipper bands show a consistent, biologically
+meaningful negative trend; the randomization of this experiment makes the
+directional evidence credible, but larger samples are needed.**

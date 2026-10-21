@@ -1,0 +1,135 @@
+---
+title: "Do Humans Give Off Pheromones?"
+subtitle: "Estratetraenol & gender perception — Zhou et al. (2014) / Chen et al. (2021)"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+```{python}
+#| include: false
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy import stats
+from great_tables import GT
+
+sns.set_theme(style="whitegrid")
+rng = np.random.default_rng(2026)
+df = pd.read_csv("data/pheromone_pse_shifts.csv")
+s = df.pse_shift.to_numpy()
+```
+
+# Question
+
+**Do humans subconsciously give off chemical signals (pheromones)?** Zhou et al.
+(2014, *Current Biology*) proposed that the steroids **androstadienone**
+(male-associated) and **estratetraenol** (female-associated) communicate gender:
+sniffing estratetraenol biases heterosexual men to perceive ambiguous
+point-light walkers as *more feminine*.
+
+Data: raw per-participant results from the within-participant replication by
+Chen et al. (2021, *eLife*, Exps 3–5) — **72 heterosexual men**, each tested
+under both **control** (clove-oil carrier) and **estratetraenol** conditions.
+Outcome: **PSE shift** — the psychometric-criterion shift between the two
+conditions (positive = biased toward judging walkers as female).
+
+```{python}
+#| echo: false
+GT(df.groupby("exp").pse_shift.agg(["count", "mean", "std"]).reset_index()) \
+    .fmt_number(["mean", "std"], decimals=4) \
+    .tab_header(title="PSE shift (EST − control) by experiment",
+                subtitle="Positive = feminine bias") \
+    .cols_label(count="n")
+```
+
+# Exploratory analysis
+
+```{python}
+#| echo: false
+#| fig-cap: "Distribution of PSE shifts; values right of 0 indicate feminine bias"
+fig, axes = plt.subplots(1, 2, figsize=(10, 4), gridspec_kw={"width_ratios": [1, 1.4]})
+sns.barplot(data=df, x="exp", y="pse_shift", ax=axes[0], color="#7b9fc7")
+axes[0].axhline(0, color="black", lw=1)
+axes[0].set_ylabel("PSE shift")
+sns.histplot(s, bins=20, ax=axes[1], color="#8fbf8f", edgecolor="white")
+axes[1].axvline(0, color="black", lw=1)
+axes[1].axvline(s.mean(), color="crimson", ls="--", label=f"mean = {s.mean():+.4f}")
+axes[1].legend(); axes[1].set_xlabel("PSE shift")
+plt.tight_layout()
+plt.show()
+```
+
+All three experiments show a positive mean shift; **62.5% of participants**
+(45/72) shifted toward judging walkers as female under estratetraenol.
+
+# Hypothesis tests
+
+**H₀:** mean PSE shift = 0 (estratetraenol has no effect)
+**Hₐ:** mean shift > 0 (feminine bias)
+
+```{python}
+#| echo: false
+t, p_t = stats.ttest_1samp(s, 0, alternative="greater")
+print(f"Matched-pairs t-test: t({len(s)-1}) = {t:.2f}, p = {p_t:.5f}")
+```
+
+## Sign-flip randomization test
+
+```{python}
+#| echo: false
+nperm = 100_000
+obs = s.mean()
+perm = np.array([np.mean(s * rng.choice([-1, 1], len(s))) for _ in range(nperm)])
+p_perm = np.mean(perm >= obs)
+print(f"Sign-flip permutation test: p = {p_perm:.5f}")
+```
+
+```{python}
+#| echo: false
+#| fig-cap: "Randomization distribution of the mean PSE shift under H₀"
+fig, ax = plt.subplots(figsize=(7, 4))
+ax.hist(perm, bins=60, color="#7b9fc7", edgecolor="white")
+ax.axvline(obs, color="crimson", lw=2, label=f"observed mean = {obs:+.4f}")
+ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+## Sign test
+
+```{python}
+#| echo: false
+k, n = int(np.sum(s > 0)), len(s)
+p_bin = stats.binomtest(k, n, 0.5, alternative="greater").pvalue
+print(f"{k}/{n} participants showed feminine bias; sign test p = {p_bin:.4f}")
+```
+
+# Interval estimate
+
+```{python}
+#| echo: false
+boot = np.array([s[rng.integers(0, n, n)].mean() for _ in range(nperm)])
+ci = np.percentile(boot, [2.5, 97.5])
+print(f"Bootstrap 95% CI for mean shift: ({ci[0]:.4f}, {ci[1]:.4f})")
+```
+
+# Decision
+
+| Method | Result |
+|---|---|
+| Matched-pairs t-test | t(71) = 2.49, **p = 0.0075** |
+| Sign-flip randomization (100k) | **p = 0.0072** |
+| Sign test (45/72 biased) | **p = 0.022** |
+| Bootstrap 95% CI | (0.0025, 0.0204) — excludes 0 |
+
+**Conclusion:** Reject H₀. Estratetraenol produces a small but consistent
+*feminine* bias in gender perception among heterosexual men — all three
+replication experiments point in the same direction, and the CI excludes zero.
+
+**Statistical answer: yes — there is evidence that humans emit chemical signals
+that subconsciously bias sex perception.** Caveats: the effect size is tiny
+(PSE shift ≈ 0.01 SD of walker masculinity); whether these steroids meet the
+strict biological definition of a *pheromone* remains debated; and
+androstadienone effects on women were not tested here.

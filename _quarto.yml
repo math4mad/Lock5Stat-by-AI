@@ -7,6 +7,10 @@ website:
     left:
       - href: sprinting_gene.qmd
         text: "Sprinting Gene"
+      - href: penguin_tagging.qmd
+        text: "Penguin Tagging"
+      - href: pheromones.qmd
+        text: "Pheromones"
 
 format:
   html:
