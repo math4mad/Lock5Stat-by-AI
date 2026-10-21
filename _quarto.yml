@@ -1,0 +1,14 @@
+project:
+  type: website
+
+website:
+  title: "Lock5Stat-by-AI"
+  navbar:
+    left:
+      - href: sprinting_gene.qmd
+        text: "Sprinting Gene"
+
+format:
+  html:
+    theme: cosmo
+    toc: true
