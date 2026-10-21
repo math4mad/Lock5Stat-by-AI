@@ -6,3 +6,8 @@ sprinting_gene_files/
 search.json
 *.html
 analysis_results.csv
+
+/.quarto/
+**/*.quarto_ipynb
+scripts/*.npy
+data/raw/*.xlsx.broken
