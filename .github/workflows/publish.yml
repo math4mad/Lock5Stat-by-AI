@@ -13,6 +13,9 @@ permissions:
 jobs:
   build-deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -22,6 +25,7 @@ jobs:
       - uses: quarto-dev/quarto-actions/setup@v2
       - uses: quarto-dev/quarto-actions/render@v2
       - uses: actions/upload-pages-artifact@v3
+        id: deployment
         with:
           path: _site
       - uses: actions/deploy-pages@v4
