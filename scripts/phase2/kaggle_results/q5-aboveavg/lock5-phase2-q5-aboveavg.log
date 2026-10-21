@@ -1,0 +1,22 @@
+[{"stream_name":"stdout","time":3.758420836,"data":"Q5: professors rating themselves 'above-average' teachers\n"}
+,{"stream_name":"stdout","time":3.758474159,"data":"Data (reconstructed, Cross 1977): 235/250 = 94.0%\n"}
+,{"stream_name":"stdout","time":3.758479066,"data":"\n"}
+,{"stream_name":"stdout","time":3.761734111,"data":"Wald 95% CI for p: (0.9106, 0.9694)\n"}
+,{"stream_name":"stdout","time":3.761753094,"data":"z-test vs 0.50 (two-sided): z=13.914, p=5.20675e-44\n"}
+,{"stream_name":"stdout","time":3.7617584280000003,"data":"Exact binomial test vs 0.50 (two-sided): p=5.47615e-52\n"}
+,{"stream_name":"stdout","time":3.761763192,"data":"\n"}
+,{"stream_name":"stdout","time":3.780607328,"data":"Bootstrap 95% CI for p: (0.9080, 0.9680)\n"}
+,{"stream_name":"stdout","time":3.789802681,"data":"Randomization test vs 0.50 (two-sided): p=9.9999e-06\n"}
+,{"stream_name":"stdout","time":3.789832274,"data":"\n"}
+,{"stream_name":"stdout","time":3.789837725,"data":"Conclusion: the proportion rating themselves above average is far above 50%,\n"}
+,{"stream_name":"stdout","time":3.789842128,"data":"a classic better-than-average (illusory superiority) effect. Since n is a\n"}
+,{"stream_name":"stdout","time":3.7898464240000003,"data":"documented reconstruction assumption (Cross's exact n unavailable), the CI\n"}
+,{"stream_name":"stdout","time":3.789851536,"data":"width is illustrative; the headline point estimate of 94% is the published figure.\n"}
+,{"stream_name":"stdout","time":3.790315188,"data":"saved scripts/phase2/out/q5_results.json\n"}
+,{"stream_name":"stderr","time":6.521530191,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":6.5215646750000005,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":6.872154882,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":6.872190421,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":8.443009324,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":9.537909972,"data":"[NbConvertApp] Writing 292690 bytes to __results__.html\n"}
+]

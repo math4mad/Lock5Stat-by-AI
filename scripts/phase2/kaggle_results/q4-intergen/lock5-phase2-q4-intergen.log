@@ -1,0 +1,31 @@
+[{"stream_name":"stdout","time":5.891531545,"data":"\n"}
+,{"stream_name":"stdout","time":5.891580929,"data":"=== Q4: How broadly do experiences of parents affect their future children? ===\n"}
+,{"stream_name":"stdout","time":5.891588733,"data":"Study: Ng, S.-F., Lin, R.C.Y., Laybutt, D.R., Barres, R., Owens, J.A. \u0026 Morris, M.J. (2010). Chronic high-fat diet in fathers programs beta-cell dysfunction in female rat offspring. Nature 467(7318), 963-966. doi:10.1038/nature09491\n"}
+,{"stream_name":"stdout","time":5.89159581,"data":"Dataset: /kaggle/working/data/phase2/q4_intergen.csv (34 rows, reconstructed from paper summaries)\n"}
+,{"stream_name":"stdout","time":5.89160068,"data":"\n"}
+,{"stream_name":"stdout","time":5.891605245,"data":"-- Fathers (manipulation check) --\n"}
+,{"stream_name":"stdout","time":5.891609648,"data":"body_weight_g            Control   550.00 vs HighFat   705.00 t= -7.24 p=3.56e-06 (paper p \u003c0.0005)\n"}
+,{"stream_name":"stdout","time":5.891614457,"data":"fasting_glucose_mM       Control     4.71 vs HighFat     5.43 t= -4.02 p=1.78e-03 (paper p 0.002)\n"}
+,{"stream_name":"stdout","time":5.89161898,"data":"fasting_insulin_ng_ml    Control     0.18 vs HighFat     0.47 t= -3.98 p=2.99e-03 (paper p 0.002)\n"}
+,{"stream_name":"stdout","time":5.891623688,"data":"homa_ir                  Control     0.88 vs HighFat     2.29 t= -6.68 p=1.50e-05 (paper p \u003c0.0005)\n"}
+,{"stream_name":"stdout","time":5.891628305,"data":"\n"}
+,{"stream_name":"stdout","time":5.891632491,"data":"-- Female offspring (all on control diet) --\n"}
+,{"stream_name":"stdout","time":5.891636759,"data":"day1_weight_g            Control     7.08 vs HighFat     6.61 t= +1.57 p=0.1449 (paper p 0.07)  \n"}
+,{"stream_name":"stdout","time":5.89164098,"data":"body_weight_12wk_g       Control   253.00 vs HighFat   260.00 t= -0.74 p=0.4724 (paper p 0.92)  \n"}
+,{"stream_name":"stdout","time":5.891645348,"data":"glucose_peak_6wk_mM      Control    12.30 vs HighFat    13.60 t= -2.60 p=0.0220 (paper p 0.043) *\n"}
+,{"stream_name":"stdout","time":5.891650513,"data":"insulin_peak_6wk_ng_ml   Control     2.70 vs HighFat     1.40 t= +2.60 p=0.0220 (paper p 0.016) *\n"}
+,{"stream_name":"stdout","time":5.891655191,"data":"insulinogenic_index      Control    86.80 vs HighFat    38.70 t= +5.16 p=0.0002 (paper p 0.004) *\n"}
+,{"stream_name":"stdout","time":5.891659598,"data":"\n"}
+,{"stream_name":"stdout","time":5.891663728,"data":"Insulinogenic index: diff = +48.1 (95% bootstrap CI +30.6 to +65.0), Cohen's d = 2.58\n"}
+,{"stream_name":"stdout","time":5.89168586,"data":"Randomization test (100k perms): p_two = 0.0004\n"}
+,{"stream_name":"stdout","time":5.891690985,"data":"\n"}
+,{"stream_name":"stdout","time":5.891695178,"data":"Islet gene expression: 56/77 genes down-regulated = 72.7%, z = +3.99, p = 6.6e-05 (95% CI 0.623-0.818)\n"}
+,{"stream_name":"stdout","time":5.891704764,"data":"\n"}
+,{"stream_name":"stdout","time":5.891709551,"data":"Results saved -\u003e /kaggle/working/scripts/phase2/out/q4_results.json\n"}
+,{"stream_name":"stderr","time":9.127632119,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":9.127694886,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":9.616892277,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":9.616918902,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":11.866478211,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":13.390994716,"data":"[NbConvertApp] Writing 352960 bytes to __results__.html\n"}
+]

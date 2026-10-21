@@ -1,0 +1,23 @@
+[{"stream_name":"stdout","time":4.628992565,"data":"Reconstructed dataset: 45 focal males (Pruitt et al. 2012 contest experiment)\n"}
+,{"stream_name":"stdout","time":4.629059508,"data":"Play bouts median = 4 -\u003e high play: 20 males, low play: 25 males\n"}
+,{"stream_name":"stdout","time":4.629068405,"data":"High play: kept female 3/20 = 0.150\n"}
+,{"stream_name":"stdout","time":4.629073403,"data":"Low play:  kept female 10/25 = 0.400\n"}
+,{"stream_name":"stdout","time":4.62907797,"data":"Difference p_high - p_low = -0.250\n"}
+,{"stream_name":"stdout","time":4.62908257,"data":"\n"}
+,{"stream_name":"stdout","time":4.630103062,"data":"Two-proportion z (one-sided): z = -1.839, p = 0.0330 (two-sided p = 0.0660)\n"}
+,{"stream_name":"stdout","time":4.635754616,"data":"Chi-square: chi2 = 3.380, df = 1, p = 0.0660 (Fisher one-sided p = 0.0641, odds ratio = 0.26)\n"}
+,{"stream_name":"stdout","time":4.807675286,"data":"Randomization test (100,000 shuffles): p = 0.0629\n"}
+,{"stream_name":"stdout","time":4.8201929,"data":"Bootstrap 95% CI for p_high - p_low: (-0.500, 0.010)\n"}
+,{"stream_name":"stdout","time":4.820342545,"data":"\n"}
+,{"stream_name":"stdout","time":4.8275453630000005,"data":"Reconstruction check (logistic LR chi2 vs paper Table 3):\n"}
+,{"stream_name":"stdout","time":4.827584008,"data":"  play bouts:  chi2 = 9.29 (paper: 7.26, p = 0.007)\n"}
+,{"stream_name":"stdout","time":4.827590386,"data":"  personality: chi2 = 13.89 (paper: 15.91, p \u003c 0.0001)\n"}
+,{"stream_name":"stdout","time":4.8471117679999995,"data":"\n"}
+,{"stream_name":"stdout","time":4.84715073,"data":"Saved scripts/phase2/out/q3_results.json\n"}
+,{"stream_name":"stderr","time":8.252583418,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":8.252683166,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":8.727583787,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":8.727618591,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":10.981140842,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":12.48979368,"data":"[NbConvertApp] Writing 318098 bytes to __results__.html\n"}
+]

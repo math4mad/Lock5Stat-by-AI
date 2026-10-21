@@ -1,0 +1,16 @@
+# Reconstructed counts from Cross, K. P. (1977), "Not can, but will college teaching
+# be improved?", New Directions for Higher Education, 1977(17), 1-15.
+# DOI: 10.1002/he.36919771703
+#
+# Published finding (from the article abstract): "more than 90 percent of faculty
+# members rate themselves as above-average teachers" and "two-thirds rate themselves
+# among the top quarter." The widely cited headline figures are 94% above average
+# (68% in the top quarter), surveying faculty during Cross's 1975-76 year as visiting
+# professor at the University of Nebraska-Lincoln.
+#
+# NOTE: Cross's exact sample size n is not documented in publicly accessible sources.
+# n = 250 is a documented reconstruction assumption chosen so that 235/250 = 94.0%
+# matches the cited headline proportion. Do not treat n as the true survey size.
+response,count
+AboveAverage,235
+NotAboveAverage,15

@@ -1,11 +1,11 @@
 {
-  "id": "lock5stat-by-ai/lock5-phase2-q4-intergen",
+  "id": "math4amd/lock5-phase2-q4-intergen",
   "title": "Lock5 Phase2 Q4 Intergen",
   "code_file": "q4_intergen.py",
   "language": "python",
   "kernel_type": "script",
   "is_private": "true",
-  "enable_gpu": "true",
+  "enable_gpu": "false",
   "enable_internet": "true",
   "dataset_sources": [],
   "competition_sources": [],

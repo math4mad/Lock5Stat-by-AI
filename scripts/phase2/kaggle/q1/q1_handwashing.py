@@ -1,3 +1,13 @@
+# ---- Kaggle self-containment shim (auto-inserted by build_kaggle_queue.py) ----
+import pathlib as _pl
+_os_cwd = _pl.Path.cwd()
+(_os_cwd / "data" / "phase2").mkdir(parents=True, exist_ok=True)
+(_os_cwd / "scripts" / "phase2" / "out").mkdir(parents=True, exist_ok=True)
+(_os_cwd / "data" / "phase2" / "q1_handwashing.csv").write_text('venue,sex,n,washed\nTurner Field (Atlanta),male,778,493\nTurner Field (Atlanta),female,810,682\nMuseum of Science and Industry (Chicago),male,375,304\nMuseum of Science and Industry (Chicago),female,380,353\nShedd Aquarium (Chicago),male,375,318\nShedd Aquarium (Chicago),female,379,354\nGrand Central Station (New York City),male,410,273\nGrand Central Station (New York City),female,461,411\nPenn Station (New York City),male,342,218\nPenn Station (New York City),female,290,268\nFerry Terminal Farmers Market (San Francisco),male,926,787\nFerry Terminal Farmers Market (San Francisco),female,810,734\n')
+import os as _os
+_os.chdir(_os_cwd)
+REPO = _os_cwd  # overridden for Kaggle (original assignment below is ignored)
+# ---- end shim ----
 """Q1 (Phase 2): What proportion of people using a public restroom wash their hands?
 
 Provenance
@@ -46,7 +56,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-REPO = Path(__file__).resolve().parents[2]
+REPO = _os_cwd  # Kaggle override
 CSV_PATH = REPO / "data" / "phase2" / "q1_handwashing.csv"
 OUT_PATH = REPO / "scripts" / "phase2" / "out" / "q1_results.json"
 

@@ -1,11 +1,11 @@
 {
-  "id": "lock5stat-by-ai/lock5-phase2-q1-handwashing",
+  "id": "math4amd/lock5-phase2-q1-handwashing",
   "title": "Lock5 Phase2 Q1 Handwashing",
   "code_file": "q1_handwashing.py",
   "language": "python",
   "kernel_type": "script",
   "is_private": "true",
-  "enable_gpu": "true",
+  "enable_gpu": "false",
   "enable_internet": "true",
   "dataset_sources": [],
   "competition_sources": [],

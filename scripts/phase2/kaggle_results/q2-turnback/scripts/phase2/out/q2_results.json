@@ -1,0 +1,167 @@
+{
+  "question": "If parents could turn back time, would they still choose to have children?",
+  "survey_item": "If you had it to do over again, would you have children?",
+  "citation": "Lock, Lock, Lock, Lock & Lock (2021), Statistics: Unlocking the Power of Data, 3rd ed., Wiley: Section 1.2 Data 1.4 (p.25), Examples 1.19-1.20 (pp.25-26), Exercise 1.57 (p.28). Underlying polls: Ann Landers column survey (1976, >10,000 voluntary responses, 30% Yes); Newsday nationwide random sample of US parents (June 13, 1976, n=1373, 91% Yes); Kansas City Star random sample of parents (1976, n=409, 94% Yes).",
+  "dataset": {
+    "path": "data/phase2/q2_turnback.csv",
+    "note": "Lock5 3e ships no dataset for this question (checked lock5stat.com/datapage3e.html). Counts are documented reconstructions from published percentages; provenance in CSV header comments."
+  },
+  "one_proportion": {
+    "kc_star_1976": {
+      "label": "Kansas City Star random sample (KC parents)",
+      "yes": 384,
+      "no": 25,
+      "n": 409,
+      "phat": 0.9389,
+      "wald_ci95": [
+        0.9157,
+        0.9621
+      ],
+      "bootstrap_ci95": [
+        0.9144,
+        0.9609
+      ],
+      "test_h0_p50": {
+        "z": 17.751,
+        "p_normal": 1.68e-70,
+        "p_randomization": 0.0
+      }
+    },
+    "landers_1976": {
+      "label": "Ann Landers column (voluntary response)",
+      "yes": 3000,
+      "no": 7000,
+      "n": 10000,
+      "phat": 0.3,
+      "wald_ci95": [
+        0.291,
+        0.309
+      ],
+      "bootstrap_ci95": [
+        0.291,
+        0.309
+      ],
+      "test_h0_p50": {
+        "z": -40.0,
+        "p_normal": 0.0,
+        "p_randomization": 0.0
+      }
+    },
+    "newsday_1976": {
+      "label": "Newsday nationwide random sample (US parents)",
+      "yes": 1250,
+      "no": 123,
+      "n": 1373,
+      "phat": 0.9104,
+      "wald_ci95": [
+        0.8953,
+        0.9255
+      ],
+      "bootstrap_ci95": [
+        0.8951,
+        0.925
+      ],
+      "test_h0_p50": {
+        "z": 30.415,
+        "p_normal": 3.47e-203,
+        "p_randomization": 0.0
+      }
+    }
+  },
+  "two_proportion": {
+    "newsday_vs_landers": {
+      "group_a": {
+        "study": "newsday_1976",
+        "label": "Newsday nationwide random sample (US parents)",
+        "yes": 1250,
+        "n": 1373,
+        "phat": 0.9104
+      },
+      "group_b": {
+        "study": "landers_1976",
+        "label": "Ann Landers column (voluntary response)",
+        "yes": 3000,
+        "n": 10000,
+        "phat": 0.3
+      },
+      "diff_phat": 0.6104,
+      "wald_ci95_diff": [
+        0.5928,
+        0.628
+      ],
+      "bootstrap_ci95_diff": [
+        0.5926,
+        0.6279
+      ],
+      "test_equal_p": {
+        "z": 43.84,
+        "p_normal": 0.0,
+        "p_randomization": 0.0,
+        "p_fisher_exact": 0.0
+      }
+    },
+    "kc_star_vs_landers": {
+      "group_a": {
+        "study": "kc_star_1976",
+        "label": "Kansas City Star random sample (KC parents)",
+        "yes": 384,
+        "n": 409,
+        "phat": 0.9389
+      },
+      "group_b": {
+        "study": "landers_1976",
+        "label": "Ann Landers column (voluntary response)",
+        "yes": 3000,
+        "n": 10000,
+        "phat": 0.3
+      },
+      "diff_phat": 0.6389,
+      "wald_ci95_diff": [
+        0.614,
+        0.6638
+      ],
+      "bootstrap_ci95_diff": [
+        0.6131,
+        0.6627
+      ],
+      "test_equal_p": {
+        "z": 27.036,
+        "p_normal": 5.57e-161,
+        "p_randomization": 0.0,
+        "p_fisher_exact": 6.76e-159
+      }
+    },
+    "kc_star_vs_newsday": {
+      "group_a": {
+        "study": "kc_star_1976",
+        "label": "Kansas City Star random sample (KC parents)",
+        "yes": 384,
+        "n": 409,
+        "phat": 0.9389
+      },
+      "group_b": {
+        "study": "newsday_1976",
+        "label": "Newsday nationwide random sample (US parents)",
+        "yes": 1250,
+        "n": 1373,
+        "phat": 0.9104
+      },
+      "diff_phat": 0.0285,
+      "wald_ci95_diff": [
+        0.0008,
+        0.0562
+      ],
+      "bootstrap_ci95_diff": [
+        0.0004,
+        0.0553
+      ],
+      "test_equal_p": {
+        "z": 1.831,
+        "p_normal": 0.0671,
+        "p_randomization": 0.0813,
+        "p_fisher_exact": 0.0821
+      }
+    }
+  },
+  "conclusion": "Random samples of parents say ~91-94% would have children again; the 30% from the Ann Landers voluntary poll differs overwhelmingly (all p < 1e-100), a textbook demonstration of voluntary-response bias."
+}

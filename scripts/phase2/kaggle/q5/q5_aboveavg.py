@@ -1,3 +1,13 @@
+# ---- Kaggle self-containment shim (auto-inserted by build_kaggle_queue.py) ----
+import pathlib as _pl
+_os_cwd = _pl.Path.cwd()
+(_os_cwd / "data" / "phase2").mkdir(parents=True, exist_ok=True)
+(_os_cwd / "scripts" / "phase2" / "out").mkdir(parents=True, exist_ok=True)
+(_os_cwd / "data" / "phase2" / "q5_aboveavg.csv").write_text('# Reconstructed counts from Cross, K. P. (1977), "Not can, but will college teaching\n# be improved?", New Directions for Higher Education, 1977(17), 1-15.\n# DOI: 10.1002/he.36919771703\n#\n# Published finding (from the article abstract): "more than 90 percent of faculty\n# members rate themselves as above-average teachers" and "two-thirds rate themselves\n# among the top quarter." The widely cited headline figures are 94% above average\n# (68% in the top quarter), surveying faculty during Cross\'s 1975-76 year as visiting\n# professor at the University of Nebraska-Lincoln.\n#\n# NOTE: Cross\'s exact sample size n is not documented in publicly accessible sources.\n# n = 250 is a documented reconstruction assumption chosen so that 235/250 = 94.0%\n# matches the cited headline proportion. Do not treat n as the true survey size.\nresponse,count\nAboveAverage,235\nNotAboveAverage,15\n')
+import os as _os
+_os.chdir(_os_cwd)
+REPO = _os_cwd  # overridden for Kaggle (original assignment below is ignored)
+# ---- end shim ----
 # Q5 (Phase 2): What percent of college professors consider themselves
 # "above-average" teachers?
 #

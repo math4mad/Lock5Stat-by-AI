@@ -1,0 +1,34 @@
+[{"stream_name":"stdout","time":11.845955589999999,"data":"================================================================\n"}
+,{"stream_name":"stdout","time":11.846005397999999,"data":"Q1: What proportion of people using a public restroom wash their hands?\n"}
+,{"stream_name":"stdout","time":11.846011906,"data":"Harris Interactive / ASM \u0026 SDA observational study, Aug 18-21, 2005\n"}
+,{"stream_name":"stdout","time":11.84601896,"data":"================================================================\n"}
+,{"stream_name":"stdout","time":11.846023106,"data":"n = 6,336 adults observed; washed = 5,195  -\u003e  p-hat = 0.8199 (82.0%)\n"}
+,{"stream_name":"stdout","time":11.846029284,"data":"\n"}
+,{"stream_name":"stdout","time":11.846032806,"data":"95% CI (Wald z):        (0.8105, 0.8294)\n"}
+,{"stream_name":"stdout","time":11.846037152,"data":"95% CI (bootstrap):     (0.8104, 0.8294)\n"}
+,{"stream_name":"stdout","time":11.846041769,"data":"\n"}
+,{"stream_name":"stdout","time":11.846045593,"data":"Test 1  H0: p = 0.50 vs Ha: p \u003e 0.50\n"}
+,{"stream_name":"stdout","time":11.846049566,"data":"        z = 50.93, normal p = 0.00e+00, exact binomial p = 0.00e+00, randomization p = 0.00000\n"}
+,{"stream_name":"stdout","time":11.846053639,"data":"Test 2  H0: p = 0.91 vs Ha: p \u003c 0.91   (vs 91% who SAY they always wash)\n"}
+,{"stream_name":"stdout","time":11.846057643,"data":"        z = -25.06, normal p = 7.59e-139, randomization p = 0.00000\n"}
+,{"stream_name":"stdout","time":11.846062339,"data":"\n"}
+,{"stream_name":"stdout","time":11.846066685,"data":"By sex:\n"}
+,{"stream_name":"stdout","time":11.846112472,"data":"  female 2,802/3,130 = 89.5%\n"}
+,{"stream_name":"stdout","time":11.846602448,"data":"  male   2,393/3,206 = 74.6%\n"}
+,{"stream_name":"stdout","time":11.846618009,"data":"\n"}
+,{"stream_name":"stdout","time":11.846622735,"data":"By venue:\n"}
+,{"stream_name":"stdout","time":11.848644042,"data":"  Ferry Terminal Farmers Market (San Francisco)  1,521/1,736 = 87.6%\n"}
+,{"stream_name":"stdout","time":11.848775467,"data":"  Turner Field (Atlanta)                         1,175/1,588 = 74.0%\n"}
+,{"stream_name":"stdout","time":11.848938468,"data":"  Grand Central Station (New York City)            684/  871 = 78.5%\n"}
+,{"stream_name":"stdout","time":11.849068373,"data":"  Shedd Aquarium (Chicago)                         672/  754 = 89.1%\n"}
+,{"stream_name":"stdout","time":11.849148765,"data":"  Museum of Science and Industry (Chicago)         657/  755 = 87.0%\n"}
+,{"stream_name":"stdout","time":11.849284309,"data":"  Penn Station (New York City)                     486/  632 = 76.9%\n"}
+,{"stream_name":"stdout","time":11.849393796,"data":"\n"}
+,{"stream_name":"stdout","time":11.849400666,"data":"Results JSON written to scripts/phase2/out/q1_results.json\n"}
+,{"stream_name":"stderr","time":14.869052975,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":14.869096077,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":15.359067643,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":15.359095422,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":17.415143448,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":18.706173879,"data":"[NbConvertApp] Writing 312616 bytes to __results__.html\n"}
+]

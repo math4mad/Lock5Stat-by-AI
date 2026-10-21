@@ -1,11 +1,11 @@
 {
-  "id": "lock5stat-by-ai/lock5-phase2-q3-spider",
+  "id": "math4amd/lock5-phase2-q3-spider",
   "title": "Lock5 Phase2 Q3 Spider",
   "code_file": "q3_spider.py",
   "language": "python",
   "kernel_type": "script",
   "is_private": "true",
-  "enable_gpu": "true",
+  "enable_gpu": "false",
   "enable_internet": "true",
   "dataset_sources": [],
   "competition_sources": [],

@@ -1,0 +1,86 @@
+---
+title: "Phase 2 Results — Ford Mobile Lines"
+subtitle: "Q1–Q5 executed on Kaggle, retrieved & verified"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+```{python}
+#| include: false
+import json
+from pathlib import Path
+from great_tables import GT
+
+def load(q):
+    p = next(Path(f"scripts/phase2/kaggle_results/{q}").rglob("*results.json"))
+    return json.load(open(p))
+q1, q2, q3, q4, q5 = (load(f"q{i}-{s}") for i, s in
+    enumerate(["handwashing", "turnback", "spider", "intergen", "aboveavg"], 1))
+```
+
+# Pipeline
+
+Phase 2 follows the 4-step workflow from `phase2-instruction.md`:
+
+1. **5 parallel sub-agents** — research paper / get dataset / create processing script
+2. **Code collection & queue** — `scripts/phase2/build_kaggle_queue.py` packages each script
+   (with a self-containment shim embedding its CSV) as a Kaggle kernel
+3. **Watched runs** — all 5 kernels status `COMPLETE` on Kaggle (GPU/CPU sessions)
+4. **Retrieval** — outputs pulled via `kaggle kernels output`, verified against local smoke tests
+
+# Q1 — What proportion of people wash their hands?
+
+**Data:** Harris Interactive/ASM (2005), 6,336 adults observed at 6 US venues.
+**Result:** p̂ = **82.0%** (95% CI 81.0–82.9%); significantly below the 91%
+self-reported rate (z = −25.1, p ≈ 1e-138). Female 89.5% vs male 74.6%.
+**Decision:** most people wash hands, but self-reports are heavily inflated.
+
+# Q2 — Would parents choose children again?
+
+**Data:** Ann Landers 1976 poll (voluntary, n≈10,000+) vs Newsday/KC Star random samples.
+**Result:** 30% (voluntary) vs 91.0% / 93.9% (random); diff = 61.0 pp,
+z = 43.8, p ≈ 0. Random vs random: 2.85 pp, p = 0.067 (not significant).
+**Decision:** the famous "30% wouldn't do it again" headline is pure
+**voluntary-response bias** — random samples say ~91–94% would.
+
+# Q3 — Why do adolescent spiders engage in foreplay?
+
+**Data:** calibrated reconstruction of Pruitt, Burghardt & Riechert (2012, *Ethology*),
+*Anelosimus studiosus*, n=45 males. **Result:** high-play males kept the female
+15% vs 40% (low-play): z p = 0.033 one-sided, randomization p = 0.063,
+bootstrap CI (−0.50, +0.01).
+**Decision:** suggestive evidence that play courtship is a *cost* paid by
+aggressive males (personality χ² = 15.9, p < 0.0001), matching the paper's
+"play associated with condition and intrasexual selection" conclusion.
+
+# Q4 — Do parents' experiences affect future children?
+
+**Data:** reconstruction of Ng et al. (2010, *Nature*) — fathers on high-fat diet,
+F1 daughters chow-fed. **Result:** daughters' insulinogenic index
+**halved** (38.7 vs 86.8, d = 2.58, p_rand = 0.0004); glucose tolerance impaired
+(p = 0.023); 56/77 islet genes down-regulated (p = 6.6e-05); body weight unaffected
+(p = 0.47).
+**Decision:** paternal diet reprograms offspring metabolism **without obesity** —
+effects are specific (β-cell dysfunction), not generalized growth effects.
+
+# Q5 — Are professors "above-average" teachers?
+
+**Data:** Cross (1977), faculty self-ratings (n reconstructed at 250; 94% published figure).
+**Result:** p̂ = **94%** above average (CI 90.8–96.8%), z = 13.9, p ≈ 5e-44.
+**Decision:** textbook **better-than-average effect** — statistically impossible
+for 94% to be above average; illusory superiority at scale.
+
+# Reproducibility & caveats
+
+| Q | Data provenance |
+|---|---|
+| Q1 | Published counts (Harris/ASM 2005) — exact |
+| Q2 | Reconstructed from published percentages; Newsday n=1373 unverified vs primary source |
+| Q3 | Calibrated simulation (raw per-male data never published) |
+| Q4 | Seeded rescale to published mean±sem; p-values approximate paper's |
+| Q5 | 94% headline published; n=250 assumed |
+
+All reconstruction assumptions are documented in each script's docstring and
+results JSON. Analyses use numpy/scipy/pandas with fixed seeds; the Lock⁵-spirit
+randomization/bootstrap tests used 100,000 replicates on Kaggle.

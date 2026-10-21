@@ -1,3 +1,13 @@
+# ---- Kaggle self-containment shim (auto-inserted by build_kaggle_queue.py) ----
+import pathlib as _pl
+_os_cwd = _pl.Path.cwd()
+(_os_cwd / "data" / "phase2").mkdir(parents=True, exist_ok=True)
+(_os_cwd / "scripts" / "phase2" / "out").mkdir(parents=True, exist_ok=True)
+(_os_cwd / "data" / "phase2" / "q2_turnback.csv").write_text('# data/phase2/q2_turnback.csv\n# Lock5 Phase 2, Q2: "If parents could turn back time, would they still choose to have children?"\n#\n# Study: Ann Landers advice-column survey (1976) contrasted with random-sample follow-ups.\n# Book citation: Lock, Lock, Lock, Lock & Lock (2021), "Statistics: Unlocking the Power of\n#   Data", 3rd ed., Wiley — Section 1.2, Data 1.4 (p.25), Examples 1.19-1.20 (pp.25-26),\n#   Exercise 1.57 "Do Parents Regret Having Children?" (p.28). The question appears in the\n#   Chapter 1 opener list (p.3).\n#\n# Sources for counts:\n#   - Ann Landers column (1976): voluntary-response poll of column readers,\n#     "over 10,000 responses", 30% answered "Yes" (Data 1.4, p.25).\n#     A second voluntary wave published in Good Housekeeping gave 95% "Yes" (n not reported,\n#     excluded here).\n#   - Newsday (June 13, 1976): nationwide simple random sample of US parents, n = 1373,\n#     91% said "Yes" (sample size documented in STA 321 course notes, Univ. of Louisville,\n#     http://polytopes.net/courses/STA321S16/STA321_10.pdf; study date in Caplan,\n#     EconLog, Feb 23 2009, https://www.econlib.org/archives/2009/02/parents_and_buy.html).\n#   - Kansas City Star (1976): random sample of Kansas City parents, 94% said "Yes"\n#     (Lock5 Exercise 1.57); poll n = 409 per Ann Landers\' follow-up column\n#     (Royal Gazette reprint, https://bnl.contentdm.oclc.org/digital/collection/BermudaNP17/id/73273/).\n#\n# No public microdata exists for any of these polls. Counts below are documented\n# reconstructions from the published percentages (nearest-integer rounding):\n#   landers_1976:  30% of 10,000  -> 3000 yes / 7000 no  (book: "over 10,000" responses)\n#   newsday_1976:  91% of 1373    -> 1250 yes / 123 no   (1250/1373 = 91.04%)\n#   kc_star_1976:  94% of 409     -> 384 yes / 25 no     (384/409 = 93.89%)\n#\n# Columns: study = source label, year, method = sampling method,\n#          population = sampled population, response = answer to\n#          "If you had it to do over again, would you have children?", count = respondents.\nstudy,year,method,population,response,count\nlanders_1976,1976,volunteer_column,us_column_readers,yes,3000\nlanders_1976,1976,volunteer_column,us_column_readers,no,7000\nnewsday_1976,1976,random_sample,us_parents,yes,1250\nnewsday_1976,1976,random_sample,us_parents,no,123\nkc_star_1976,1976,random_sample,kansas_city_parents,yes,384\nkc_star_1976,1976,random_sample,kansas_city_parents,no,25\n')
+import os as _os
+_os.chdir(_os_cwd)
+REPO = _os_cwd  # overridden for Kaggle (original assignment below is ignored)
+# ---- end shim ----
 # If parents could turn back time, would they still choose to have children?
 # Ann Landers (1976) voluntary-response column poll vs random-sample follow-ups
 # (Newsday 1976 nationwide SRS of parents; Kansas City Star 1976 random sample).
@@ -10,7 +20,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = _os_cwd  # Kaggle override
 DATA = ROOT / "data" / "phase2" / "q2_turnback.csv"
 OUT = ROOT / "scripts" / "phase2" / "out" / "q2_results.json"
 

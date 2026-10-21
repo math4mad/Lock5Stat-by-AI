@@ -11,6 +11,8 @@ website:
         text: "Penguin Tagging"
       - href: pheromones.qmd
         text: "Pheromones"
+      - href: phase2_results.qmd
+        text: "Phase 2 Results"
 
 format:
   html:

@@ -1,3 +1,13 @@
+# ---- Kaggle self-containment shim (auto-inserted by build_kaggle_queue.py) ----
+import pathlib as _pl
+_os_cwd = _pl.Path.cwd()
+(_os_cwd / "data" / "phase2").mkdir(parents=True, exist_ok=True)
+(_os_cwd / "scripts" / "phase2" / "out").mkdir(parents=True, exist_ok=True)
+(_os_cwd / "data" / "phase2" / "q3_spider.csv").write_text('male_id,personality,play_bouts,kept_female\n1,aggressive,8,0\n2,aggressive,3,0\n3,aggressive,3,1\n4,aggressive,5,0\n5,aggressive,3,1\n6,aggressive,2,0\n7,aggressive,5,0\n8,aggressive,5,0\n9,aggressive,4,1\n10,aggressive,7,0\n11,aggressive,7,1\n12,aggressive,9,1\n13,aggressive,3,1\n14,aggressive,8,1\n15,aggressive,3,0\n16,aggressive,3,1\n17,aggressive,4,0\n18,aggressive,7,0\n19,aggressive,5,0\n20,aggressive,3,1\n21,aggressive,2,0\n22,aggressive,6,0\n23,aggressive,5,0\n24,docile,5,0\n25,docile,5,0\n26,docile,4,0\n27,docile,2,1\n28,docile,3,0\n29,docile,2,0\n30,docile,6,0\n31,docile,4,0\n32,docile,1,0\n33,docile,7,0\n34,docile,5,0\n35,docile,5,0\n36,docile,1,1\n37,docile,2,1\n38,docile,2,1\n39,docile,4,0\n40,docile,6,0\n41,docile,3,0\n42,docile,2,0\n43,docile,8,0\n44,docile,3,0\n45,docile,4,0\n')
+import os as _os
+_os.chdir(_os_cwd)
+REPO = _os_cwd  # overridden for Kaggle (original assignment below is ignored)
+# ---- end shim ----
 # Q3 (Phase 2): Why do adolescent spiders engage in foreplay?
 #
 # Study: Pruitt, J.N., Burghardt, G.M. & Riechert, S.E. (2012).
@@ -37,7 +47,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = _os_cwd  # Kaggle override
 CSV = ROOT / "data" / "phase2" / "q3_spider.csv"
 OUT = ROOT / "scripts" / "phase2" / "out" / "q3_results.json"
 NPERM = 100_000

@@ -1,0 +1,63 @@
+[{"stream_name":"stdout","time":4.273586996,"data":"Question: If parents could turn back time, would they still choose to have children?\n"}
+,{"stream_name":"stdout","time":4.273645418,"data":"Survey item: \"If you had it to do over again, would you have children?\"\n"}
+,{"stream_name":"stdout","time":4.273651048,"data":"\n"}
+,{"stream_name":"stdout","time":4.273654346,"data":"Reconstructed counts (data/phase2/q2_turnback.csv):\n"}
+,{"stream_name":"stdout","time":4.282701791,"data":"response       yes    no\n"}
+,{"stream_name":"stdout","time":4.282737745,"data":"study                   \n"}
+,{"stream_name":"stdout","time":4.282743757,"data":"kc_star_1976   384    25\n"}
+,{"stream_name":"stdout","time":4.282748665,"data":"landers_1976  3000  7000\n"}
+,{"stream_name":"stdout","time":4.282751724,"data":"newsday_1976  1250   123 \n"}
+,{"stream_name":"stdout","time":4.2827548570000005,"data":"\n"}
+,{"stream_name":"stdout","time":4.328858111,"data":"--- Kansas City Star random sample (KC parents)\n"}
+,{"stream_name":"stdout","time":4.328892948,"data":"    'Yes': 384/409 = 0.939\n"}
+,{"stream_name":"stdout","time":4.328899119,"data":"    95% CI (Wald):        (0.9157, 0.9621)\n"}
+,{"stream_name":"stdout","time":4.328904124,"data":"    95% CI (bootstrap):   (0.9144, 0.9609)\n"}
+,{"stream_name":"stdout","time":4.32890944,"data":"    Test H0 p=0.5: z=17.751, normal p=1.68e-70, randomization p=0.00e+00 (100000 shuffles)\n"}
+,{"stream_name":"stdout","time":4.328912884,"data":"\n"}
+,{"stream_name":"stdout","time":4.344554243,"data":"--- Ann Landers column (voluntary response)\n"}
+,{"stream_name":"stdout","time":4.344599595,"data":"    'Yes': 3000/10000 = 0.300\n"}
+,{"stream_name":"stdout","time":4.344605425,"data":"    95% CI (Wald):        (0.2910, 0.3090)\n"}
+,{"stream_name":"stdout","time":4.344609961,"data":"    95% CI (bootstrap):   (0.2910, 0.3090)\n"}
+,{"stream_name":"stdout","time":4.344614244,"data":"    Test H0 p=0.5: z=-40.000, normal p=0.00e+00, randomization p=0.00e+00 (100000 shuffles)\n"}
+,{"stream_name":"stdout","time":4.344619079,"data":"\n"}
+,{"stream_name":"stdout","time":4.365084329,"data":"--- Newsday nationwide random sample (US parents)\n"}
+,{"stream_name":"stdout","time":4.365126396,"data":"    'Yes': 1250/1373 = 0.910\n"}
+,{"stream_name":"stdout","time":4.365133109,"data":"    95% CI (Wald):        (0.8953, 0.9255)\n"}
+,{"stream_name":"stdout","time":4.365138306,"data":"    95% CI (bootstrap):   (0.8951, 0.9250)\n"}
+,{"stream_name":"stdout","time":4.365142953,"data":"    Test H0 p=0.5: z=30.415, normal p=3.47e-203, randomization p=0.00e+00 (100000 shuffles)\n"}
+,{"stream_name":"stdout","time":4.365147991,"data":"\n"}
+,{"stream_name":"stdout","time":4.365152338,"data":"--- Two-proportion comparisons (difference 'Yes' rate)\n"}
+,{"stream_name":"stdout","time":4.421784878,"data":"    Newsday nationwide random sample (US parents) (0.910) vs Ann Landers column (voluntary response) (0.300)\n"}
+,{"stream_name":"stdout","time":4.421823498,"data":"    diff = 0.6104\n"}
+,{"stream_name":"stdout","time":4.421829385,"data":"    95% CI (Wald):      (0.5928, 0.6280)\n"}
+,{"stream_name":"stdout","time":4.421834203,"data":"    95% CI (bootstrap): (0.5926, 0.6279)\n"}
+,{"stream_name":"stdout","time":4.421838847,"data":"    z=43.840, normal p=0.00e+00, randomization p=0.00e+00, Fisher exact p=0.00e+00\n"}
+,{"stream_name":"stdout","time":4.421843493,"data":"\n"}
+,{"stream_name":"stdout","time":4.487097372,"data":"    Kansas City Star random sample (KC parents) (0.939) vs Ann Landers column (voluntary response) (0.300)\n"}
+,{"stream_name":"stdout","time":4.487135586,"data":"    diff = 0.6389\n"}
+,{"stream_name":"stdout","time":4.487160468,"data":"    95% CI (Wald):      (0.6140, 0.6638)\n"}
+,{"stream_name":"stdout","time":4.487165901,"data":"    95% CI (bootstrap): (0.6131, 0.6627)\n"}
+,{"stream_name":"stdout","time":4.487170711,"data":"    z=27.036, normal p=5.57e-161, randomization p=0.00e+00, Fisher exact p=6.76e-159\n"}
+,{"stream_name":"stdout","time":4.487175258,"data":"\n"}
+,{"stream_name":"stdout","time":4.551256059,"data":"    Kansas City Star random sample (KC parents) (0.939) vs Newsday nationwide random sample (US parents) (0.910)\n"}
+,{"stream_name":"stdout","time":4.551291423,"data":"    diff = 0.0285\n"}
+,{"stream_name":"stdout","time":4.551297652,"data":"    95% CI (Wald):      (0.0008, 0.0562)\n"}
+,{"stream_name":"stdout","time":4.551302695,"data":"    95% CI (bootstrap): (0.0004, 0.0553)\n"}
+,{"stream_name":"stdout","time":4.551307359,"data":"    z=1.831, normal p=6.71e-02, randomization p=8.13e-02, Fisher exact p=8.21e-02\n"}
+,{"stream_name":"stdout","time":4.551312276,"data":"\n"}
+,{"stream_name":"stdout","time":4.551316626,"data":"Conclusion:\n"}
+,{"stream_name":"stdout","time":4.551321061,"data":"  The Ann Landers voluntary poll (30% 'Yes') disagrees dramatically with both\n"}
+,{"stream_name":"stdout","time":4.551325685,"data":"  random samples (91% and 94% 'Yes'); every comparison above is significant at\n"}
+,{"stream_name":"stdout","time":4.551330065,"data":"  any conventional level, and the one-proportion tests reject p=0.5 outright.\n"}
+,{"stream_name":"stdout","time":4.551334973,"data":"  Parents overwhelmingly would choose to have children again -- the famous 70%\n"}
+,{"stream_name":"stdout","time":4.551339749,"data":"  'regret' figure is a voluntary-response artifact, exactly the lesson of Lock5\n"}
+,{"stream_name":"stdout","time":4.5513445489999995,"data":"  Section 1.2 (Data 1.4 / Examples 1.19-1.20 / Exercise 1.57).\n"}
+,{"stream_name":"stdout","time":4.551842452,"data":"\n"}
+,{"stream_name":"stdout","time":4.551867409,"data":"Saved results to /kaggle/working/scripts/phase2/out/q2_results.json\n"}
+,{"stream_name":"stderr","time":7.745245448,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":7.7452800459999995,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":8.141282762,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":8.141313719,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":9.943943888,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":11.304744582,"data":"[NbConvertApp] Writing 325023 bytes to __results__.html\n"}
+]
