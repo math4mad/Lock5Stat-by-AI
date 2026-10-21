@@ -1,0 +1,461 @@
+{
+  "question": "How broadly do experiences of parents affect their future children?",
+  "lock5_reference": "Statistics: Unlocking the Power of Data (Lock5), 3rd ed., Ex. 1.17 'Trans-Generational Effects of Diet'",
+  "study": {
+    "citation": "Ng, S.-F., Lin, R.C.Y., Laybutt, D.R., Barres, R., Owens, J.A. & Morris, M.J. (2010). Chronic high-fat diet in fathers programs beta-cell dysfunction in female rat offspring. Nature 467(7318), 963-966. doi:10.1038/nature09491",
+    "design": "Controlled experiment: founder male rats randomized to high-fat vs control diet, mated to chow-fed females; all F1 daughters weaned onto control diet, outcomes at 6-12 weeks (quasi-experimental intergenerational design)."
+  },
+  "dataset": {
+    "path": "/Users/mac/Programming/Trae-Projects/Lock5Stat-by-AI/data/phase2/q4_intergen.csv",
+    "n_rows": 34,
+    "provenance": "No Lock5 dataset exists for this study (lock5stat.com/datapage3e.html checked). Individual-level reconstruction of Ng et al. 2010 group summaries (mean +/- s.e.m., n), seeded (rng seed 2026) and exactly rescaled to published group mean/SD; education use only.",
+    "columns": {
+      "cohort": "father | offspring",
+      "father_diet": "Control | HighFat",
+      "rat_id": "animal identifier",
+      "glucose_peak_6wk_mM/insulin_peak_6wk_ng_ml/insulinogenic_index": "6-week glucose tolerance test, n=8 per group (Fig. 2d,e)"
+    }
+  },
+  "published_group_summaries": {
+    "father": {
+      "body_weight_g": {
+        "Control": [
+          550.0,
+          13.0,
+          8
+        ],
+        "HighFat": [
+          705.0,
+          17.0,
+          9
+        ]
+      },
+      "fasting_glucose_mM": {
+        "Control": [
+          4.71,
+          0.08,
+          8
+        ],
+        "HighFat": [
+          5.43,
+          0.16,
+          9
+        ]
+      },
+      "fasting_insulin_ng_ml": {
+        "Control": [
+          0.18,
+          0.02,
+          8
+        ],
+        "HighFat": [
+          0.47,
+          0.07,
+          9
+        ]
+      },
+      "homa_ir": {
+        "Control": [
+          0.88,
+          0.11,
+          8
+        ],
+        "HighFat": [
+          2.29,
+          0.18,
+          9
+        ]
+      }
+    },
+    "offspring": {
+      "day1_weight_g": {
+        "Control": [
+          7.08,
+          0.26,
+          8
+        ],
+        "HighFat": [
+          6.61,
+          0.15,
+          9
+        ]
+      },
+      "body_weight_12wk_g": {
+        "Control": [
+          253.0,
+          8.0,
+          8
+        ],
+        "HighFat": [
+          260.0,
+          5.0,
+          9
+        ]
+      },
+      "glucose_peak_6wk_mM": {
+        "Control": [
+          12.3,
+          0.4,
+          8
+        ],
+        "HighFat": [
+          13.6,
+          0.3,
+          8
+        ]
+      },
+      "insulin_peak_6wk_ng_ml": {
+        "Control": [
+          2.7,
+          0.4,
+          8
+        ],
+        "HighFat": [
+          1.4,
+          0.3,
+          8
+        ]
+      },
+      "insulinogenic_index": {
+        "Control": [
+          86.8,
+          7.3,
+          8
+        ],
+        "HighFat": [
+          38.7,
+          5.8,
+          8
+        ]
+      }
+    }
+  },
+  "fathers_manipulation_check": {
+    "body_weight_g": {
+      "n_control": 8,
+      "n_highfat": 9,
+      "mean_control": 550.0,
+      "mean_highfat": 704.9999999999999,
+      "diff_control_minus_highfat": -154.9999999999999,
+      "cohens_d": -3.4502993022115382,
+      "welch_t": -7.242674359497961,
+      "welch_df": 14.446289976449178,
+      "p_welch_two_sided": 3.5645041053570493e-06,
+      "p_welch_greater": 0.9999982177479473,
+      "p_welch_less": 1.7822520526785246e-06,
+      "p_randomization_two_sided": 5e-05,
+      "p_randomization_greater": 0.99995,
+      "bootstrap95CI_diff": [
+        -195.08030145984938,
+        -117.82332847224377
+      ],
+      "paper_reported_p": "<0.0005",
+      "label": {
+        "Control": [
+          550.0,
+          13.0,
+          8
+        ],
+        "HighFat": [
+          705.0,
+          17.0,
+          9
+        ]
+      }
+    },
+    "fasting_glucose_mM": {
+      "n_control": 8,
+      "n_highfat": 9,
+      "mean_control": 4.71,
+      "mean_highfat": 5.429999999999999,
+      "diff_control_minus_highfat": -0.7199999999999989,
+      "cohens_d": -1.8793554065652498,
+      "welch_t": -4.024922359499614,
+      "welch_df": 11.66666666666667,
+      "p_welch_two_sided": 0.001779993971945803,
+      "p_welch_greater": 0.9991100030140271,
+      "p_welch_less": 0.0008899969859729015,
+      "p_randomization_two_sided": 0.00322,
+      "p_randomization_greater": 0.99859,
+      "bootstrap95CI_diff": [
+        -1.0435915804547595,
+        -0.38072974149560246
+      ],
+      "paper_reported_p": "0.002",
+      "label": {
+        "Control": [
+          4.71,
+          0.08,
+          8
+        ],
+        "HighFat": [
+          5.43,
+          0.16,
+          9
+        ]
+      }
+    },
+    "fasting_insulin_ng_ml": {
+      "n_control": 8,
+      "n_highfat": 9,
+      "mean_control": 0.18,
+      "mean_highfat": 0.47000000000000003,
+      "diff_control_minus_highfat": -0.29000000000000004,
+      "cohens_d": -1.8336321395055546,
+      "welch_t": -3.9834563545119805,
+      "welch_df": 9.288692057868321,
+      "p_welch_two_sided": 0.002994206248759826,
+      "p_welch_greater": 0.9985028968756201,
+      "p_welch_less": 0.001497103124379913,
+      "p_randomization_two_sided": 0.00261,
+      "p_randomization_greater": 0.99891,
+      "bootstrap95CI_diff": [
+        -0.41960697934947316,
+        -0.15371710571934644
+      ],
+      "paper_reported_p": "0.002",
+      "label": {
+        "Control": [
+          0.18,
+          0.02,
+          8
+        ],
+        "HighFat": [
+          0.47,
+          0.07,
+          9
+        ]
+      }
+    },
+    "homa_ir": {
+      "n_control": 8,
+      "n_highfat": 9,
+      "mean_control": 0.88,
+      "mean_highfat": 2.29,
+      "diff_control_minus_highfat": -1.4100000000000001,
+      "cohens_d": -3.1474050660843282,
+      "welch_t": -6.684041030273681,
+      "welch_df": 13.016338795248608,
+      "p_welch_two_sided": 1.497588219879968e-05,
+      "p_welch_greater": 0.9999925120589006,
+      "p_welch_less": 7.48794109939984e-06,
+      "p_randomization_two_sided": 5e-05,
+      "p_randomization_greater": 0.99995,
+      "bootstrap95CI_diff": [
+        -1.8214933684493753,
+        -1.045168818105392
+      ],
+      "paper_reported_p": "<0.0005",
+      "label": {
+        "Control": [
+          0.88,
+          0.11,
+          8
+        ],
+        "HighFat": [
+          2.29,
+          0.18,
+          9
+        ]
+      }
+    }
+  },
+  "offspring_outcomes": {
+    "day1_weight_g": {
+      "n_control": 8,
+      "n_highfat": 9,
+      "mean_control": 7.08,
+      "mean_highfat": 6.610000000000001,
+      "diff_control_minus_highfat": 0.46999999999999886,
+      "cohens_d": 0.7829274761332706,
+      "welch_t": 1.5657970209340044,
+      "welch_df": 11.336354475593755,
+      "p_welch_two_sided": 0.14486745100378012,
+      "p_welch_greater": 0.07243372550189006,
+      "p_welch_less": 0.9275662744981099,
+      "p_randomization_two_sided": 0.12773,
+      "p_randomization_greater": 0.06507,
+      "bootstrap95CI_diff": [
+        -0.07404445208236826,
+        1.0376089243899014
+      ],
+      "paper_reported_p": "0.07",
+      "label": {
+        "Control": [
+          7.08,
+          0.26,
+          8
+        ],
+        "HighFat": [
+          6.61,
+          0.15,
+          9
+        ]
+      }
+    },
+    "body_weight_12wk_g": {
+      "n_control": 8,
+      "n_highfat": 9,
+      "mean_control": 253.0,
+      "mean_highfat": 260.0,
+      "diff_control_minus_highfat": -7.0,
+      "cohens_d": -0.36948017779450765,
+      "welch_t": -0.741998516004452,
+      "welch_df": 11.942384836981391,
+      "p_welch_two_sided": 0.47242968276030656,
+      "p_welch_greater": 0.7637851586198467,
+      "p_welch_less": 0.23621484138015328,
+      "p_randomization_two_sided": 0.4554,
+      "p_randomization_greater": 0.77142,
+      "bootstrap95CI_diff": [
+        -24.412133033460556,
+        10.668042101135708
+      ],
+      "paper_reported_p": "0.92",
+      "label": {
+        "Control": [
+          253.0,
+          8.0,
+          8
+        ],
+        "HighFat": [
+          260.0,
+          5.0,
+          9
+        ]
+      }
+    },
+    "glucose_peak_6wk_mM": {
+      "n_control": 8,
+      "n_highfat": 8,
+      "mean_control": 12.3,
+      "mean_highfat": 13.6,
+      "diff_control_minus_highfat": -1.299999999999999,
+      "cohens_d": -1.2999999999999987,
+      "welch_t": -2.5999999999999974,
+      "welch_df": 12.982195845697335,
+      "p_welch_two_sided": 0.02202589079660218,
+      "p_welch_greater": 0.9889870546016989,
+      "p_welch_less": 0.01101294539830109,
+      "p_randomization_two_sided": 0.0233,
+      "p_randomization_greater": 0.98843,
+      "bootstrap95CI_diff": [
+        -2.2009835972207443,
+        -0.37941392610752683
+      ],
+      "paper_reported_p": "0.043",
+      "label": {
+        "Control": [
+          12.3,
+          0.4,
+          8
+        ],
+        "HighFat": [
+          13.6,
+          0.3,
+          8
+        ]
+      }
+    },
+    "insulin_peak_6wk_ng_ml": {
+      "n_control": 8,
+      "n_highfat": 8,
+      "mean_control": 2.7,
+      "mean_highfat": 1.4,
+      "diff_control_minus_highfat": 1.3000000000000003,
+      "cohens_d": 1.3000000000000003,
+      "welch_t": 2.6000000000000005,
+      "welch_df": 12.982195845697325,
+      "p_welch_two_sided": 0.02202589079660206,
+      "p_welch_greater": 0.01101294539830103,
+      "p_welch_less": 0.988987054601699,
+      "p_randomization_two_sided": 0.02466,
+      "p_randomization_greater": 0.01208,
+      "bootstrap95CI_diff": [
+        0.33262408774571084,
+        2.171120521951651
+      ],
+      "paper_reported_p": "0.016",
+      "label": {
+        "Control": [
+          2.7,
+          0.4,
+          8
+        ],
+        "HighFat": [
+          1.4,
+          0.3,
+          8
+        ]
+      }
+    },
+    "insulinogenic_index": {
+      "n_control": 8,
+      "n_highfat": 8,
+      "mean_control": 86.8,
+      "mean_highfat": 38.7,
+      "diff_control_minus_highfat": 48.099999999999994,
+      "cohens_d": 2.579468572346889,
+      "welch_t": 5.158937144693778,
+      "welch_df": 13.319432104007134,
+      "p_welch_two_sided": 0.00017007120680819805,
+      "p_welch_greater": 8.503560340409903e-05,
+      "p_welch_less": 0.9999149643965959,
+      "p_randomization_two_sided": 0.00042,
+      "p_randomization_greater": 0.00014,
+      "bootstrap95CI_diff": [
+        30.594789302874027,
+        64.98909745265858
+      ],
+      "paper_reported_p": "0.004",
+      "label": {
+        "Control": [
+          86.8,
+          7.3,
+          8
+        ],
+        "HighFat": [
+          38.7,
+          5.8,
+          8
+        ]
+      }
+    }
+  },
+  "offspring_islet_gene_expression_counts": {
+    "source": "Ng et al. 2010, islet microarray of female offspring: 77 genes altered (P < 0.001)",
+    "n_genes": 77,
+    "n_upregulated": 21,
+    "n_downregulated": 56,
+    "prop_downregulated": 0.7272727272727273,
+    "two_prop_z_vs_50pct": 3.9886201760873288,
+    "p_two_prop_z_two_sided": 6.645873265780829e-05,
+    "chi_square_gof": 15.909090909090908,
+    "p_chi_square_gof": 6.64587326578086e-05,
+    "p_binomial_two_sided": 8.215921903007378e-05,
+    "bootstrap95CI_prop_down": [
+      0.6233766233766234,
+      0.8181818181818182
+    ]
+  },
+  "offspring_islet_morphology_descriptive": {
+    "source": "Ng et al. 2010 Table 1 (n = 7 pancreases per group)",
+    "total_islet_area_pct": {
+      "Control": 1.17,
+      "HighFat": 0.9,
+      "paper_p": "0.040"
+    },
+    "pct_large_islets": {
+      "Control": 18.14,
+      "HighFat": 14.84,
+      "paper_p": "0.031"
+    },
+    "pct_small_islets": {
+      "Control": 71.81,
+      "HighFat": 76.08,
+      "paper_p": "0.034"
+    },
+    "note": "paper tests compare animals (n=7/group); islet-level counts would be pseudoreplicated, so no islet-level chi-square is reported"
+  },
+  "conclusion": "Fathers on the high-fat diet became obese and insulin resistant (HOMA-IR 2.29 vs 0.88, p_welch = 1.50e-05). Their daughters - despite eating a control diet and having normal body weight (12-wk weight p = 0.47) - showed halved glucose-stimulated insulin secretion (insulinogenic index 38.7 vs 86.8, diff +48.1, 95% bootstrap CI [30.6, 65.0], p_rand = 0.0004) and a higher 6-week glucose peak (13.6 vs 12.3 mM, p_rand = 0.023). Expression changes were broad: 56/77 altered islet genes down-regulated (z = 3.99, p = 6.6e-05). Paternal pre-conception diet measurably reprograms daughters' metabolic health - experiences of parents do affect future children."
+}

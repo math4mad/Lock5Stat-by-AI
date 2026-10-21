@@ -1,0 +1,98 @@
+{
+  "question": "What proportion of people using a public restroom wash their hands?",
+  "provenance": {
+    "study": "Harris Interactive for the American Society for Microbiology (ASM) and the Soap and Detergent Association (SDA)",
+    "report": "A Survey of Hand Washing Behavior (2005 Findings), September 2005",
+    "design": "Observational: observers recorded handwashing by 6,336 adults in public restrooms at six major U.S. public attractions, Aug 18-21, 2005",
+    "data_source": "Constructed CSV from published per-venue/per-sex counts (n and successes); no Lock5 dataset distributed for this study (3e/4e data pages checked)",
+    "note": "Press fact sheet headline says 83%; the published counts give 82.0%"
+  },
+  "data": {
+    "n": 6336,
+    "washed": 5195,
+    "not_washed": 1141,
+    "source_csv": "data/phase2/q1_handwashing.csv"
+  },
+  "point_estimate": {
+    "proportion": 0.8199179292929293,
+    "se_wald": 0.004827395100133963
+  },
+  "ci_95_wald": [
+    0.8104564087575216,
+    0.829379449828337
+  ],
+  "ci_95_bootstrap_percentile": [
+    0.8104482323232324,
+    0.8293876262626263
+  ],
+  "tests": {
+    "majority": {
+      "null": 0.5,
+      "alternative": "greater",
+      "z": 50.93029128826057,
+      "p_normal": 0.0,
+      "p_exact_binomial": 0.0,
+      "p_randomization": 0.0
+    },
+    "vs_self_report": {
+      "null": 0.91,
+      "alternative": "less",
+      "self_report_context": "91% of U.S. adults say they always wash after using a public restroom (telephone survey, same study)",
+      "z": -25.055553094355652,
+      "p_normal": 7.593835948950375e-139,
+      "p_randomization": 0.0
+    }
+  },
+  "methods": {
+    "n_bootstrap": 100000,
+    "n_randomization": 100000,
+    "seed": 2026,
+    "engine": "numpy/scipy/pandas"
+  },
+  "breakdown": {
+    "by_sex": {
+      "female": {
+        "n": 3130,
+        "washed": 2802,
+        "proportion": 0.8952076677316294
+      },
+      "male": {
+        "n": 3206,
+        "washed": 2393,
+        "proportion": 0.7464129756706176
+      }
+    },
+    "by_venue": {
+      "Ferry Terminal Farmers Market (San Francisco)": {
+        "n": 1736,
+        "washed": 1521,
+        "proportion": 0.8761520737327189
+      },
+      "Grand Central Station (New York City)": {
+        "n": 871,
+        "washed": 684,
+        "proportion": 0.7853042479908151
+      },
+      "Museum of Science and Industry (Chicago)": {
+        "n": 755,
+        "washed": 657,
+        "proportion": 0.8701986754966887
+      },
+      "Penn Station (New York City)": {
+        "n": 632,
+        "washed": 486,
+        "proportion": 0.7689873417721519
+      },
+      "Shedd Aquarium (Chicago)": {
+        "n": 754,
+        "washed": 672,
+        "proportion": 0.8912466843501327
+      },
+      "Turner Field (Atlanta)": {
+        "n": 1588,
+        "washed": 1175,
+        "proportion": 0.7399244332493703
+      }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "id": "lock5stat-by-ai/lock5-phase2-q2-turnback",
+  "title": "Lock5 Phase2 Q2 Turnback",
+  "code_file": "q2_turnback.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": "true",
+  "enable_gpu": "true",
+  "enable_internet": "true",
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": []
+}

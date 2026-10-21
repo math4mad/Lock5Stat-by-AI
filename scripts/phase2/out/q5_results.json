@@ -1,0 +1,26 @@
+{
+  "question": "What percent of college professors consider themselves \"above-average\" teachers?",
+  "citation": "Cross, K. P. (1977). \"Not can, but will college teaching be improved?\" New Directions for Higher Education, 1977(17), 1-15. DOI 10.1002/he.36919771703",
+  "data": {
+    "file": "data/phase2/q5_aboveavg.csv",
+    "provenance": "Reconstructed counts from Cross (1977); n=250 is a documented reconstruction assumption (exact n not published); 235/250 = 94.0% matches the cited headline.",
+    "x_above_average": 235,
+    "n_total": 250
+  },
+  "p_hat": 0.94,
+  "wald_ci_95": [
+    0.9105608260985468,
+    0.9694391739014531
+  ],
+  "z_test_vs_50": {
+    "z": 13.914021704740868,
+    "p_two_sided": 5.206747722174115e-44
+  },
+  "exact_binomial_p_two_sided": 5.476153263411536e-52,
+  "bootstrap_ci_95": [
+    0.908,
+    0.968
+  ],
+  "randomization_p_two_sided": 9.99990000099999e-06,
+  "conclusion": "94% of professors rated themselves above average, far above the 50% null; all methods (z-test, exact binomial, randomization) give p << 0.001. Strong better-than-average effect; CI width is illustrative due to assumed n."
+}

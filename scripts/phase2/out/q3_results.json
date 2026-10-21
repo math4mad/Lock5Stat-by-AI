@@ -1,0 +1,75 @@
+{
+  "question": "Why do adolescent spiders engage in foreplay?",
+  "paper": {
+    "citation": "Pruitt, J.N., Burghardt, G.M. & Riechert, S.E. (2012). Non-Conceptive Sexual Behavior in Spiders: A Form of Play Associated with Body Condition, Personality Type, and Male Intrasexual Selection. Ethology 118(1), 33-40. doi:10.1111/j.1439-0310.2011.01980.x",
+    "companion": "Pruitt & Riechert (2011). Nonconceptive sexual experience diminishes individuals' latency to mate and increases maternal investment. Animal Behaviour 81(4), 789-794. doi:10.1016/j.anbehav.2011.01.011"
+  },
+  "dataset": {
+    "path": "data/phase2/q3_spider.csv",
+    "provenance": "Reconstructed calibrated simulation (numpy seed=41) of the 45-male staged male-male contest experiment; no per-male data archived, no spider dataset on lock5stat.com 3e/4e lists. Calibrated to Table 3 logistic chi-square magnitudes; see script docstring.",
+    "n": 45,
+    "columns": [
+      "male_id",
+      "personality",
+      "play_bouts",
+      "kept_female"
+    ],
+    "dichotomization": "high play = play_bouts > median (4)"
+  },
+  "groups": {
+    "high_play": {
+      "kept": 3,
+      "n": 20,
+      "prop": 0.15
+    },
+    "low_play": {
+      "kept": 10,
+      "n": 25,
+      "prop": 0.4
+    },
+    "diff": -0.25,
+    "by_personality": {
+      "aggressive": {
+        "kept": 9,
+        "n": 23,
+        "prop": 0.391304347826087
+      },
+      "docile": {
+        "kept": 4,
+        "n": 22,
+        "prop": 0.18181818181818182
+      }
+    }
+  },
+  "tests": {
+    "two_proportion_z": {
+      "z": -1.8385887669204755,
+      "p_one_sided": 0.03298784736319726,
+      "p_two_sided": 0.06597569472639452,
+      "alternative": "high play keeps female at lower rate"
+    },
+    "chi_square": {
+      "chi2": 3.3804086538461546,
+      "df": 1,
+      "p": 0.06597569472639447,
+      "odds_ratio": 0.2647058823529412,
+      "fisher_p_one_sided": 0.06413836249343907
+    },
+    "randomization": {
+      "n_permutations": 100000,
+      "p_one_sided": 0.06285
+    },
+    "bootstrap_ci95": {
+      "low": -0.5,
+      "high": 0.010000000000000009,
+      "n_resamples": 10000
+    }
+  },
+  "reconstruction_check": {
+    "lr_chi2_bouts": 9.285698777923265,
+    "paper_lr_chi2_bouts": 7.26,
+    "lr_chi2_personality": 13.890763812235466,
+    "paper_lr_chi2_personality": 15.91
+  },
+  "conclusion": "High-play males kept their female less often than low-play males (0.15 vs 0.40, diff = -0.25). Evidence is suggestive: two-proportion z one-sided p = 0.033, but the exact randomization test (p = 0.063) and the bootstrap CI (-0.50, 0.01) only marginally miss alpha = 0.05 at this sample size (n = 45). Foreplay in adolescent spiders is play with benefits (faster courtship, less female aggression, heavier egg cases - Pruitt & Riechert 2011) but for males it trades off against the stamina needed to defend the female from rival males (Pruitt et al. 2012): the paper's full logistic model finds a significant cost of play bouts (chi2 = 7.26, p = 0.007) alongside a personality effect (aggressive males win more, chi2 = 15.91)."
+}
