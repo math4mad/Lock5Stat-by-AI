@@ -1,0 +1,163 @@
+---
+title: "Is there a 'Sprinting Gene'?"
+subtitle: "ACTN3 R577X — Lock5 Phase 1 Workflow Test"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+format:
+  html:
+    theme: cosmo
+    toc: true
+---
+
+```{python}
+#| include: false
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy import stats
+from great_tables import GT
+
+sns.set_theme(style="whitegrid")
+rng = np.random.default_rng(2026)
+df = pd.read_csv("data/actn3_yang2003.csv")
+genotypes = ["RR", "RX", "XX"]
+tab = df.set_index("group").loc[["Sprint", "Control"]][genotypes].to_numpy()
+```
+
+# Question
+
+**Is there a "sprinting gene"?** The *α-actinin-3* gene (**ACTN3**) encodes a protein
+expressed in fast-twitch muscle fibers. The **R577X** polymorphism creates a premature
+stop codon: the **XX** genotype produces no functioning actinin-3 at all.
+
+Data: @yang2003 — genotype distributions for elite sprint athletes (n=107), endurance
+athletes (n=194), and controls (n=436). This is the same case study used in
+*Statistics: Unlocking the Power of Data* (Lock⁵).
+
+## Data
+
+```{python}
+#| echo: false
+GT(df).fmt_number(columns=["n", "RR", "RX", "XX"], decimals=0) \
+    .tab_header(title="ACTN3 R577X genotype counts (Yang et al. 2003)")
+```
+
+# Exploratory analysis
+
+```{python}
+#| echo: false
+#| fig-cap: "ACTN3 genotype distribution by group (proportions)"
+long = df.melt(id_vars=["group", "n"], value_vars=genotypes,
+               var_name="Genotype", value_name="count")
+long["prop"] = long["count"] / long["n"]
+fig, ax = plt.subplots(figsize=(7, 4))
+sns.barplot(data=long, x="Genotype", y="prop", hue="group", ax=ax)
+ax.set_ylabel("Proportion of group")
+plt.tight_layout()
+plt.show()
+```
+
+Elite sprinters show a markedly **lower proportion of the XX genotype** (5.6% vs
+18.3% in controls) and a **higher R-allele frequency** (72.0% vs 55.7%).
+
+# Hypothesis tests
+
+**H₀:** ACTN3 genotype distribution is the same for sprinters and controls
+**Hₐ:** distributions differ
+
+```{python}
+#| echo: false
+chi2, p_chi, dof, exp = stats.chi2_contingency(tab)
+print(f"Chi-square test of homogeneity: χ² = {chi2:.2f}, df = {dof}, p = {p_chi:.6f}")
+```
+
+## Randomization test (Lock5 approach)
+
+We simulate 100,000 shuffles of group labels under H₀ and recompute χ² each time:
+
+```{python}
+#| echo: false
+counts_geno = tab.sum(axis=0)
+geno_vec = np.concatenate([np.repeat("RR", counts_geno[0]),
+                           np.repeat("RX", counts_geno[1]),
+                           np.repeat("XX", counts_geno[2])])
+lab_vec = np.array(["Sprint"] * tab[0].sum() + ["Control"] * tab[1].sum())
+nperm = 100_000
+perm_stats = np.empty(nperm)
+for i in range(nperm):
+    g = geno_vec[rng.permutation(len(geno_vec))]
+    ct = np.array([[np.sum(g[lab_vec == "Sprint"] == geno) for geno in genotypes],
+                   [np.sum(g[lab_vec == "Control"] == geno) for geno in genotypes]])
+    perm_stats[i] = stats.chi2_contingency(ct)[0]
+p_perm = np.mean(perm_stats >= chi2)
+print(f"Permutation test p-value = {p_perm:.5f}")
+```
+
+```{python}
+#| echo: false
+#| fig-cap: "Randomization distribution of χ² under H₀"
+fig, ax = plt.subplots(figsize=(7, 4))
+ax.hist(perm_stats, bins=60, color="#7b9fc7", edgecolor="white")
+ax.axvline(chi2, color="crimson", lw=2,
+           label=f"observed χ² = {chi2:.2f}")
+ax.set_xlabel("χ² statistic"); ax.set_ylabel("Frequency"); ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+## Two-proportion test: XX genotype
+
+```{python}
+#| echo: false
+xx_s, n_s = tab[0, 2], tab[0].sum()
+xx_c, n_c = tab[1, 2], tab[1].sum()
+pooled = (xx_s + xx_c) / (n_s + n_c)
+se = np.sqrt(pooled * (1 - pooled) * (1 / n_s + 1 / n_c))
+z = (xx_s / n_s - xx_c / n_c) / se
+p_z = 2 * stats.norm.sf(abs(z))
+print(f"Sprinters XX: {xx_s}/{n_s} = {xx_s/n_s:.3f} vs Controls: {xx_c}/{n_c} = {xx_c/n_c:.3f}")
+print(f"z = {z:.3f}, p-value = {p_z:.5f}")
+```
+
+# Interval estimate: R-allele advantage
+
+Bootstrap 95% CI for the difference in R-allele frequency (sprint − control):
+
+```{python}
+#| echo: false
+#| fig-cap: "Bootstrap distribution of difference in R-allele frequency"
+sprint_alleles = np.array([1] * (2*tab[0,0] + tab[0,1]) + [0] * (2*tab[0,2] + tab[0,1]))
+ctrl_alleles  = np.array([1] * (2*tab[1,0] + tab[1,1]) + [0] * (2*tab[1,2] + tab[1,1]))
+boot = np.array([sprint_alleles[rng.integers(0, len(sprint_alleles), len(sprint_alleles))].mean()
+                 - ctrl_alleles[rng.integers(0, len(ctrl_alleles), len(ctrl_alleles))].mean()
+                 for _ in range(nperm)])
+ci = np.percentile(boot, [2.5, 97.5])
+print(f"95% CI: ({ci[0]:.3f}, {ci[1]:.3f})")
+fig, ax = plt.subplots(figsize=(7, 4))
+ax.hist(boot, bins=60, color="#8fbf8f", edgecolor="white")
+ax.axvline(ci[0], color="crimson", ls="--"); ax.axvline(ci[1], color="crimson", ls="--")
+ax.set_xlabel("p_R(sprint) − p_R(control)"); ax.set_ylabel("Frequency")
+plt.tight_layout()
+plt.show()
+```
+
+# Decision
+
+| Method | Result | p-value / CI |
+|---|---|---|
+| χ² homogeneity (Sprint vs Control) | χ² = 19.54, df = 2 | p < 0.0001 |
+| Randomization test (100k shuffles) | — | p < 0.0001 |
+| Two-proportion z (XX genotype) | z = −3.24 | p = 0.0012 |
+| Bootstrap 95% CI (R-allele diff) | — | (0.093, 0.231) |
+
+**Conclusion:** All three methods agree — reject H₀. Genotype distribution differs
+significantly between elite sprinters and controls. The XX (no-actinin-3) genotype is
+**under-represented** among elite sprinters (5.6% vs 18.3%), and sprinters carry the
+R allele at a rate ~16 percentage points higher than controls.
+
+**Statistical answer: yes — there is strong evidence for a "sprinting gene" association.**
+Caveats: observational data (association ≠ causation), modest sprinter sample size
+(only 6 XX sprinters), and elite athletic performance involves many genes and
+environmental factors.

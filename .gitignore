@@ -1,0 +1,4 @@
+.venv/
+*.html
+analysis_results.csv
+.quarto/
