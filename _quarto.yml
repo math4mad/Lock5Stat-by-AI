@@ -101,6 +101,16 @@ website:
             text: "Ch. 5 · Section 5.1"
           - href: chapters/ch05/s5-2.qmd
             text: "Ch. 5 · Section 5.2"
+          - href: chapters/ch06/s6-1.qmd
+            text: "Ch. 6 · Section 6.1"
+          - href: chapters/ch06/s6-2.qmd
+            text: "Ch. 6 · Section 6.2"
+          - href: chapters/ch06/s6-3.qmd
+            text: "Ch. 6 · Section 6.3"
+          - href: chapters/ch06/s6-4.qmd
+            text: "Ch. 6 · Section 6.4"
+          - href: chapters/ch06/s6-5.qmd
+            text: "Ch. 6 · Section 6.5"
 
 format:
   html:

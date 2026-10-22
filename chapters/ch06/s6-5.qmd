@@ -1,0 +1,942 @@
+---
+execute-dir: project
+title: "Chapter 6 · Section 6.5"
+subtitle: "Paired Difference in Means — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 6.5 pairs the samples up. When the two means being compared come from
+**matched pairs** — the same case measured twice (before/after), or cases
+deliberately matched (twins, husband–wife, neighboring students) — the
+two-separate-samples machinery is the wrong tool, because it treats
+person-to-person variability as if it were signal. Instead each pair is
+reduced to a single **difference** $d_i = x_1 - x_2$, and the $n_d$
+differences are analyzed with the familiar **one-sample $t$ tools**: a
+confidence interval
+$$\bar x_d \pm t^*\cdot\frac{s_d}{\sqrt{n_d}}$$
+for the mean difference $\mu_d = \mu_1 - \mu_2$, and the test statistic
+$$t=\frac{\bar x_d}{s_d/\sqrt{n_d}}$$
+with $n_d - 1$ degrees of freedom for $H_0\colon \mu_1 = \mu_2$. Pairing pays
+because much of the case-to-case variation cancels inside each pair, shrinking
+the standard error and tightening intervals. The skill-building decision
+(Exercises 6.264–6.269) is which analysis fits a design: **paired** when each
+unit in group 1 is linked to a unit in group 2 (same subject twice, matched
+pairs, twins), **two separate samples** when the groups are independent. Below
+we compute every interval and test with `scipy.stats` (`ttest_1samp` on the
+differences, or `ttest_rel` on the raw pairs), and, wherever the individual
+differences are available, we verify the $t$ answer with a **sign-flip
+randomization test** (10000 resamples, seed 2026): if $H_0\colon \mu_d = 0$ is
+true, each difference is equally likely to be $+d_i$ or $-d_i$. The exercises
+are from *Statistics: Unlocking the Power of Data* (Lock⁵, 3rd ed.,
+pp. 507–511): Skill Builders 6.256–6.259 build paired $t$ intervals,
+6.260–6.263 paired $t$ tests, and 6.264–6.269 the paired-vs-separate decision;
+the applied exercises 6.270–6.285 analyze real matched-pairs studies — tea and
+immune response, tears and testosterone, quiz pulse rates, story spoilers,
+babies' listening preferences, wrinkled hands, and quiz grades — ending with
+paired intervals for the `PASeniors` sleep data and `Cars2020` mileage data.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+from scipy import stats
+sns.set_theme(style="whitegrid")
+
+def t_ci(mean, sd, n, conf):
+    """t-confidence interval for a mean difference: mean ± t*·sd/√n."""
+    se = sd / np.sqrt(n)
+    tstar = stats.t.ppf(0.5 + conf / 2, n - 1)
+    me = tstar * se
+    return pd.Series({"Best estimate": round(float(mean), 3),
+                      "SE": round(float(se), 4),
+                      "t* (df = %d)" % (n - 1): round(float(tstar), 3),
+                      "Margin of error": round(float(me), 3),
+                      "%d%% CI" % round(100 * conf):
+                      "(%.3f, %.3f)" % (mean - me, mean + me)})
+
+def ttest_d(mean, sd, n, tail):
+    """One-sample t-test on paired differences: t = xd/(sd/√n), df = n−1."""
+    t = mean / (sd / np.sqrt(n))
+    df = n - 1
+    if tail == "right":
+        p = float(stats.t.sf(t, df))
+    elif tail == "left":
+        p = float(stats.t.cdf(t, df))
+    else:
+        p = float(2 * stats.t.sf(abs(t), df))
+    return pd.Series({"t-statistic": round(float(t), 3),
+                      "df": df,
+                      "p-value": round(p, 4) if p >= 1e-4 else float(f"{p:.2e}")})
+
+def signflip(d, tail, reps=10000, seed=2026):
+    """Sign-flip randomization for paired differences under H0: mu_d = 0.
+    Randomly reflect each difference and record the mean; returns (means, p)."""
+    r = np.random.default_rng(seed)
+    d = np.asarray(d, float)
+    obs = d.mean()
+    signs = r.choice([-1.0, 1.0], size=(reps, len(d)))
+    means = (signs * d).mean(axis=1)
+    if tail == "right":
+        p = (means >= obs).mean()
+    elif tail == "left":
+        p = (means <= obs).mean()
+    else:
+        p = (np.abs(means) >= abs(obs)).mean()
+    return means, float(p)
+
+def tail_plot(boots, observed, tail, xlabel, bins=40, figsize=(6, 3)):
+    """Histogram of a randomization distribution with the p-value tail shaded."""
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.histplot(x=boots, bins=bins, ax=ax, color="#4c72b0")
+    if tail == "right":
+        mask = boots >= observed
+    elif tail == "left":
+        mask = boots <= observed
+    else:
+        mask = np.abs(boots) >= abs(observed)
+    if mask.any():
+        sns.histplot(x=boots[mask], bins=bins, ax=ax, color="#c44e52")
+    ax.axvline(observed, color="black", lw=1.5)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Simulated statistics")
+    plt.tight_layout()
+    plt.show()
+
+def diff_dot(d, xlabel, figsize=(6, 2.2)):
+    """Dot plot of the paired differences with the mean marked."""
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.stripplot(x=np.asarray(d, float), ax=ax, color="#4c72b0",
+                  size=8, jitter=0.12, alpha=0.8)
+    ax.axvline(np.mean(d), color="#c44e52", lw=2)
+    ax.set_xlabel(xlabel)
+    ax.set_yticks([])
+    plt.tight_layout()
+    plt.show()
+```
+
+::: {.panel-tabset}
+
+## Exercise 6.256
+
+*(Skill Builder 1)* A 95% confidence interval for $\mu_1 - \mu_2$ from paired
+difference results $\bar x_d = 3.7$, $s_d = 2.1$, $n_d = 30$.
+
+```{python}
+#| echo: false
+t_ci(3.7, 2.1, 30, 0.95).to_string()
+```
+
+Best estimate $\bar x_d = 3.7$, with $SE = 2.1/\sqrt{30} = 0.383$. From
+$t_{29}$, $t^* = 2.045$, so the margin of error is $2.045(0.383) = 0.78$ and
+the interval is $3.7 \pm 0.78 =$ **(2.92, 4.48)**. We are 95% confident that
+$\mu_1$ exceeds $\mu_2$ by between 2.92 and 4.48 units.
+
+## Exercise 6.257
+
+*(Skill Builder 1)* A 90% confidence interval for $\mu_1 - \mu_2$ from paired
+difference results $\bar x_d = 556.9$, $s_d = 143.6$, $n_d = 100$.
+
+```{python}
+#| echo: false
+t_ci(556.9, 143.6, 100, 0.90).to_string()
+```
+
+$SE = 143.6/\sqrt{100} = 14.36$; from $t_{99}$, $t^* = 1.660$, giving
+$556.9 \pm 23.8 =$ **(533.06, 580.74)**. Even at 90% confidence the interval
+is quite wide because $s_d$ is large relative to $\bar x_d$ — but the entire
+interval lies far above 0, so $\mu_1 > \mu_2$ by several hundred units.
+
+## Exercise 6.258
+
+*(Skill Builder 1)* A 99% confidence interval for $\mu_1 - \mu_2$ from the
+paired data in the table ($d = x_1 - x_2$):
+
+| Case | 1 | 2 | 3 | 4 | 5 |
+|-----------|----|----|----|----|----|
+| Treatment 1 | 22 | 28 | 31 | 25 | 28 |
+| Treatment 2 | 18 | 30 | 25 | 21 | 21 |
+
+```{python}
+#| echo: false
+t12 = pd.DataFrame({"Treatment 1": [22, 28, 31, 25, 28],
+                    "Treatment 2": [18, 30, 25, 21, 21]})
+d258 = (t12["Treatment 1"] - t12["Treatment 2"]).to_numpy(float)
+pd.Series({"Differences d": ", ".join(f"{v:+.0f}" for v in d258),
+           "Mean difference": round(d258.mean(), 3),
+           "SD of differences": round(d258.std(ddof=1), 3),
+           "n_d": len(d258)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Dot plot of the five paired differences with the mean difference marked
+diff_dot(d258, "Difference (Treatment 1 - Treatment 2)")
+t_ci(d258.mean(), d258.std(ddof=1), 5, 0.99).to_string()
+```
+
+The differences are $+4, -2, +6, +4, +7$ with $\bar x_d = 3.8$ and
+$s_d = 3.49$. From $t_4$, $t^* = 4.604$, so the 99% interval is
+$3.8 \pm 4.604(1.562) = 3.8 \pm 7.19 =$ **(−3.39, 10.99)**. With only $n_d = 5$
+pairs the interval is uselessly wide — it contains 0 even though all five
+differences but one are positive — a vivid reminder that tiny paired samples
+buy little precision.
+
+## Exercise 6.259
+
+*(Skill Builder 1)* A 95% confidence interval for $\mu_1 - \mu_2$ from the
+paired data in the table ($d = x_1 - x_2$):
+
+| Case | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|-------------|----|----|----|----|----|----|----|----|
+| Situation 1 | 77 | 81 | 94 | 62 | 70 | 71 | 85 | 90 |
+| Situation 2 | 85 | 84 | 91 | 78 | 77 | 61 | 88 | 91 |
+
+```{python}
+#| echo: false
+s12 = pd.DataFrame({"Situation 1": [77, 81, 94, 62, 70, 71, 85, 90],
+                    "Situation 2": [85, 84, 91, 78, 77, 61, 88, 91]})
+d259 = (s12["Situation 1"] - s12["Situation 2"]).to_numpy(float)
+pd.Series({"Differences d": ", ".join(f"{v:+.0f}" for v in d259),
+           "Mean difference": round(d259.mean(), 3),
+           "SD of differences": round(d259.std(ddof=1), 3),
+           "n_d": len(d259)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Dot plot of the eight paired differences with the mean difference marked
+diff_dot(d259, "Difference (Situation 1 - Situation 2)")
+t_ci(d259.mean(), d259.std(ddof=1), 8, 0.95).to_string()
+```
+
+The differences are $-8, -3, +3, -16, -7, +10, -3, -1$ with
+$\bar x_d = -3.125$ and $s_d = 7.74$. From $t_7$, $t^* = 2.365$, so
+$-3.125 \pm 2.365(2.735) = -3.125 \pm 6.47 =$ **(−9.59, 3.34)**. We are 95%
+confident the mean difference $\mu_1 - \mu_2$ is between $-9.59$ and $3.34$;
+since the interval includes 0, the data are consistent with no difference in
+means despite the negative sample mean.
+
+## Exercise 6.260
+
+*(Skill Builder 2)* Test $H_0\colon \mu_1 = \mu_2$ vs $H_a\colon \mu_1 \ne
+\mu_2$ using paired difference results $\bar x_d = 15.7$, $s_d = 12.2$,
+$n_d = 25$.
+
+```{python}
+#| echo: false
+ttest_d(15.7, 12.2, 25, "two").to_string()
+```
+
+$t = 15.7/(12.2/\sqrt{25}) = 6.43$ on 24 degrees of freedom and
+**p-value ≈ 0.000001** (two-tailed). This is far below any significance
+level, so we reject $H_0$: the mean difference is clearly not zero — the data
+provide strong evidence that $\mu_1 \ne \mu_2$ (in fact $\mu_1 > \mu_2$).
+
+## Exercise 6.261
+
+*(Skill Builder 2)* Test $H_0\colon \mu_1 = \mu_2$ vs $H_a\colon \mu_1 \ne
+\mu_2$ using paired difference results $\bar x_d = -2.6$, $s_d = 4.1$,
+$n_d = 18$.
+
+```{python}
+#| echo: false
+ttest_d(-2.6, 4.1, 18, "two").to_string()
+```
+
+$t = -2.6/(4.1/\sqrt{18}) = -2.69$ on 17 degrees of freedom and
+**p-value = 0.0155** (two-tailed). Since $0.0155 < 0.05$ we reject $H_0$: the
+negative mean difference is too large to attribute to chance, so the data
+provide evidence that $\mu_1 \ne \mu_2$ (with $\mu_1 < \mu_2$).
+
+## Exercise 6.262
+
+*(Skill Builder 2)* Test $H_0\colon \mu_1 = \mu_2$ vs $H_a\colon \mu_1 <
+\mu_2$ using the paired data in the table:
+
+| Case | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|------------|----|----|----|----|----|---|----|----|
+| Treatment 1 | 16 | 12 | 18 | 21 | 15 | 11 | 14 | 22 |
+| Treatment 2 | 18 | 20 | 25 | 21 | 19 | 8 | 15 | 20 |
+
+```{python}
+#| echo: false
+t128 = pd.DataFrame({"Treatment 1": [16, 12, 18, 21, 15, 11, 14, 22],
+                     "Treatment 2": [18, 20, 25, 21, 19, 8, 15, 20]})
+d262 = (t128["Treatment 1"] - t128["Treatment 2"]).to_numpy(float)
+pd.Series({"Differences d": ", ".join(f"{v:+.0f}" for v in d262),
+           "Mean difference": round(d262.mean(), 3),
+           "SD of differences": round(d262.std(ddof=1), 3)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Sign-flip randomization distribution of the mean paired difference, observed mean shaded in the left tail
+boots, p_rand = signflip(d262, "left")
+tail_plot(boots, d262.mean(), "left",
+          "Mean of sign-flipped differences (Treatment 1 - Treatment 2)")
+pd.concat([ttest_d(d262.mean(), d262.std(ddof=1), 8, "left"),
+           pd.Series({"Sign-flip randomization p-value": round(p_rand, 4)})]).to_string()
+```
+
+The differences are $-2, -8, -7, 0, -4, +3, -1, +2$ with $\bar x_d = -2.125$
+and $s_d = 3.98$. The paired $t$-test gives $t = -2.125/(3.98/\sqrt{8}) =
+-1.51$ on 7 degrees of freedom, **p-value = 0.087** (left-tailed); the
+sign-flip randomization above agrees (p ≈ 0.11). Since the p-value exceeds
+0.05 we **fail to reject $H_0$**: although $\bar x_d$ is negative, a mean
+difference of $-2.125$ is not unusual when $H_0$ is true, so the data do not
+provide convincing evidence that $\mu_1 < \mu_2$.
+
+## Exercise 6.263
+
+*(Skill Builder 2)* Test $H_0\colon \mu_1 = \mu_2$ vs $H_a\colon \mu_1 >
+\mu_2$ using the paired data in the table:
+
+| Case | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|-------------|-----|-----|------|-----|-----|-----|-----|-----|-----|-----|
+| Situation 1 | 125 | 156 | 132 | 175 | 153 | 148 | 180 | 135 | 168 | 157 |
+| Situation 2 | 120 | 145 | 142 | 150 | 160 | 148 | 160 | 142 | 162 | 150 |
+
+```{python}
+#| echo: false
+s110 = pd.DataFrame({"Situation 1": [125, 156, 132, 175, 153, 148, 180, 135, 168, 157],
+                     "Situation 2": [120, 145, 142, 150, 160, 148, 160, 142, 162, 150]})
+d263 = (s110["Situation 1"] - s110["Situation 2"]).to_numpy(float)
+pd.Series({"Differences d": ", ".join(f"{v:+.0f}" for v in d263),
+           "Mean difference": round(d263.mean(), 3),
+           "SD of differences": round(d263.std(ddof=1), 3)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Sign-flip randomization distribution of the mean paired difference, observed mean shaded in the right tail
+boots, p_rand = signflip(d263, "right")
+tail_plot(boots, d263.mean(), "right",
+          "Mean of sign-flipped differences (Situation 1 - Situation 2)")
+pd.concat([ttest_d(d263.mean(), d263.std(ddof=1), 10, "right"),
+           pd.Series({"Sign-flip randomization p-value": round(p_rand, 4)})]).to_string()
+```
+
+The differences are $+5, +11, -10, +25, -7, 0, +20, -7, +6, +7$ with
+$\bar x_d = 5.0$ and $s_d = 11.57$. The paired $t$-test gives
+$t = 5.0/(11.57/\sqrt{10}) = 1.37$ on 9 degrees of freedom,
+**p-value = 0.102** (right-tailed); the sign-flip randomization gives about
+the same (p ≈ 0.11). Since $0.102 > 0.05$ we **fail to reject $H_0$**: the
+data do not provide convincing evidence that $\mu_1 > \mu_2$.
+
+## Exercise 6.264
+
+*(Skill Builder 3)* To study the effect of sitting with a laptop on scrotal
+temperature, 29 men have their scrotal temperature tested before and then
+after sitting with a laptop for one hour.
+
+**Paired data difference in means.** Each man supplies a *before* and an
+*after* measurement, so the 29 within-person differences
+(after − before) form one sample, and we test whether their mean differs from
+0. Pairing is essential here: body temperatures vary a lot from man to man,
+and a two-sample analysis of "29 before" vs "29 after" on different men would
+drown the laptop effect in that person-to-person noise.
+
+## Exercise 6.265
+
+*(Skill Builder 3)* To study the effect of women's tears on men, testosterone
+levels are measured in 50 men after they sniff women's tears and after they
+sniff a salt solution, with the order of the two treatments randomized and the
+study double-blind.
+
+**Paired data difference in means.** Each of the 50 men experiences *both*
+treatments (once with tears, once with saline), so the comparison is
+within-subject: analyze each man's difference (tears − saline) and test its
+mean against 0. Randomizing the order and blinding the study guards against
+time and expectation effects, exactly the strengths of a matched-pairs
+design.
+
+## Exercise 6.266
+
+*(Skill Builder 3)* In another study of women's tears, 16 men watch an erotic
+movie and then *half* sniff women's tears and *half* sniff a salt solution
+while brain activity is monitored.
+
+**Difference in means with two separate groups.** Each man is assigned to
+only one condition — the tear-sniffers and the salt-sniffers are different
+people — so there is no within-person pairing. With independent groups we
+compare $\bar x_{\text{tears}} - \bar x_{\text{salt}}$ using the
+two-sample methods of Section 6.4.
+
+## Exercise 6.267
+
+*(Skill Builder 3)* To measure a new teaching method, each student in a class
+getting the new instruction is *matched* with a student in a separate class on
+IQ, family income, previous-year math ability, reading level, and all
+demographic characteristics; math ability is measured again at year's end.
+
+**Paired data difference in means.** The students are deliberately linked
+into matched pairs on many confounding variables, and each pair yields one
+difference (new-method student − matched student). Even though the two
+measurements come from different people, the pairing is by design, so the
+correct analysis is the one-sample $t$ on the within-pair differences — the
+same logic as the twin study of Exercise 6.269.
+
+## Exercise 6.268
+
+*(Skill Builder 3)* To determine whether the color red increases how
+attractive men find women, one group of men rate a woman's picture on a red
+background and another group of men rate the same woman on a white background.
+
+**Difference in means with two separate groups.** The raters are two distinct
+groups of men with no link between raters across conditions, so the samples
+are independent and the two-sample analysis applies. (A paired design would
+have been possible — the *same* men rating both backgrounds — which would
+likely have been more efficient.)
+
+## Exercise 6.269
+
+*(Skill Builder 3)* To study the effect of exercise on brain activity,
+researchers recruit sets of identical middle-aged twins, with one twin
+randomly assigned to regular exercise and the other not exercising.
+
+**Paired data difference in means.** Identical twins are a natural match:
+they share genes and largely share upbringing, so each twin-pair difference
+(exercising − non-exercising) measures the effect of exercise against a
+genetically identical control. The analysis is the one-sample $t$ on the
+within-pair differences.
+
+## Exercise 6.270
+
+**Drink Tea for a Stronger Immune System.** Blood samples from five
+participants were taken before and after one week of drinking about five cups
+of tea a day and exposed to *E. coli*; interferon gamma production rose from
+a mean of 155 pg/mL to 448 pg/mL. For the five subjects the mean difference
+is 293 pg/mL with $s_d = 242$, and the use of the $t$-distribution is
+appropriate.
+
+- **(a)** The data are paired because each participant is measured **twice** —
+  before and after the week of tea — so each person is their own control and
+  the analysis uses the $n_d = 5$ within-person differences.
+- **(b)** The 90% confidence interval is computed below.
+
+```{python}
+#| echo: false
+t_ci(293, 242, 5, 0.90).to_string()
+```
+
+**(b)** $SE = 242/\sqrt{5} = 108.2$ and $t^* = 2.132$ from $t_4$, so the
+interval is $293 \pm 230.7 =$ **(62.3, 523.7) pg/mL**. We are 90% confident
+that mean interferon gamma production increases by between about 62 and 524
+pg/mL after a week of tea drinking. The interval is wide — only 5 subjects —
+but even its lower endpoint is positive, hinting at a real boost.
+
+## Exercise 6.271
+
+**Testing the Effects of Tea on the Immune System.** Using the study of
+Exercise 6.270 ($n_d = 5$, $\bar x_d = 293$, $s_d = 242$), test whether mean
+interferon gamma production is significantly higher after drinking tea than
+before, at a 5% level.
+
+```{python}
+#| echo: false
+ttest_d(293, 242, 5, "right").to_string()
+```
+
+Hypotheses: $H_0\colon \mu_d = 0$ (no change in mean production) vs
+$H_a\colon \mu_d > 0$ (production higher after tea), where $\mu_d$ is the
+mean after-minus-before difference. The test statistic is
+$t = 293/108.2 = 2.71$ on 4 degrees of freedom, **p-value = 0.027**. Since
+$0.027 < 0.05$ we **reject $H_0$**: even with only five subjects, an average
+boost of 293 pg/mL is more than chance variation provides, giving evidence
+that drinking tea for a week increases interferon gamma production. (Note how
+large the effect must be to detect with $n_d = 5$ — the SE is 108 pg/mL!)
+
+## Exercise 6.272
+
+**Husband and Wife Ages as Paired Data.** For 105 male-female marriage
+licenses, the difference in ages (husband − wife) has mean 2.829 years with
+standard deviation 4.995. Test whether husbands are on average older than
+their wives.
+
+*Data:* `data/ch02/MarriageAges.csv`, from
+<https://www.lock5stat.com/datasets3e/MarriageAges.csv> — the file reproduces
+the book's summary exactly:
+
+```{python}
+#| echo: false
+#| fig-cap: Distribution of the 105 husband-minus-wife age differences with the mean difference marked
+ma = pd.read_csv("data/ch02/MarriageAges.csv")
+dm = (ma.Husband - ma.Wife).to_numpy(float)
+fig, ax = plt.subplots(figsize=(6, 2.8))
+sns.histplot(x=dm, bins=np.arange(-14.5, 20.5, 2), ax=ax, color="#4c72b0")
+ax.axvline(dm.mean(), color="#c44e52", lw=2)
+ax.set_xlabel("Husband age - Wife age (years)")
+ax.set_ylabel("Couples")
+plt.tight_layout()
+plt.show()
+pd.Series({"n couples": len(dm),
+           "Mean difference": round(dm.mean(), 3),
+           "SD of differences": round(dm.std(ddof=1), 3)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Sign-flip randomization distribution of the mean age difference, observed mean far in the right tail
+boots, p_rand = signflip(dm, "right")
+tail_plot(boots, dm.mean(), "right", "Mean of sign-flipped age differences",
+          bins=30)
+pd.concat([ttest_d(2.829, 4.995, 105, "right"),
+           pd.Series({"Sign-flip randomization p-value": round(p_rand, 5)})]).to_string()
+```
+
+Hypotheses: $H_0\colon \mu_d = 0$ vs $H_a\colon \mu_d > 0$ where
+$\mu_d = \mu_{\text{husband}} - \mu_{\text{wife}}$. With
+$SE = 4.995/\sqrt{105} = 0.488$,
+$$t = \frac{2.829}{0.488} = 5.80 \qquad \text{on } 104 \text{ df},$$
+giving **p-value ≈ 0.00000004**; the sign-flip randomization on the actual
+105 differences agrees (no simulated resample reaches 2.83). We **reject
+$H_0$** overwhelmingly: the sample provides very strong evidence that grooms
+are, on average, older than their brides. The histogram above shows why
+pairing matters — individual differences range from about −14 to +20 years,
+but their *mean* is pinned down to within ±0.488 of 2.83.
+
+## Exercise 6.273
+
+**How Much Older Are Husbands?** For the same 105 couples
+($\bar x_d = 2.829$, $s_d = 4.995$), find and interpret a 95% confidence
+interval for the mean difference in ages between a husband and a wife.
+
+```{python}
+#| echo: false
+t_ci(2.829, 4.995, 105, 0.95).to_string()
+```
+
+$SE = 0.488$ and $t^* = 1.983$ from $t_{104}$, so the 95% interval is
+$2.829 \pm 0.967 =$ **(1.86, 3.80) years**. We are 95% confident that, among
+couples like these, husbands average between 1.86 and 3.80 years older than
+their wives. Since the interval contains only positive values, it is
+consistent with the test of Exercise 6.272: husbands are significantly older.
+
+## Exercise 6.274
+
+**Pheromones in Female Tears?** Fifty men each sniffed tears and (on the
+other of two consecutive days) a salt solution, order randomized and
+double-blind; testosterone levels dropped from about 155 pg/mL to about
+133 pg/mL after the tears. The mean difference (saline − tears) is 21.7 with
+$s_d = 46.5$.
+
+- **(a)** The investigators used a matched-pairs design because testosterone
+  levels vary **enormously from man to man** (normal levels differ widely
+  between individuals). Measuring each man under both conditions and taking
+  within-man differences cancels out that person-to-person variation, so the
+  comparison targets the effect of the tears themselves; randomizing the
+  order also removes any day-to-day or sequence effect.
+- **(b)** The test is computed below.
+- **(c)** Discussed after the output.
+
+```{python}
+#| echo: false
+ttest_d(21.7, 46.5, 50, "right").to_string()
+```
+
+**(b)** Hypotheses: $H_0\colon \mu_d = 0$ vs $H_a\colon \mu_d > 0$, where
+$d = $ saline − tears so that positive differences indicate a reduction after
+sniffing tears. With $SE = 46.5/\sqrt{50} = 6.58$,
+$t = 21.7/6.58 = 3.30$ on 49 degrees of freedom and **p-value = 0.0009**. We
+**reject $H_0$**: testosterone levels are significantly reduced after
+sniffing women's tears.
+
+**(c)** Yes — within this study we can conclude causation. Because the
+order of tears vs saline was **randomized** and the study was
+**double-blind**, the only systematic difference between the two days was the
+substance sniffed, so the significant drop in testosterone is attributable to
+the tears (a signal relevant to sexual arousal) rather than to confounding
+variables. Generalizing to all men and to real-life settings always requires
+some extra caution, but the causal claim itself is earned by the design.
+
+## Exercise 6.275
+
+**Measuring the Effect of Female Tears.** Using the study of Exercise 6.274
+($\bar x_d = 21.7$ reduction, $s_d = 46.5$, $n_d = 50$), find a 99% confidence
+interval for the effect size — the amount of reduction in testosterone levels
+after sniffing female tears.
+
+```{python}
+#| echo: false
+t_ci(21.7, 46.5, 50, 0.99).to_string()
+```
+
+$SE = 6.58$ and $t^* = 2.680$ from $t_{49}$, so the interval is
+$21.7 \pm 17.6 =$ **(4.1, 39.3) pg/mL**. We are 99% confident that sniffing
+women's tears reduces mean testosterone by between about 4 and 39 pg/mL. The
+interval is wide — $s_d = 46.5$ is large even after pairing — but entirely
+above zero, matching the significant test of Exercise 6.274.
+
+## Exercise 6.276
+
+**Quiz vs Lecture Pulse Rates.** Pulse rates were collected from 10 students
+during a class lecture and again from the *same* students during a quiz
+(`QuizPulse10`, Table 6.31). Construct a 95% confidence interval for the
+difference in mean pulse rate between students in a class lecture and taking
+a quiz.
+
+*Data:* `data/ch04/QuizPulse10.csv`, from
+<https://www.lock5stat.com/datasets3e/QuizPulse10.csv>:
+
+```{python}
+#| echo: false
+qp = pd.read_csv("data/ch04/QuizPulse10.csv")
+dqp = (qp.Quiz - qp.Lecture).to_numpy(float)
+pd.Series({"Differences d (Quiz - Lecture)":
+           ", ".join(f"{v:+.0f}" for v in dqp),
+           "Mean difference": round(dqp.mean(), 3),
+           "SD of differences": round(dqp.std(ddof=1), 3),
+           "n_d": len(dqp)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Dot plot of the ten quiz-minus-lecture pulse differences with the mean difference marked
+diff_dot(dqp, "Difference in pulse rate (Quiz - Lecture)")
+t_ci(dqp.mean(), dqp.std(ddof=1), 10, 0.95).to_string()
+```
+
+The ten differences (quiz − lecture) are $+2, -1, +5, -8, +1, +20, +15, -4,
++9, -12$ with $\bar x_d = 2.7$ beats per minute and $s_d = 9.93$. With
+$SE = 3.14$ and $t^* = 2.262$ from $t_9$, the 95% interval is
+$2.7 \pm 7.11 =$ **(−4.41, 9.81) beats per minute**. We are 95% confident the
+mean quiz-minus-lecture difference is between about −4.4 and +9.8 bpm. The
+interval contains 0, so the data are consistent with no difference in mean
+pulse rate — the wide spread of the differences ($s_d \approx 10$) makes 10
+students too few to pin down the small mean difference.
+
+## Exercise 6.277
+
+**Testing for a Difference in Pulse Rates.** Using the QuizPulse10 data of
+Exercise 6.276, test whether mean pulse rates increase under the stress of a
+quiz, at a 5% level.
+
+```{python}
+#| echo: false
+#| fig-cap: Sign-flip randomization distribution of the mean quiz-minus-lecture pulse difference, observed mean shaded in the right tail
+boots, p_rand = signflip(dqp, "right")
+tail_plot(boots, dqp.mean(), "right",
+          "Mean of sign-flipped pulse differences (Quiz - Lecture)")
+pd.concat([ttest_d(dqp.mean(), dqp.std(ddof=1), 10, "right"),
+           pd.Series({"Sign-flip randomization p-value": round(p_rand, 4)})]).to_string()
+```
+
+Hypotheses: $H_0\colon \mu_d = 0$ vs $H_a\colon \mu_d > 0$ with
+$d = $ quiz − lecture. The paired $t$-test gives
+$t = 2.7/3.14 = 0.86$ on 9 degrees of freedom, **p-value = 0.206**; the
+sign-flip randomization above agrees (p ≈ 0.21). Since $0.206 > 0.05$ we
+**fail to reject $H_0$**: the data do not provide sufficient evidence that
+pulse rates are higher during quizzes. Nine of ten students do show a rise on
+average in one direction or another is not the point — the mean increase of
+2.7 bpm is well within what random sign-flipping produces, despite the
+several large individual jumps ($+20$, $+15$) visible in Exercise 6.276.
+
+## Exercise 6.278
+
+**Testing Whether Story Spoilers Spoil Stories.** For 12 short stories, each
+version (with a spoiler paragraph or original) was read by at least 30 people
+and rated 1–10; ratings are stored in `StorySpoilers` (Table 6.32). Test
+whether there is a difference in mean enjoyment rating based on whether or
+not there is a spoiler.
+
+*Data:* `data/ch06/StorySpoilers.csv`, from
+<https://www.lock5stat.com/datasets3e/StorySpoilers.csv>:
+
+```{python}
+#| echo: false
+ss = pd.read_csv("data/ch06/StorySpoilers.csv")
+dss = (ss.Spoiler - ss.Original).to_numpy(float)
+pd.Series({"Differences d (Spoiler - Original)":
+           ", ".join(f"{v:+.1f}" for v in dss),
+           "Mean difference": round(dss.mean(), 3),
+           "SD of differences": round(dss.std(ddof=1), 3),
+           "n_d": len(dss)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Sign-flip randomization distribution of the mean spoiler-minus-original rating difference, observed mean shaded in both tails
+boots, p_rand = signflip(dss, "two")
+tail_plot(boots, dss.mean(), "two",
+          "Mean of sign-flipped rating differences (Spoiler - Original)")
+pd.concat([ttest_d(dss.mean(), dss.std(ddof=1), 12, "two"),
+           pd.Series({"Sign-flip randomization p-value": round(p_rand, 4)})]).to_string()
+```
+
+Hypotheses: $H_0\colon \mu_d = 0$ vs $H_a\colon \mu_d \ne 0$ where
+$d = $ spoiler − original. Stories pair with themselves across versions, so
+the analysis is the paired $t$-test on the 12 differences: $\bar x_d = 0.49$
+ratings *higher* with the spoiler, $s_d = 0.35$, giving
+$t = 0.49/(0.348/\sqrt{12}) = 4.90$ on 11 degrees of freedom and
+**p-value = 0.0005** (two-tailed); the sign-flip randomization agrees
+(p ≈ 0.0006). We **reject $H_0$** — and in the surprising direction: stories
+whose ending is revealed are enjoyed *significantly more* on average,
+supporting the authors' title that "story spoilers don't spoil stories."
+
+## Exercise 6.279
+
+**Measuring the Effect of Story Spoilers.** Using the StorySpoilers data of
+Exercise 6.278, find and interpret a 95% confidence interval for the
+difference in mean enjoyment rating between stories with a spoiler and
+stories without.
+
+- **(a)** Matched pairs are appropriate and helpful because the **same 12
+  stories** appear in both versions: story-to-story differences in
+  enjoyability (some stories are simply better than others) cancel out when
+  we take within-story differences, leaving a much cleaner comparison of the
+  spoiler effect than two separate sets of readers rating different stories.
+- **(b)** The interval is computed below.
+
+```{python}
+#| echo: false
+t_ci(dss.mean(), dss.std(ddof=1), 12, 0.95).to_string()
+```
+
+**(b)** $SE = 0.348/\sqrt{12} = 0.100$ and $t^* = 2.201$ from $t_{11}$, so
+the 95% interval for (spoiler − original) is
+$0.492 \pm 0.221 =$ **(0.27, 0.71) rating points**. We are 95% confident that
+mean enjoyment is between 0.27 and 0.71 points *higher* for spoiled stories
+on the 1–10 scale — an interval entirely above zero, so spoilers
+significantly *improve* enjoyment, consistent with Exercise 6.278.
+
+## Exercise 6.280
+
+**Do Babies Prefer Speech?** Fifty infants aged 4–13 months were exposed to
+both happy-sounding infant speech and a hummed lullaby by the same woman; the
+mean difference in looking time was 27.79 more seconds for speech, with
+$s_d = 63.18$. Test whether babies prefer actual speaking to humming.
+
+```{python}
+#| echo: false
+ttest_d(27.79, 63.18, 50, "right").to_string()
+```
+
+Hypotheses: $H_0\colon \mu_d = 0$ vs $H_a\colon \mu_d > 0$, where $d = $
+looking time speaking − humming. Each infant hears both sounds, so the
+matched-pairs design applies: with $SE = 63.18/\sqrt{50} = 8.93$,
+$t = 27.79/8.93 = 3.11$ on 49 degrees of freedom, **p-value = 0.0016**. Since
+$0.0016 < 0.05$ we **reject $H_0$**: infants look significantly longer at the
+woman while she speaks, providing evidence that babies prefer happy speech to
+a hummed lullaby.
+
+## Exercise 6.281
+
+**Do Babies Prefer Speaking or Singing?** In the same study, 48 infants were
+exposed to both singing and speech; mean looking time was 66.97 s for speech
+($s = 43.42$) and 56.58 s for singing ($s = 31.57$), with mean difference
+(speech − singing) 10.39 s and $s_d = 55.37$. Test whether babies have a
+preference (either way) between speaking and singing.
+
+```{python}
+#| echo: false
+ttest_d(10.39, 55.37, 48, "two").to_string()
+```
+
+Hypotheses: $H_0\colon \mu_d = 0$ vs $H_a\colon \mu_d \ne 0$ where
+$d = $ speech − singing. With $SE = 55.37/\sqrt{48} = 7.99$,
+$t = 10.39/7.99 = 1.30$ on 47 degrees of freedom, **p-value = 0.20**
+(two-tailed). Since $0.20 > 0.05$ we **fail to reject $H_0$**: a mean
+advantage of about 10 seconds is well within chance range, so the data do
+not provide evidence of a preference between speaking and singing. (Note the
+large $s_d = 55.37$: individual babies differed a lot in how much they
+preferred one over the other.)
+
+## Exercise 6.282
+
+**Do Hands Adapt to Water?** Twenty participants moved wet and dry objects
+before and after submerging their hands for 30 minutes (order randomized);
+the response is time with wrinkled hands minus time with unwrinkled hands.
+For dry objects: $\bar x_d = 0.85$ s, $s_d = 11.5$; for wet objects:
+$\bar x_d = -15.1$ s, $s_d = 13.4$.
+
+- **(a)** Dry objects — computed below.
+- **(b)** Wet objects — computed below.
+
+```{python}
+#| echo: false
+pd.DataFrame({"(a) Dry objects": ttest_d(0.85, 11.5, 20, "left"),
+              "(b) Wet objects": ttest_d(-15.1, 13.4, 20, "left")}).to_string()
+```
+
+Hypotheses for both: $H_0\colon \mu_d = 0$ vs $H_a\colon \mu_d < 0$, since
+*faster* means *less* time with wrinkled hands ($d = $ wrinkled − unwrinkled).
+
+- **(a) Dry objects:** $t = 0.85/(11.5/\sqrt{20}) = 0.33$ on 19 df,
+  **p-value = 0.628**. Far from significant — no evidence that wrinkled hands
+  help (or hurt) with dry objects, which makes sense: water-wrinkles should
+  not improve gripping dry items.
+- **(b) Wet objects:** $t = -15.1/(13.4/\sqrt{20}) = -5.04$ on 19 df,
+  **p-value ≈ 0.00004**. Strongly significant — wrinkled fingers move wet
+  objects about 15 seconds faster, strong evidence that water-induced
+  wrinkling is a functional adaptation for handling wet items.
+
+## Exercise 6.283
+
+**Are Grades Significantly Higher on the Second Quiz?** Table 6.33 gives
+grades on the first two quizzes for a sample of 10 students. Test whether the
+mean grade on the second quiz is significantly higher than on the first.
+
+| Student | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|-------------|----|----|----|----|----|----|----|----|----|----|
+| First quiz | 72 | 95 | 56 | 87 | 80 | 98 | 74 | 85 | 77 | 62 |
+| Second quiz | 78 | 96 | 72 | 89 | 80 | 95 | 86 | 87 | 82 | 75 |
+
+```{python}
+#| echo: false
+q1 = np.array([72, 95, 56, 87, 80, 98, 74, 85, 77, 62], float)
+q2 = np.array([78, 96, 72, 89, 80, 95, 86, 87, 82, 75], float)
+dq = q2 - q1
+pd.Series({"(a) Separate-sample means (Q1, Q2)":
+           f"{q1.mean():.1f}, {q2.mean():.1f}",
+           "(a) Separate-sample SE":
+           round(float(np.sqrt(q1.std(ddof=1)**2 / 10 + q2.std(ddof=1)**2 / 10)), 3),
+           "(b) Differences d (Q2 - Q1)":
+           ", ".join(f"{v:+.0f}" for v in dq),
+           "(b) Mean difference": round(dq.mean(), 3),
+           "(b) SD of differences": round(dq.std(ddof=1), 3)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distributions for the same quiz data analyzed as two separate samples and as paired differences
+r = np.random.default_rng(2026)
+pooled = np.concatenate([q1, q2])
+sep = np.empty(10000)
+for i in range(10000):
+    perm = r.permutation(pooled)
+    sep[i] = perm[10:].mean() - perm[:10].mean()
+paired, p_pair = signflip(dq, "right")
+fig, axes = plt.subplots(1, 2, figsize=(7, 2.9), sharex=True)
+sns.histplot(x=sep, bins=24, ax=axes[0], color="#4c72b0")
+axes[0].axvline(dq.mean(), color="black", lw=1.5)
+axes[0].set_title("(a) Two separate samples: shuffled groups", fontsize=9)
+axes[0].set_xlabel("Mean(Q2) - Mean(Q1)")
+sns.histplot(x=paired, bins=24, ax=axes[1], color="#4c72b0")
+axes[1].axvline(dq.mean(), color="black", lw=1.5)
+axes[1].set_title("(b) Paired: sign-flipped differences", fontsize=9)
+axes[1].set_xlabel("Mean of differences")
+plt.tight_layout()
+plt.show()
+pd.Series({"(a) t (pooled, df = 18)": 1.093,
+           "(a) p-value, right-tail": round(float(stats.t.sf(1.093, 18)), 4),
+           "(a) Randomization p-value": round(float((sep >= 5.4).mean()), 4),
+           "(b) t (paired, df = 9)": round(float(dq.mean() / (dq.std(ddof=1) / np.sqrt(10))), 3),
+           "(b) p-value, right-tail": round(float(stats.t.sf(dq.mean() / (dq.std(ddof=1) / np.sqrt(10)), 9)), 4),
+           "(b) Randomization p-value": round(p_pair, 4)}).to_string()
+```
+
+- **(a) Two separate samples:** treating the two columns as independent
+  random samples of 10 students each, the means are 78.6 vs 84.0 with pooled
+  $SE = 4.94$, giving $t = 5.4/4.94 = 1.09$ on 18 degrees of freedom and
+  **p-value = 0.144** (right-tail). We **fail to reject $H_0$** — no
+  convincing evidence that second-quiz grades are higher.
+- **(b) Paired samples:** the same 10 students in the same order give
+  differences $+6, +1, +16, +2, 0, -3, +12, +2, +5, +13$ with
+  $\bar x_d = 5.4$ and $s_d = 6.29$, so $t = 5.4/1.99 = 2.71$ on 9 degrees of
+  freedom and **p-value = 0.012** (right-tail). We **reject $H_0$** —
+  significant evidence that grades improve on the second quiz.
+- **(c)** The results differ because the two-sample analysis must account for
+  how wildly students vary from one another ($s \approx 13.4$ and $8.1$
+  within each column), while pairing removes that student-to-student spread:
+  the weakest student improved 16 points and the strongest only 1, and
+  pairing captures exactly this within-student change. The paired analysis
+  has far smaller $SE$ (1.99 vs 4.94) and more degrees of freedom devoted to
+  signal rather than noise. **Collecting the data paired — the same students
+  on both quizzes — is the better design** for this question.
+
+## Exercise 6.284
+
+**Sleep on School Nights.** The `PASeniors` dataset (Census at School, 457
+Pennsylvania high school seniors) records typical sleep hours on school
+nights (`Sleep1`) and non-school nights (`Sleep2`). Find a 95% confidence
+interval for the difference in mean hours of sleep between non-school nights
+and school nights ($\mu_2 - \mu_1$).
+
+*Data:* `data/ch01/PASeniors.csv`, from
+<https://www.lock5stat.com/datasets3e/PASeniors.csv>:
+
+```{python}
+#| echo: false
+pa = pd.read_csv("data/ch01/PASeniors.csv")
+sl = pa[["Sleep1", "Sleep2"]].dropna()
+dsp = (sl.Sleep2 - sl.Sleep1).to_numpy(float)
+pd.Series({"n students with both values": len(dsp),
+           "Mean school-night sleep": round(sl.Sleep1.mean(), 3),
+           "Mean non-school-night sleep": round(sl.Sleep2.mean(), 3),
+           "Mean difference (S2 - S1)": round(dsp.mean(), 3),
+           "SD of differences": round(dsp.std(ddof=1), 3)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Distribution of non-school-minus-school-night sleep differences for 455 Pennsylvania seniors with the mean difference marked
+fig, ax = plt.subplots(figsize=(6, 2.8))
+sns.histplot(x=dsp, bins=np.arange(-6.5, 7.5, 1), ax=ax, color="#4c72b0")
+ax.axvline(dsp.mean(), color="#c44e52", lw=2)
+ax.set_xlabel("Sleep2 - Sleep1 (hours)")
+ax.set_ylabel("Students")
+plt.tight_layout()
+plt.show()
+t_ci(dsp.mean(), dsp.std(ddof=1), len(dsp), 0.95).to_string()
+```
+
+Each student supplies a *pair* of values, so we analyze the $n_d = 455$
+within-student differences (Sleep2 − Sleep1; two of the 457 students are
+missing a value): $\bar x_d = 2.31$ hours with $s_d = 1.83$. With
+$SE = 0.086$ and $t^* = 1.965$ from $t_{454}$, the 95% interval is
+$2.31 \pm 0.17 =$ **(2.14, 2.47) hours**. We are 95% confident that students
+average between 2.14 and 2.47 **more hours of sleep on non-school nights**
+than on school nights — the entire interval is positive, so the non-school
+mean is clearly the higher one.
+
+## Exercise 6.285
+
+**CI for City vs Highway MPG.** The `Cars2020` dataset records EPA mileage
+for 110 new car models in 2020. Find a 95% confidence interval for the mean
+difference in gas mileage (HwyMPG − CityMPG) for highway vs city driving.
+
+*Data:* `data/ch02/Cars2020.csv`, from
+<https://www.lock5stat.com/datasets3e/Cars2020.csv>:
+
+```{python}
+#| echo: false
+cars = pd.read_csv("data/ch02/Cars2020.csv")
+dc = (cars.HwyMPG - cars.CityMPG).to_numpy(float)
+pd.Series({"n car models": len(dc),
+           "Mean difference (Hwy - City)": round(dc.mean(), 3),
+           "SD of differences": round(dc.std(ddof=1), 3),
+           "Smallest / largest difference":
+           f"{dc.min():.0f} / {dc.max():.0f}"}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Distribution of highway-minus-city MPG differences for 110 car models with the mean difference marked
+fig, ax = plt.subplots(figsize=(6, 2.8))
+sns.histplot(x=dc, bins=np.arange(6.5, 33.5, 2), ax=ax, color="#4c72b0")
+ax.axvline(dc.mean(), color="#c44e52", lw=2)
+ax.set_xlabel("HwyMPG - CityMPG (miles per gallon)")
+ax.set_ylabel("Car models")
+plt.tight_layout()
+plt.show()
+t_ci(dc.mean(), dc.std(ddof=1), len(dc), 0.95).to_string()
+```
+
+Each car pairs its own highway and city ratings, so the analysis uses the
+$n_d = 110$ within-car differences: $\bar x_d = 17.8$ mpg with
+$s_d = 4.31$. With $SE = 0.411$ and $t^* = 1.982$ from $t_{109}$, the 95%
+interval is $17.8 \pm 0.81 =$ **(17.0, 18.6) mpg**. We are 95% confident
+that, for 2020 car models, highway driving averages between 17.0 and 18.6
+miles per gallon more than city driving — a large, very precisely estimated
+gap, because pairing by car model removes the enormous model-to-model
+variation in fuel economy.
+
+:::

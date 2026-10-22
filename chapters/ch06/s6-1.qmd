@@ -1,0 +1,1531 @@
+---
+execute-dir: project
+title: "Chapter 6 · Section 6.1"
+subtitle: "Inference for a Proportion — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 6.1 replaces simulated standard errors with **formulas**. For a
+categorical variable the parameter is a population proportion $p$ and the
+statistic is the sample proportion $\hat p$, whose distribution is centered
+at $p$ with **standard error**
+$$SE=\sqrt{\frac{p(1-p)}{n}}$$
+and — provided the sample is large enough that $np \ge 10$ and
+$n(1-p) \ge 10$ (equivalently, at least 10 successes and 10 failures) — the
+Central Limit Theorem makes that distribution approximately **normal**
+(Section 6.1-D). Section 6.1-CI uses the curve to build **confidence
+intervals** of the form $\hat p \pm z^*\cdot SE$ with
+$SE=\sqrt{\hat p(1-\hat p)/n}$ estimated from the sample, and turns the
+margin-of-error formula around to **plan a sample size**,
+$n=\left(\frac{z^*}{ME}\right)^2\tilde p(1-\tilde p)$ with $\tilde p = 0.5$
+when nothing is known in advance (the conservative choice, for which the
+95% shortcut $n \approx 1/(ME)^2$ holds). Section 6.1-HT tests
+$H_0\colon p = p_0$ with the standardized statistic
+$$z=\frac{\hat p-p_0}{SE}, \qquad SE=\sqrt{\frac{p_0(1-p_0)}{n}}$$
+using the *null* value $p_0$ in the standard error, and reads the p-value
+off the standard normal curve when $np_0 \ge 10$ and $n(1-p_0)\ge 10$.
+Below every interval and test is computed exactly with
+`scipy.stats.norm`, and, wherever the exercise supplies data or counts, the
+normal answer is checked against a randomization or bootstrap simulation
+(10000 samples, seed 2026).
+The exercises are from *Statistics: Unlocking the Power of Data* (Lock⁵,
+3rd ed., pp. 434–447): Skill Builders 6.1–6.6 find standard errors for
+sample proportions; 6.7–6.12 examine the sampling distribution and its
+normal conditions; 6.13–6.27 build formula-based confidence intervals;
+6.28–6.33 compare them with bootstrap intervals; 6.34–6.43 determine
+sample sizes; 6.44–6.45 construct intervals from real datasets; and the
+hypothesis tests 6.46–6.64 run the full $z$-test for a proportion on
+skill-builder cases and real studies — ending with babies judging
+probability (6.62) and smokers and vitamin-takers in the `NutritionStudy`
+data (6.63–6.64).
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+from scipy import stats
+sns.set_theme(style="whitegrid")
+
+def se_prop(p, n):
+    """Standard error for sample proportions: sqrt(p(1-p)/n)."""
+    return float(np.sqrt(p * (1 - p) / n))
+
+ZSTAR = {0.90: 1.645, 0.95: 1.96, 0.98: 2.326, 0.99: 2.576}
+
+def ci_row(phat, n, conf):
+    """One-row summary: best estimate, SE, margin of error, and the CI."""
+    se = se_prop(phat, n)
+    zstar = ZSTAR[conf]
+    me = zstar * se
+    return pd.Series({"Best estimate": round(float(phat), 4),
+                      "SE": round(se, 4),
+                      "z*": zstar,
+                      "Margin of error": round(me, 4),
+                      f"{int(conf * 100)}% CI": f"({phat - me:.3f}, {phat + me:.3f})"})
+
+def n_needed(me, conf, ptilde=0.5):
+    """Smallest sample size giving margin of error `me` at level `conf`."""
+    zstar = ZSTAR[conf]
+    return int(np.ceil((zstar / me) ** 2 * ptilde * (1 - ptilde)))
+
+def ht_row(phat, n, p0, tail, alpha=0.05):
+    """One-row z-test for a proportion: SE from the null value p0."""
+    se = se_prop(p0, n)
+    z = (phat - p0) / se
+    if tail == "right":
+        p = float(stats.norm.sf(z))
+    elif tail == "left":
+        p = float(stats.norm.cdf(z))
+    else:
+        p = float(2 * stats.norm.sf(abs(z)))
+    p_disp = round(p, 4) if p >= 1e-4 else float(f"{p:.2e}")
+    return pd.Series({"Sample p-hat": round(float(phat), 4),
+                      "Null p0": p0, "n": n, "SE": round(se, 4),
+                      "z-statistic": round(float(z), 3),
+                      "p-value (normal)": p_disp,
+                      "Conclusion": "Reject H0" if p < alpha else "Do not reject H0"})
+
+def zcurve(z, tail, figsize=(6, 2.6)):
+    """Standard normal curve with the p-value tail beyond z shaded."""
+    x = np.linspace(-4.5, 4.5, 500)
+    y = stats.norm.pdf(x)
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.plot(x, y, color="#4c72b0", lw=2)
+    if tail == "right":
+        mask = x >= z
+    elif tail == "left":
+        mask = x <= z
+    else:
+        mask = (x >= abs(z)) | (x <= -abs(z))
+    if mask.any():
+        ax.fill_between(x[mask], y[mask], color="#c44e52", alpha=0.65)
+    ax.axvline(np.clip(z, -4.5, 4.5), color="black", lw=1)
+    ax.set_xlabel("z")
+    ax.set_ylabel("Density")
+    plt.tight_layout()
+    plt.show()
+
+def prop_curve(p, se, shade=(), xlabel="Sample proportions", figsize=(6, 2.8)):
+    """Normal curve N(p, se) for sample proportions with regions shaded."""
+    x = np.linspace(p - 4.2 * se, p + 4.2 * se, 600)
+    y = stats.norm.pdf(x, p, se)
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.plot(x, y, color="#4c72b0", lw=2)
+    for s in shade:
+        kind, vals = s[0], s[1:]
+        if kind == "right":
+            m = x >= vals[0]
+        elif kind == "left":
+            m = x <= vals[0]
+        elif kind == "between":
+            m = (x >= vals[0]) & (x <= vals[1])
+        else:  # outside
+            m = (x <= vals[0]) | (x >= vals[1])
+        if m.any():
+            ax.fill_between(x[m], y[m], color="#c44e52", alpha=0.6)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Density")
+    plt.tight_layout()
+    plt.show()
+
+def rand_prop(n, p0, stat, tail, reps=10000, seed=2026):
+    """Randomization distribution for a proportion: simulate `reps` samples
+    of size n with success probability p0 (the null value) and record the
+    sample proportion in each. Returns (proportions, p-value)."""
+    r = np.random.default_rng(seed)
+    props = r.binomial(n, p0, reps) / n
+    if tail == "right":
+        p = (props >= stat).mean()
+    elif tail == "left":
+        p = (props <= stat).mean()
+    else:  # two-tailed: double the tail on the side of the observed statistic
+        p = 2 * ((props >= stat).mean() if stat >= p0 else (props <= stat).mean())
+    return props, float(p)
+
+def boot_props(n, phat, reps=10000, seed=2026):
+    """Bootstrap distribution of sample proportions: resample n flips with
+    success probability phat (the observed sample)."""
+    r = np.random.default_rng(seed)
+    return r.binomial(n, phat, reps) / n
+
+def tail_plot(boots, observed, tail, xlabel, null=0.0, bins=40, figsize=(6, 3)):
+    """Histogram of a simulated distribution with the p-value tail shaded."""
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.histplot(x=boots, bins=bins, ax=ax, color="#4c72b0")
+    if tail == "right":
+        mask = boots >= observed
+    elif tail == "left":
+        mask = boots <= observed
+    else:
+        mask = np.abs(boots - null) >= abs(observed - null)
+    if mask.any():
+        sns.histplot(x=boots[mask], bins=bins, ax=ax, color="#c44e52")
+    ax.axvline(observed, color="black", lw=1.5)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Simulated statistics")
+    plt.tight_layout()
+    plt.show()
+
+def p_row(label, stat, boots, tail, null=0.0, digits=4):
+    """One-row summary: statistic and simulated (randomization) p-value."""
+    if tail == "right":
+        p = (boots >= stat).mean()
+    elif tail == "left":
+        p = (boots <= stat).mean()
+    else:
+        p = (np.abs(boots - null) >= abs(stat - null)).mean()
+    return pd.Series({label: round(float(stat), 4),
+                      "Randomization p-value": round(float(p), digits),
+                      "Simulated samples": len(boots)})
+```
+
+::: {.panel-tabset}
+
+## Exercise 6.1
+
+*(Skill Builder 1)* Samples of size $n = 50$ from a population with
+proportion $p = 0.25$.
+
+```{python}
+#| echo: false
+round(se_prop(0.25, 50), 4)
+```
+
+$$SE=\sqrt{\frac{0.25(1-0.25)}{50}}=\sqrt{0.00375}\approx \textbf{0.0612}$$
+
+## Exercise 6.2
+
+*(Skill Builder 1)* Samples of size $n = 1000$ from a population with
+$p = 0.70$.
+
+```{python}
+#| echo: false
+round(se_prop(0.70, 1000), 4)
+```
+
+$$SE=\sqrt{\frac{0.70(0.30)}{1000}}\approx \textbf{0.0145}$$
+
+## Exercise 6.3
+
+*(Skill Builder 1)* Samples of size $n = 60$ from a population with
+$p = 0.90$.
+
+```{python}
+#| echo: false
+round(se_prop(0.90, 60), 4)
+```
+
+$$SE=\sqrt{\frac{0.90(0.10)}{60}}\approx \textbf{0.0387}$$
+
+## Exercise 6.4
+
+*(Skill Builder 1)* Samples of size $n = 30$ from a population with
+$p = 0.27$.
+
+```{python}
+#| echo: false
+round(se_prop(0.27, 30), 4)
+```
+
+$$SE=\sqrt{\frac{0.27(0.73)}{30}}\approx \textbf{0.0811}$$ — the largest of
+the Skill Builder set: a small sample with $p$ near the middle gives the
+most variable sample proportions.
+
+## Exercise 6.5
+
+*(Skill Builder 1)* Samples of size $n = 300$ from a population with
+$p = 0.08$.
+
+```{python}
+#| echo: false
+round(se_prop(0.08, 300), 4)
+```
+
+$$SE=\sqrt{\frac{0.08(0.92)}{300}}\approx \textbf{0.0157}$$
+
+## Exercise 6.6
+
+*(Skill Builder 1)* Samples of size $n = 100$ from a population with
+$p = 0.41$.
+
+```{python}
+#| echo: false
+round(se_prop(0.41, 100), 4)
+```
+
+$$SE=\sqrt{\frac{0.41(0.59)}{100}}\approx \textbf{0.0492}$$
+
+## Exercise 6.7
+
+*(Impact of Sample Size)* Population with $p = 0.4$, for sample sizes
+$n = 30$, $n = 200$, and $n = 1000$.
+
+```{python}
+#| echo: false
+pd.Series({f"SE, n = {n}": round(se_prop(0.4, n), 4)
+           for n in (30, 200, 1000)}).to_string()
+```
+
+The SE drops from **0.0894** ($n=30$) to **0.0346** ($n=200$) to
+**0.0155** ($n=1000$): increasing the sample size shrinks the standard
+error, so a sample proportion estimates the population proportion with
+greater accuracy. The SE is proportional to $1/\sqrt{n}$ — quadrupling the
+sample size cuts it in half.
+
+## Exercise 6.8
+
+*(Impact of Sample Size)* Population with $p = 0.75$, for sample sizes
+$n = 40$, $n = 300$, and $n = 1000$.
+
+```{python}
+#| echo: false
+pd.Series({f"SE, n = {n}": round(se_prop(0.75, n), 4)
+           for n in (40, 300, 1000)}).to_string()
+```
+
+Same story: **0.0685 → 0.0250 → 0.0137**. Larger samples give sample
+proportions that cluster more tightly around $p = 0.75$, so estimates made
+from them are more accurate.
+
+## Exercise 6.9
+
+*(Is a Normal Distribution Appropriate?)* Is the sample size large enough
+for sample proportions to follow a normal distribution?
+
+```{python}
+#| echo: false
+cases = {"(a) n = 500, p = 0.1": (500, 0.1), "(b) n = 25, p = 0.5": (25, 0.5),
+         "(c) n = 30, p = 0.2": (30, 0.2), "(d) n = 100, p = 0.92": (100, 0.92)}
+pd.DataFrame({k: {"np": n * p, "n(1-p)": n * (1 - p),
+                  "Normal?": "Yes" if n * p >= 10 and n * (1 - p) >= 10 else "No"}
+              for k, (n, p) in cases.items()}).T.to_string()
+```
+
+- **(a) Yes** — $np = 50$ and $n(1-p) = 450$ both exceed 10.
+- **(b) Yes** — $np = n(1-p) = 12.5$.
+- **(c) No** — only $np = 6$ expected successes; too few.
+- **(d) No** — only $np = 8$ expected successes (even though failures are
+  plentiful).
+
+## Exercise 6.10
+
+*(Is a Normal Distribution Appropriate?)* Same task, new cases.
+
+```{python}
+#| echo: false
+cases = {"(a) n = 80, p = 0.1": (80, 0.1), "(b) n = 25, p = 0.8": (25, 0.8),
+         "(c) n = 50, p = 0.4": (50, 0.4), "(d) n = 200, p = 0.7": (200, 0.7)}
+pd.DataFrame({k: {"np": n * p, "n(1-p)": n * (1 - p),
+                  "Normal?": "Yes" if n * p >= 10 and n * (1 - p) >= 10 else "No"}
+              for k, (n, p) in cases.items()}).T.to_string()
+```
+
+- **(a) No** — $np = 8$.
+- **(b) No** — $n(1-p) = 5$ expected failures.
+- **(c) Yes** — $np = 20$, $n(1-p) = 30$.
+- **(d) Yes** — $np = 140$, $n(1-p) = 60$.
+
+## Exercise 6.11
+
+**Public Two-year Colleges.** From `CollegeScores2yr` about 66% of US
+two-year colleges are public. For samples of $n = 90$ schools with
+$p = 0.66$: **(a)** sketch the distribution of sample proportions;
+**(b)** what proportion of samples have more than 75% public schools?
+
+*Data:* `data/ch02/CollegeScores2yr.csv` (check on the 66% figure):
+
+```{python}
+#| echo: false
+c2 = pd.read_csv("data/ch02/CollegeScores2yr.csv")
+pd.Series({"Two-year colleges": len(c2),
+           "Public": int((c2.Control == "Public").sum()),
+           "Proportion public": round(float((c2.Control == "Public").mean()), 3),
+           "SE, n = 90": round(se_prop(0.66, 90), 4)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Distribution of sample proportions of public schools for samples of n = 90 two-year colleges when p = 0.66, with the area above 0.75 shaded
+prop_curve(0.66, se_prop(0.66, 90), shade=[("right", 0.75)])
+r = np.random.default_rng(2026)
+sims = r.binomial(90, 0.66, 10000) / 90
+pd.Series({"(b) Normal answer, P(p-hat > 0.75)":
+           round(float(stats.norm.sf((0.75 - 0.66) / se_prop(0.66, 90))), 4),
+           "(b) Simulated answer": round(float((sims > 0.75).mean()), 4)}).to_string()
+```
+
+- **(a)** The distribution of sample proportions is approximately
+  $N\left(0.66,\ SE = \sqrt{0.66 \cdot 0.34/90} \approx 0.05\right)$ —
+  sketched above (conditions easily met: $np = 59.4$, $n(1-p) = 30.6$).
+- **(b)** $z = (0.75 - 0.66)/0.05 = 1.80$, so about **0.036** of samples
+  (3.6%) have more than 75% public schools; the simulation above agrees.
+
+## Exercise 6.12
+
+**Private Four-year Colleges.** From `CollegeScores4yr` about 62% of US
+four-year colleges are private. For samples of $n = 75$ schools with
+$p = 0.62$: **(a)** sketch the distribution of sample proportions of
+private schools; **(b)** what proportion of samples have *less than 50%
+public* schools (i.e., more than 50% private)?
+
+*Data:* `data/ch02/CollegeScores4yr.csv` (check on the 62% figure):
+
+```{python}
+#| echo: false
+c4 = pd.read_csv("data/ch02/CollegeScores4yr.csv")
+pd.Series({"Four-year colleges": len(c4),
+           "Private": int((c4.Control == "Private").sum()),
+           "Proportion private": round(float((c4.Control == "Private").mean()), 3),
+           "SE, n = 75": round(se_prop(0.62, 75), 4)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Distribution of sample proportions of private schools for samples of n = 75 four-year colleges when p = 0.62, with the region above 0.50 shaded
+prop_curve(0.62, se_prop(0.62, 75), shade=[("right", 0.5)])
+r = np.random.default_rng(2026)
+sims = r.binomial(75, 0.62, 10000) / 75
+pd.Series({"(b) Normal answer, P(p-hat private > 0.5)":
+           round(float(stats.norm.sf((0.5 - 0.62) / se_prop(0.62, 75))), 4),
+           "(b) Simulated answer": round(float((sims > 0.5).mean()), 4)}).to_string()
+```
+
+- **(a)** The distribution of sample proportions of private schools is
+  approximately $N\left(0.62,\ SE = \sqrt{0.62 \cdot 0.38/75} \approx 0.056\right)$.
+- **(b)** Fewer than 50% public is the same event as more than 50% private,
+  so $z = (0.5 - 0.62)/0.056 = -2.14$ and the answer is
+  $P(Z > -2.14) \approx$ **0.984** — nearly all such samples have a majority
+  of private (fewer than half public) schools. The simulation above agrees.
+
+## Exercise 6.13
+
+*(Skill Builder 1)* 95% confidence interval for $p$ given
+$\hat p = 0.38$, $n = 500$.
+
+```{python}
+#| echo: false
+ci_row(0.38, 500, 0.95).to_string()
+```
+
+Best estimate **$\hat p = 0.38$**; SE $= \sqrt{0.38 \cdot 0.62/500} = 0.0217$;
+margin of error $= 1.96(0.0217) = 0.043$; CI **(0.337, 0.423)**.
+
+## Exercise 6.14
+
+*(Skill Builder 1)* 90% confidence interval for $p$ given
+$\hat p = 0.85$, $n = 120$.
+
+```{python}
+#| echo: false
+ci_row(0.85, 120, 0.90).to_string()
+```
+
+Best estimate **0.85**; margin of error $= 1.645(0.0326) = 0.054$; CI
+**(0.796, 0.904)**.
+
+## Exercise 6.15
+
+*(Skill Builder 1)* 99% confidence interval for the proportion answering
+"Yes", given 62 yes answers in a random sample of $n = 90$ people.
+
+```{python}
+#| echo: false
+ci_row(62 / 90, 90, 0.99).to_string()
+```
+
+$\hat p = 62/90 = 0.689$ (successes 62 and failures 28 both $\ge 10$, so the
+formula is valid); SE $= 0.0488$; margin of error $= 2.576(0.0488) = 0.126$;
+CI **(0.563, 0.815)** — wide, because $n$ is small, $\hat p$ is near 0.5,
+and 99% confidence demands a wide net.
+
+## Exercise 6.16
+
+*(Skill Builder 1)* 95% confidence interval for the proportion in
+Category A, given 23% of a sample of $n = 400$.
+
+```{python}
+#| echo: false
+ci_row(0.23, 400, 0.95).to_string()
+```
+
+Best estimate **0.23**; margin of error $= 1.96(0.021) = 0.041$; CI
+**(0.189, 0.271)**.
+
+## Exercise 6.17
+
+*(Skill Builder 2)* Sample size for a margin of error within ±5% with 95%
+confidence (no prior knowledge of $p$).
+
+```{python}
+#| echo: false
+n_needed(0.05, 0.95)
+```
+
+With $\tilde p = 0.5$ and $z^* = 1.96$:
+$$n = \left(\tfrac{1.96}{0.05}\right)^2 (0.5)(0.5) = 384.16 \Rightarrow \textbf{385 people}$$
+
+## Exercise 6.18
+
+*(Skill Builder 2)* Margin of error within ±1% with 99% confidence.
+
+```{python}
+#| echo: false
+n_needed(0.01, 0.99)
+```
+
+$$n = \left(\tfrac{2.576}{0.01}\right)^2 (0.5)(0.5) = 16589.4 \Rightarrow \textbf{16590 people}$$
+Tighter accuracy *and* more confidence cost a sample over 40 times larger
+than Exercise 6.17.
+
+## Exercise 6.19
+
+*(Skill Builder 2)* Margin of error within ±3% with 90% confidence, using
+the estimate $\tilde p \approx 0.3$.
+
+```{python}
+#| echo: false
+n_needed(0.03, 0.90, 0.3)
+```
+
+$$n = \left(\tfrac{1.645}{0.03}\right)^2 (0.3)(0.7) = 631.4 \Rightarrow \textbf{632 people}$$
+
+## Exercise 6.20
+
+*(Skill Builder 2)* Margin of error within ±2% with 95% confidence, using
+the pilot estimate $\hat p = 0.78$.
+
+```{python}
+#| echo: false
+n_needed(0.02, 0.95, 0.78)
+```
+
+$$n = \left(\tfrac{1.96}{0.02}\right)^2 (0.78)(0.22) = 1648.1 \Rightarrow \textbf{1649 people}$$
+
+## Exercise 6.21
+
+**What Proportion of Americans Say They Are Poor?** Of $n = 1000$ US
+adults surveyed in October 2019, 182 described themselves as poor. Build
+the 90% confidence interval with the formula: **(a)** sample statistic;
+**(b)** standard error; **(c)** $z^*$; **(d)** the interval.
+
+```{python}
+#| echo: false
+ci_row(182 / 1000, 1000, 0.90).to_string()
+```
+
+- **(a)** $\hat p = 182/1000 = 0.182$.
+- **(b)** $SE = \sqrt{0.182 \cdot 0.818/1000} = 0.0122$.
+- **(c)** $z^* = 1.645$ for 90% confidence.
+- **(d)** $0.182 \pm 1.645(0.0122) = 0.182 \pm 0.020$, CI **(0.162, 0.202)**.
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the sample proportion who say they are poor, with the 90% percentile interval marked
+boots = boot_props(1000, 182 / 1000)
+lo, hi = np.percentile(boots, [5, 95])
+fig, ax = plt.subplots(figsize=(6, 3))
+sns.histplot(x=boots, bins=30, ax=ax, color="#4c72b0")
+for v, lbl in [(lo, "5th pctile"), (hi, "95th pctile")]:
+    ax.axvline(v, color="#c44e52", lw=1.5)
+ax.set_xlabel("Bootstrap sample proportions")
+ax.set_ylabel("Bootstrap samples")
+plt.tight_layout()
+plt.show()
+pd.Series({"Bootstrap 90% percentile interval": f"({lo:.3f}, {hi:.3f})",
+           "Formula 90% interval": "(0.162, 0.202)"}).to_string()
+```
+
+The bootstrap percentile interval (Exercise 3.128 redo) lands within a
+thousandth or two of the formula interval — the two methods agree.
+
+## Exercise 6.22
+
+**Teen Cigarette Use Is Down.** In the 2019 National Youth Tobacco Survey
+of $n = 1582$ teens, 92 reported smoking a cigarette in the last 30 days.
+
+```{python}
+#| echo: false
+ci_row(92 / 1582, 1582, 0.99).to_string()
+```
+
+- **(a)** Parameter: $p$, the proportion of all US teens who smoked a
+  cigarette in the last 30 days.
+- **(b)** Statistic: $\hat p = 92/1582 = 0.058$.
+- **(c)** $SE = \sqrt{0.058 \cdot 0.942/1582} = 0.0059$.
+- **(d)** $z^* = 2.576$ for 99% confidence.
+- **(e)** $0.058 \pm 2.576(0.0059) = 0.058 \pm 0.015$, CI **(0.043, 0.073)**.
+- **(f)** Best estimate 0.058 (about 5.8% of teens); margin of error 0.015.
+
+## Exercise 6.23
+
+**How Many Household Cats Hunt Birds?** Using a sample of $n = 140$ US
+households with cats, 35% of household cats hunt outdoors.
+
+```{python}
+#| echo: false
+ci_row(0.35, 140, 0.95).to_string()
+```
+
+- **(a)** $0.35 \pm 1.96\sqrt{0.35 \cdot 0.65/140} = 0.35 \pm 0.079$, CI
+  **(0.271, 0.429)**: we are 95% sure that between 27.1% and 42.9% of US
+  household cats hunt outdoors.
+- **(b)** 0.45 lies above the interval, so it is **not plausible** at 95%
+  confidence; 0.30 lies inside the interval, so it **is plausible**.
+
+## Exercise 6.24
+
+**Have You Made a Friend Online?** A survey of 1060 US teens found 605
+who say they have made a new friend online.
+
+```{python}
+#| echo: false
+ci_row(605 / 1060, 1060, 0.90).to_string()
+```
+
+- **(a)** $\hat p = 605/1060 = 0.571$; $SE = 0.0152$; 90% CI:
+  $0.571 \pm 1.645(0.0152) = 0.571 \pm 0.025$, **(0.546, 0.596)** — we are
+  90% sure that between 54.6% and 59.6% of all US teens have made a new
+  friend online.
+- **(b)** Best estimate 0.571; margin of error 0.025.
+- **(c)** Yes — the entire interval lies above 0.5, so we can be 90%
+  confident that **more than half** of US teens have made a friend online.
+
+## Exercise 6.25
+
+**What Percent of US Adults Say They Never Exercise?** In a survey of
+$n = 1000$ US adults, 20% say they never exercise.
+
+```{python}
+#| echo: false
+ci_row(0.20, 1000, 0.99).to_string()
+```
+
+$0.20 \pm 2.576\sqrt{0.20 \cdot 0.80/1000} = 0.20 \pm 0.033$, CI
+**(0.167, 0.233)**: we are 99% sure that between 16.7% and 23.3% of US
+adults say they never exercise; the margin of error is 0.033.
+
+## Exercise 6.26
+
+**Fourth Down Conversions in American Football.** Of 1068 fourth-down
+situations where going for it was the right call, teams punted 959 times.
+
+```{python}
+#| echo: false
+ci_row(959 / 1068, 1068, 0.95).to_string()
+```
+
+$\hat p = 959/1068 = 0.898$; $SE = 0.0093$; 95% CI:
+$0.898 \pm 1.96(0.0093) = 0.898 \pm 0.018$, **(0.880, 0.916)** — we are 95%
+sure that NFL teams punt in about 88% to 92% of fourth-down situations
+where the statistics say they should go for it.
+
+## Exercise 6.27
+
+**One True Love?** Of 2625 respondents, 735 agreed that there is only one
+true love for each person, 1812 disagreed, and 78 answered "don't know."
+
+```{python}
+#| echo: false
+pd.DataFrame({"(a) Disagree": ci_row(1812 / 2625, 2625, 0.90),
+              "(b) Don't know": ci_row(78 / 2625, 2625, 0.90)}).to_string()
+```
+
+- **(a)** $\hat p = 1812/2625 = 0.690$; 90% CI **(0.675, 0.705)**.
+- **(b)** $\hat p = 78/2625 = 0.030$; 90% CI **(0.024, 0.035)**.
+- **(c)** The **disagree** estimate has the larger margin of error
+  (0.015 vs 0.005): at the same $n$, proportions closer to 0.5 give wider
+  intervals, while extreme proportions (near 0 or 1) give narrower ones.
+
+## Exercise 6.28
+
+*(Formula and Bootstrap SE)* Proportion of peanuts in mixed nuts, with
+$n = 100$ and $\hat p = 0.52$.
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the proportion of peanuts in 100 mixed nuts with the matching normal curve overlaid
+boots = boot_props(100, 0.52)
+fig, ax = plt.subplots(figsize=(6, 3))
+sns.histplot(x=boots, bins=25, ax=ax, color="#4c72b0", stat="density")
+xg = np.linspace(0.30, 0.74, 300)
+ax.plot(xg, stats.norm.pdf(xg, 0.52, se_prop(0.52, 100)), color="black", lw=2)
+ax.set_xlabel("Bootstrap sample proportions")
+ax.set_ylabel("Density")
+plt.tight_layout()
+plt.show()
+pd.Series({"Formula SE (CLT)": round(se_prop(0.52, 100), 4),
+           "Bootstrap SE": round(float(boots.std(ddof=1)), 4)}).to_string()
+```
+
+The central limit SE is $\sqrt{0.52 \cdot 0.48/100} = 0.0500$ and the
+bootstrap SE (10000 resamples above) is **0.0496** — nearly identical, as
+the overlaid normal curve suggests.
+
+## Exercise 6.29
+
+*(Formula and Bootstrap SE)* Proportion of home team wins in soccer, with
+$n = 120$ and $\hat p = 0.583$.
+
+```{python}
+#| echo: false
+boots = boot_props(120, 0.583)
+pd.Series({"Formula SE (CLT)": round(se_prop(0.583, 120), 4),
+           "Bootstrap SE": round(float(boots.std(ddof=1)), 4),
+           "Bootstrap 95% percentile interval":
+           f"({np.percentile(boots, 2.5):.3f}, {np.percentile(boots, 97.5):.3f})"}).to_string()
+```
+
+Formula SE **0.0450**, bootstrap SE **0.0448** — a match.
+
+## Exercise 6.30
+
+*(Formula and Bootstrap SE)* Proportion of lie-detector trials missing a
+lie, with $n = 48$ and $\hat p = 0.354$.
+
+```{python}
+#| echo: false
+boots = boot_props(48, 0.354)
+pd.Series({"Formula SE (CLT)": round(se_prop(0.354, 48), 4),
+           "Bootstrap SE": round(float(boots.std(ddof=1)), 4)}).to_string()
+```
+
+Formula SE **0.0690**, bootstrap SE **0.0689** — again in close agreement
+(both success and failure counts exceed 10: $48(0.354) = 17$,
+$48(0.646) = 31$).
+
+## Exercise 6.31
+
+*(Formula and Bootstrap SE)* Proportion saying exercise is important, with
+$n = 1000$ and $\hat p = 0.753$.
+
+```{python}
+#| echo: false
+boots = boot_props(1000, 0.753)
+pd.Series({"Formula SE (CLT)": round(se_prop(0.753, 1000), 4),
+           "Bootstrap SE": round(float(boots.std(ddof=1)), 4)}).to_string()
+```
+
+Formula SE **0.0136**, bootstrap SE **0.0136** — indistinguishable at this
+sample size.
+
+## Exercise 6.32
+
+*(Comparing Normal and Bootstrap CIs)* Proportion of home team wins in
+soccer, using $\hat p = 0.583$ with $n = 120$.
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the proportion of home team wins with the bootstrap percentile interval and the formula interval marked
+boots = boot_props(120, 0.583)
+lo, hi = np.percentile(boots, [2.5, 97.5])
+fig, ax = plt.subplots(figsize=(6, 3))
+sns.histplot(x=boots, bins=25, ax=ax, color="#4c72b0")
+for v, c in [(lo, "#c44e52"), (hi, "#c44e52"),
+             (0.583 - 1.96 * se_prop(0.583, 120), "#55a868"),
+             (0.583 + 1.96 * se_prop(0.583, 120), "#55a868")]:
+    ax.axvline(v, color=c, lw=1.5)
+ax.set_xlabel("Bootstrap sample proportions")
+ax.set_ylabel("Bootstrap samples")
+plt.tight_layout()
+plt.show()
+pd.Series({"Bootstrap 95% percentile interval": f"({lo:.3f}, {hi:.3f})",
+           "Formula 95% interval":
+           f"({0.583 - 1.96 * se_prop(0.583, 120):.3f}, {0.583 + 1.96 * se_prop(0.583, 120):.3f})"}).to_string()
+```
+
+Bootstrap percentile interval **(0.492, 0.667)** vs formula interval
+$0.583 \pm 1.96(0.045) =$ **(0.495, 0.671)**. The intervals agree to about
+half a percentage point — either is fine for inference here.
+
+## Exercise 6.33
+
+*(Comparing Normal and Bootstrap CIs)* Proportion of Reese's Pieces that
+are orange, using $\hat p = 0.48$ with $n = 150$.
+
+```{python}
+#| echo: false
+boots = boot_props(150, 0.48)
+pd.Series({"Bootstrap 95% percentile interval":
+           f"({np.percentile(boots, 2.5):.3f}, {np.percentile(boots, 97.5):.3f})",
+           "Formula 95% interval":
+           f"({0.48 - 1.96 * se_prop(0.48, 150):.3f}, {0.48 + 1.96 * se_prop(0.48, 150):.3f})"}).to_string()
+```
+
+Bootstrap percentile interval **(0.400, 0.560)** vs formula interval
+$0.48 \pm 1.96(0.0408) = 0.48 \pm 0.080 =$ **(0.400, 0.560)** — a very
+close match.
+
+## Exercise 6.34
+
+*(What Influences the Sample Size?)* Sample size for 95% confidence with
+margin of error ±6%, ±4%, and ±1% (no prior knowledge of $p$).
+
+```{python}
+#| echo: false
+pd.Series({f"ME = {me:.0%}": n_needed(me, 0.95)
+           for me in (0.06, 0.04, 0.01)}).to_string()
+```
+
+**267, 601, and 9604.** Halving the desired margin of error (6% → 3%-scale
+comparisons) multiplies the needed sample size by 4, since
+$n \propto 1/(ME)^2$ — demanding accuracy is quadratically expensive.
+
+## Exercise 6.35
+
+*(What Influences the Sample Size?)* Sample size for a margin of error of
+±3% at 99%, 95%, and 90% confidence (no prior knowledge of $p$).
+
+```{python}
+#| echo: false
+pd.Series({f"{int(c * 100)}% confidence": n_needed(0.03, c)
+           for c in (0.99, 0.95, 0.90)}).to_string()
+```
+
+**1844, 1068, and 752.** Higher confidence requires a larger sample to
+keep the same accuracy: more confidence means a bigger $z^*$ and thus a
+bigger $n$.
+
+## Exercise 6.36
+
+*(What Influences the Sample Size?)* Sample size for 95% confidence with
+margin of error ±3% using $\tilde p = 0.5$, then $\tilde p \approx 0.7$,
+then $\tilde p \approx 0.9$.
+
+```{python}
+#| echo: false
+pd.Series({f"tilde p = {pt}": n_needed(0.03, 0.95, pt)
+           for pt in (0.5, 0.7, 0.9)}).to_string()
+```
+
+**1068, 897, and 385.** The required sample size shrinks as the guessed
+$\tilde p$ moves away from 0.5, because $\tilde p(1-\tilde p)$ is largest
+at 0.5 — the conservative, no-prior-knowledge choice.
+
+## Exercise 6.37
+
+**Does the Public Support Sin Taxes?** Of $n = 1000$ US adults, 32% favor
+taxes on soda and junk food.
+
+```{python}
+#| echo: false
+ci_row(0.32, 1000, 0.95).to_string()
+pd.Series({"(c) n for ME = 0.01, tilde p = 0.32": n_needed(0.01, 0.95, 0.32),
+           "(c) n for ME = 0.01, tilde p = 0.5 (conservative)":
+           n_needed(0.01, 0.95, 0.5)}).to_string()
+```
+
+- **(a)** $0.32 \pm 1.96\sqrt{0.32 \cdot 0.68/1000} = 0.32 \pm 0.029$, CI
+  **(0.291, 0.349)**.
+- **(b)** Margin of error **0.029** (about 3%).
+- **(c)** Using the current estimate $\tilde p = 0.32$:
+  $n = (1.96/0.01)^2(0.32)(0.68) = 8359.3$, so **8360 adults** (using the
+  conservative $\tilde p = 0.5$ would demand 9604).
+
+## Exercise 6.38
+
+**What Proportion Favor a Gun Control Law?** Margin of error ±2% with 95%
+confidence, no prior knowledge of $p$.
+
+```{python}
+#| echo: false
+n_needed(0.02, 0.95, 0.5)
+```
+
+$$n = \left(\tfrac{1.96}{0.02}\right)^2(0.5)(0.5) = 2401 \Rightarrow \textbf{2401 people}$$
+
+## Exercise 6.39
+
+**Advertising a Sunscreen Pill.** Margin of error ±4% with 98% confidence
+(no prior knowledge of $p$, so $\tilde p = 0.5$).
+
+```{python}
+#| echo: false
+n_needed(0.04, 0.98, 0.5)
+```
+
+With $z^* = 2.326$ for 98% confidence:
+$$n = \left(\tfrac{2.326}{0.04}\right)^2(0.5)(0.5) = 845.6 \Rightarrow \textbf{846 individuals}$$
+
+## Exercise 6.40
+
+*(Using n = 1/(ME)^2)* Margin of error 0.01 at 95% confidence with
+$\tilde p = 0.5$.
+
+```{python}
+#| echo: false
+int(np.ceil(1 / 0.01 ** 2))
+```
+
+$$n \approx \frac{1}{(0.01)^2} = \textbf{10000}$$
+
+## Exercise 6.41
+
+*(Using n = 1/(ME)^2)* Margin of error 0.02.
+
+```{python}
+#| echo: false
+int(np.ceil(1 / 0.02 ** 2))
+```
+
+$$n \approx \frac{1}{(0.02)^2} = \textbf{2500}$$
+
+## Exercise 6.42
+
+*(Using n = 1/(ME)^2)* Margin of error 0.04.
+
+```{python}
+#| echo: false
+int(np.ceil(1 / 0.04 ** 2))
+```
+
+$$n \approx \frac{1}{(0.04)^2} = \textbf{625}$$
+
+## Exercise 6.43
+
+*(Using n = 1/(ME)^2)* Margin of error 0.05.
+
+```{python}
+#| echo: false
+int(np.ceil(1 / 0.05 ** 2))
+```
+
+$$n \approx \frac{1}{(0.05)^2} = \textbf{400}$$
+
+## Exercise 6.44
+
+**Sex of Atlanta Commuters.** The `CommuteAtlanta` dataset (Data 3.3)
+records the sex of each of 500 commuters; build and interpret a 95%
+confidence interval for the proportion who are male.
+
+*Data:* `data/ch03/CommuteAtlanta.csv`, from
+<https://www.lock5stat.com/datasets3e/CommuteAtlanta.csv>:
+
+```{python}
+#| echo: false
+ca = pd.read_csv("data/ch03/CommuteAtlanta.csv")
+sex = ca.Sex.dropna().to_numpy()
+pd.Series({"n": len(sex), "Male": int((sex == "M").sum()),
+           "Proportion male": round(float((sex == "M").mean()), 3)}).to_string()
+```
+
+```{python}
+#| echo: false
+ci_row((sex == "M").mean(), len(sex), 0.95).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the proportion of male commuters from resampling the CommuteAtlanta data, 95% percentile interval marked
+r = np.random.default_rng(2026)
+idx = r.integers(0, len(sex), (10000, len(sex)))
+boots = (sex[idx] == "M").mean(axis=1)
+lo, hi = np.percentile(boots, [2.5, 97.5])
+fig, ax = plt.subplots(figsize=(6, 3))
+sns.histplot(x=boots, bins=25, ax=ax, color="#4c72b0")
+for v in (lo, hi):
+    ax.axvline(v, color="#c44e52", lw=1.5)
+ax.set_xlabel("Bootstrap proportions male")
+ax.set_ylabel("Bootstrap samples")
+plt.tight_layout()
+plt.show()
+pd.Series({"Bootstrap 95% percentile interval": f"({lo:.3f}, {hi:.3f})"}).to_string()
+```
+
+$\hat p = 254/500 = 0.508$; formula 95% CI **(0.464, 0.552)** — matching
+the bootstrap percentile interval above. We are 95% sure that between
+46.4% and 55.2% of Atlanta commuters are male; the interval contains 0.5,
+so the commuting population is plausibly split about evenly.
+
+## Exercise 6.45
+
+**Survival of ICU Patients.** The `ICUAdmissions` dataset (Data 2.3) has
+200 ICU patients with Status 0 (lived) or 1 (died); build and interpret a
+95% confidence interval for the proportion who live.
+
+*Data:* `data/ch03/ICUAdmissions.csv`, from
+<https://www.lock5stat.com/datasets3e/ICUAdmissions.csv>:
+
+```{python}
+#| echo: false
+icu = pd.read_csv("data/ch03/ICUAdmissions.csv")
+st = icu.Status.dropna().to_numpy()
+pd.Series({"n": len(st), "Lived": int((st == 0).sum()),
+           "Proportion who live": round(float((st == 0).mean()), 3)}).to_string()
+```
+
+```{python}
+#| echo: false
+ci_row((st == 0).mean(), len(st), 0.95).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the proportion of ICU patients who live from resampling the ICUAdmissions data, 95% percentile interval marked
+r = np.random.default_rng(2026)
+idx = r.integers(0, len(st), (10000, len(st)))
+boots = (st[idx] == 0).mean(axis=1)
+lo, hi = np.percentile(boots, [2.5, 97.5])
+fig, ax = plt.subplots(figsize=(6, 3))
+sns.histplot(x=boots, bins=25, ax=ax, color="#4c72b0")
+for v in (lo, hi):
+    ax.axvline(v, color="#c44e52", lw=1.5)
+ax.set_xlabel("Bootstrap proportion who live")
+ax.set_ylabel("Bootstrap samples")
+plt.tight_layout()
+plt.show()
+pd.Series({"Bootstrap 95% percentile interval": f"({lo:.3f}, {hi:.3f})"}).to_string()
+```
+
+$\hat p = 160/200 = 0.80$; formula 95% CI
+$0.80 \pm 1.96(0.0283) =$ **(0.745, 0.855)**, agreeing with the bootstrap
+percentile interval above. We are 95% sure that between 74.5% and 85.5% of
+comparable ICU patients live.
+
+## Exercise 6.46
+
+*(Skill Builder 1)* Test $H_0\colon p = 0.5$ vs $H_a\colon p > 0.5$ using
+$\hat p = 0.57$ with $n = 40$.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of sample proportions when p = 0.5 for n = 40, observed 0.57 shaded in the right tail
+boots, p_rand = rand_prop(40, 0.5, 0.57, "right")
+tail_plot(boots, 0.57, "right", "Randomization sample proportions", bins=18)
+pd.Series({"Randomization p-value": round(p_rand, 4)}).to_string()
+```
+
+```{python}
+#| echo: false
+ht_row(0.57, 40, 0.5, "right").to_string()
+```
+
+Conditions: $np_0 = 20$ and $n(1-p_0) = 20$, so the normal test is
+appropriate. $z = (0.57 - 0.5)/0.079 = 0.89$ and **p-value ≈ 0.188**
+(randomization simulation above agrees). Since $0.188 > 0.05$ we do not
+reject $H_0$: no evidence that $p$ exceeds 0.5.
+
+## Exercise 6.47
+
+*(Skill Builder 1)* Test $H_0\colon p = 0.3$ vs $H_a\colon p < 0.3$ using
+$\hat p = 0.21$ with $n = 200$.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of sample proportions when p = 0.3 for n = 200, observed 0.21 shaded in the left tail
+boots, p_rand = rand_prop(200, 0.3, 0.21, "left")
+tail_plot(boots, 0.21, "left", "Randomization sample proportions", bins=24)
+pd.Series({"Randomization p-value": round(p_rand, 4)}).to_string()
+```
+
+```{python}
+#| echo: false
+ht_row(0.21, 200, 0.3, "left").to_string()
+```
+
+Conditions: $np_0 = 60$, $n(1-p_0) = 140$ — fine. $z = -2.78$ and
+**p-value ≈ 0.0027** (simulation agrees). Since $0.0027 < 0.05$ we
+**reject $H_0$**: convincing evidence that $p$ is less than 0.3.
+
+## Exercise 6.48
+
+*(Skill Builder 1)* Test $H_0\colon p = 0.25$ vs $H_a\colon p < 0.25$
+using $\hat p = 0.16$ with $n = 100$.
+
+```{python}
+#| echo: false
+boots, p_rand = rand_prop(100, 0.25, 0.16, "left")
+pd.Series({"Randomization p-value": round(p_rand, 4)}).to_string()
+```
+
+```{python}
+#| echo: false
+ht_row(0.16, 100, 0.25, "left").to_string()
+```
+
+Conditions: $np_0 = 25$, $n(1-p_0) = 75$ — appropriate. $z = -2.08$ and
+**p-value ≈ 0.019** (simulation agrees). Since $0.019 < 0.05$ we reject
+$H_0$: evidence that $p < 0.25$.
+
+## Exercise 6.49
+
+*(Skill Builder 1)* Test $H_0\colon p = 0.8$ vs $H_a\colon p > 0.8$ using
+$\hat p = 0.88$ with $n = 50$.
+
+```{python}
+#| echo: false
+boots, p_rand = rand_prop(50, 0.8, 0.88, "right")
+pd.Series({"Randomization p-value": round(p_rand, 4)}).to_string()
+```
+
+```{python}
+#| echo: false
+ht_row(0.88, 50, 0.8, "right").to_string()
+```
+
+Conditions: $np_0 = 40$, $n(1-p_0) = 10$ — just met. $z = 0.08/0.0566 =
+1.41$ and **p-value ≈ 0.079** (simulation agrees). Since $0.079 > 0.05$ we
+do not reject $H_0$: no evidence that $p > 0.8$.
+
+## Exercise 6.50
+
+*(Skill Builder 1)* Test $H_0\colon p = 0.75$ vs $H_a\colon p \ne 0.75$
+using $\hat p = 0.69$ with $n = 120$.
+
+```{python}
+#| echo: false
+boots, p_rand = rand_prop(120, 0.75, 0.69, "two")
+pd.Series({"Randomization p-value": round(p_rand, 4)}).to_string()
+```
+
+```{python}
+#| echo: false
+ht_row(0.69, 120, 0.75, "two").to_string()
+```
+
+Conditions: $np_0 = 90$, $n(1-p_0) = 30$ — appropriate. $z = -1.52$ and
+**p-value ≈ 0.129** (two-tailed; simulation agrees). Since $0.129 > 0.05$ we do not reject $H_0$: no evidence that $p$
+differs from 0.75.
+
+## Exercise 6.51
+
+*(Skill Builder 1)* Test $H_0\colon p = 0.2$ vs $H_a\colon p \ne 0.2$
+using $\hat p = 0.26$ with $n = 1000$.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of sample proportions when p = 0.2 for n = 1000, observed 0.26 marked
+boots, p_rand = rand_prop(1000, 0.2, 0.26, "two")
+tail_plot(boots, 0.26, "two", "Randomization sample proportions",
+          null=0.2, bins=30)
+pd.Series({"Randomization p-value": round(p_rand, 4)}).to_string()
+```
+
+```{python}
+#| echo: false
+ht_row(0.26, 1000, 0.2, "two").to_string()
+```
+
+Conditions: $np_0 = 200$, $n(1-p_0) = 800$ — easily met. $z = 4.74$ and
+**p-value ≈ 0.000002** (simulation gives 0). Since this is far below 0.05
+we reject $H_0$: very strong evidence that $p$ differs from 0.2.
+
+## Exercise 6.52
+
+**Antibiotics in Infancy.** Of 616 Canadian children in a longitudinal
+study, 438 received antibiotics during the first year of life. Test
+whether more than 70% of Canadian children receive antibiotics in infancy
+(5% level, all details).
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the antibiotic proportion when p = 0.7 for n = 616, observed 0.711 shaded in the right tail
+boots, p_rand = rand_prop(616, 0.7, 438 / 616, "right")
+tail_plot(boots, 438 / 616, "right", "Randomization sample proportions",
+          bins=24)
+p_row("Proportion with antibiotics", 438 / 616, boots, "right").to_string()
+```
+
+```{python}
+#| echo: false
+ht_row(438 / 616, 616, 0.7, "right").to_string()
+```
+
+- **Hypotheses:** $H_0\colon p = 0.7$ vs $H_a\colon p > 0.7$, where $p$ is
+  the proportion of all Canadian children receiving antibiotics in the
+  first year.
+- **Statistic:** $\hat p = 438/616 = 0.711$; conditions
+  $np_0 = 431$, $n(1-p_0) = 185$ pass.
+- **Test statistic:** $z = (0.711 - 0.7)/0.0185 = 0.60$.
+- **p-value ≈ 0.275** (randomization above agrees).
+- **Conclusion:** since $0.275 > 0.05$ we do not reject $H_0$ — the data
+  provide **no evidence** that more than 70% of Canadian children receive
+  antibiotics during the first year of life.
+
+## Exercise 6.53
+
+**Left-Handed Lawyers.** About 10% of Americans are left-handed; in a
+random sample of 105 lawyers, 16 were left-handed. Test whether the
+proportion of left-handed lawyers differs from 0.10.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the left-handed proportion when p = 0.1 for n = 105, observed 0.152 marked
+boots, p_rand = rand_prop(105, 0.1, 16 / 105, "two")
+tail_plot(boots, 16 / 105, "two", "Randomization sample proportions",
+          null=0.1, bins=22)
+p_row("Proportion left-handed", 16 / 105, boots, "two", null=0.1).to_string()
+```
+
+```{python}
+#| echo: false
+ht_row(16 / 105, 105, 0.1, "two").to_string()
+pd.Series({"Significant at 5%?": "No", "Significant at 10%?": "Yes"}).to_string()
+```
+
+- **(a)** $H_0\colon p = 0.10$ vs $H_a\colon p \ne 0.10$, where $p$ is the
+  proportion of all left-handed lawyers.
+- **(b)** $\hat p = 16/105 = 0.152$; conditions $np_0 = 10.5$,
+  $n(1-p_0) = 94.5$ pass. $SE = \sqrt{0.1 \cdot 0.9/105} = 0.0293$;
+  $z = 1.79$ and **p-value ≈ 0.074** (two-tailed; simulation above gives
+  about the same).
+- **(c)** Since $0.074 > 0.05$ we do **not** conclude a difference at the
+  5% level — but since $0.074 < 0.10$ the difference **is** significant at
+  the 10% level: moderate evidence that lawyers are more often left-handed
+  than the general population.
+
+## Exercise 6.54
+
+**Do You Believe in Ghosts?** A telephone survey of 1000 US adults found
+31% believe in ghosts. Does this provide evidence that more than 1 in 4
+US adults believe in ghosts?
+
+```{python}
+#| echo: false
+#| fig-cap: Standard normal curve with the right tail beyond z = 4.38 shaded
+zcurve((0.31 - 0.25) / se_prop(0.25, 1000), "right")
+ht_row(0.31, 1000, 0.25, "right").to_string()
+```
+
+- **Hypotheses:** $H_0\colon p = 0.25$ vs $H_a\colon p > 0.25$; conditions
+  $np_0 = 250$, $n(1-p_0) = 750$ pass.
+- **Test statistic:** $z = (0.31 - 0.25)/0.0137 = 4.38$.
+- **p-value ≈ 0.000006** — essentially zero.
+- **Conclusion:** reject $H_0$; the data provide very strong evidence that
+  **more than 25%** of US adults believe in ghosts.
+
+## Exercise 6.55
+
+**What Proportion of College Students Are Satisfied?** Of 5204 first-year
+full-time college students surveyed at the end of their first year, 4122
+said they were satisfied with their overall academic experience. Test
+whether more than 75% of US full-time students are satisfied.
+
+```{python}
+#| echo: false
+#| fig-cap: Standard normal curve with the right tail beyond z = 7.01 shaded
+zcurve((4122 / 5204 - 0.75) / se_prop(0.75, 5204), "right")
+ht_row(4122 / 5204, 5204, 0.75, "right").to_string()
+```
+
+- **Hypotheses:** $H_0\colon p = 0.75$ vs $H_a\colon p > 0.75$; conditions
+  $np_0 = 3903$, $n(1-p_0) = 1301$ pass.
+- **Statistic:** $\hat p = 4122/5204 = 0.792$.
+- **Test statistic:** $z = (0.792 - 0.75)/0.006 = 7.01$ — seven standard
+  errors above the null.
+- **p-value ≈ $10^{-12}$**, essentially zero.
+- **Conclusion:** reject $H_0$; very strong evidence that **more than
+  75%** of US first-year full-time students are satisfied with their
+  academic experience.
+
+## Exercise 6.56
+
+**Are Husbands More Likely to Be Older Than Wives?** In a sample of 105
+marriages, the husband was older in 75. Test whether the husband is older
+in more than half of all male-female married couples.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the proportion of marriages with an older husband when p = 0.5 for n = 105, observed 0.714 shaded in the right tail
+boots, p_rand = rand_prop(105, 0.5, 75 / 105, "right")
+tail_plot(boots, 75 / 105, "right", "Randomization sample proportions",
+          bins=22)
+p_row("Proportion husband older", 75 / 105, boots, "right").to_string()
+```
+
+```{python}
+#| echo: false
+ht_row(75 / 105, 105, 0.5, "right").to_string()
+```
+
+- **Hypotheses:** $H_0\colon p = 0.5$ vs $H_a\colon p > 0.5$, where $p$ is
+  the proportion of all male-female married couples in which the husband
+  is older; conditions $np_0 = n(1-p_0) = 52.5$ pass.
+- **Statistic:** $\hat p = 75/105 = 0.714$.
+- **Test statistic:** $z = (0.714 - 0.5)/0.0488 = 4.39$.
+- **p-value ≈ 0.000006** (randomization above agrees).
+- **Conclusion:** reject $H_0$ — strong evidence that the husband is older
+  than the wife in **more than half** of male-female married couples.
+
+## Exercise 6.57
+
+**Home Field Advantage in Baseball 2009.** Of 2430 MLB games played in
+2009, the home team won 54.9%. Treating these as a sample of all MLB
+games, test at the 1% level whether the home team wins more than half.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of home-win proportions when p = 0.5 for n = 2430 games, observed 0.549 shaded in the right tail
+boots, p_rand = rand_prop(2430, 0.5, 0.549, "right")
+tail_plot(boots, 0.549, "right", "Randomization sample proportions",
+          bins=26)
+p_row("Proportion of home wins", 0.549, boots, "right").to_string()
+```
+
+```{python}
+#| echo: false
+ht_row(0.549, 2430, 0.5, "right", alpha=0.01).to_string()
+```
+
+- **Hypotheses:** $H_0\colon p = 0.5$ vs $H_a\colon p > 0.5$; conditions
+  $np_0 = n(1-p_0) = 1215$ pass.
+- **Statistic:** $\hat p = 0.549$.
+- **Test statistic:** $z = (0.549 - 0.5)/0.0101 = 4.83$.
+- **p-value ≈ 0.0000007** (randomization above agrees).
+- **Conclusion:** since $0.0000007 < 0.01$ we reject $H_0$ — very strong
+  evidence that home teams win **more than half** of MLB games: a real
+  home field advantage.
+
+## Exercise 6.58
+
+**Home Field Advantage in Baseball 2018.** Of 2458 MLB games played in
+2018, the home team won 1297. Test at the 1% level whether the home team
+wins more than half.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of home-win proportions when p = 0.5 for n = 2458 games, observed 0.528 shaded in the right tail
+boots, p_rand = rand_prop(2458, 0.5, 1297 / 2458, "right")
+tail_plot(boots, 1297 / 2458, "right", "Randomization sample proportions",
+          bins=26)
+p_row("Proportion of home wins", 1297 / 2458, boots, "right").to_string()
+```
+
+```{python}
+#| echo: false
+ht_row(1297 / 2458, 2458, 0.5, "right", alpha=0.01).to_string()
+```
+
+- **Hypotheses:** $H_0\colon p = 0.5$ vs $H_a\colon p > 0.5$; conditions
+  $np_0 = n(1-p_0) = 1229$ pass.
+- **Statistic:** $\hat p = 1297/2458 = 0.528$.
+- **Test statistic:** $z = (0.528 - 0.5)/0.0101 = 2.74$.
+- **p-value ≈ 0.003** (randomization above agrees).
+- **Conclusion:** since $0.003 < 0.01$ we reject $H_0$ — evidence that
+  home teams still win more than half the games in 2018, though the
+  advantage is smaller than in 2009 (Exercise 6.57).
+
+## Exercise 6.59
+
+**Do You Know Your Neighbors?** A survey of 2255 randomly selected US
+adults found 51% know all or most of their neighbors. Does this provide
+evidence that more than half of US adults know most or all of their
+neighbors?
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of sample proportions when p = 0.5 for n = 2255, observed 0.51 shaded in the right tail
+boots, p_rand = rand_prop(2255, 0.5, 0.51, "right")
+tail_plot(boots, 0.51, "right", "Randomization sample proportions",
+          bins=26)
+p_row("Proportion knowing neighbors", 0.51, boots, "right").to_string()
+```
+
+```{python}
+#| echo: false
+ht_row(0.51, 2255, 0.5, "right").to_string()
+```
+
+Conditions: $np_0 = n(1-p_0) = 1127.5$ pass. $z = (0.51 - 0.5)/0.0105 =
+0.95$ and **p-value ≈ 0.171** (simulation above agrees). Since
+$0.171 > 0.05$ we do not reject $H_0$: a 51% sample result is entirely
+typical when the true proportion is 50%, so the data provide **no
+evidence** that more than half of US adults know most or all of their
+neighbors.
+
+## Exercise 6.60
+
+**Is B a Good Choice on a Multiple-Choice Exam?** On AP exams each
+question has five options; in a random sample of 400 correct answers from
+a variety of AP exams, B was the correct choice 90 times. Test whether B
+is more likely to be correct than the 20% expected if all options were
+equally likely.
+
+*Data:* `data/ch06/APMultipleChoice.csv`, from
+<https://www.lock5stat.com/datasets3e/APMultipleChoice.csv>:
+
+```{python}
+#| echo: false
+ap = pd.read_csv("data/ch06/APMultipleChoice.csv")
+ap.Answer.value_counts().to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the count of B answers when each option is equally likely for n = 400 questions, observed 90 shaded in the right tail
+boots, p_rand = rand_prop(400, 0.2, 90 / 400, "right")
+tail_plot(boots, 90 / 400, "right", "Randomization sample proportions",
+          bins=26)
+p_row("Proportion of B answers", 90 / 400, boots, "right").to_string()
+```
+
+```{python}
+#| echo: false
+ht_row(90 / 400, 400, 0.2, "right").to_string()
+```
+
+- **Hypotheses:** $H_0\colon p = 0.2$ vs $H_a\colon p > 0.2$, where $p$ is
+  the probability that B is the correct choice; conditions $np_0 = 80$,
+  $n(1-p_0) = 320$ pass.
+- **Statistic:** $\hat p = 90/400 = 0.225$.
+- **Test statistic:** $z = (0.225 - 0.2)/0.02 = 1.25$.
+- **p-value ≈ 0.106** (randomization above, run on the actual answer data,
+  agrees).
+- **Conclusion:** since $0.106 > 0.05$ we do not reject $H_0$ — the data
+  do **not** provide evidence that B is disproportionately the correct
+  choice on AP multiple-choice questions.
+
+## Exercise 6.61
+
+**Euchre.** After 40 games between Team A and Team B, Team A has won 16
+and Team B 24. Can we conclude that one team is better than the other?
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the proportion of games won by Team A when p = 0.5 for n = 40 games, observed 0.4 marked
+boots, p_rand = rand_prop(40, 0.5, 0.4, "two")
+tail_plot(boots, 0.4, "two", "Randomization sample proportions",
+          null=0.5, bins=18)
+p_row("Proportion of games won by Team A", 0.4, boots, "two", null=0.5).to_string()
+```
+
+```{python}
+#| echo: false
+ht_row(0.4, 40, 0.5, "two").to_string()
+```
+
+- **Hypotheses:** $H_0\colon p = 0.5$ vs $H_a\colon p \ne 0.5$, where $p$
+  is the proportion of all such games Team A would win (if neither team is
+  better); conditions $np_0 = n(1-p_0) = 20$ pass.
+- **Statistic:** $\hat p = 16/40 = 0.4$.
+- **Test statistic:** $z = (0.4 - 0.5)/0.0791 = -1.26$.
+- **p-value ≈ 0.206** (two-tailed; simulation above agrees).
+- **Conclusion:** since $0.206 > 0.05$ we do not reject $H_0$ — a 16–24
+  record over 40 games is unremarkable random variation, so the data give
+  **no evidence that either team is better**.
+
+## Exercise 6.62
+
+**Do Babies Understand Probability?** Each of 24 ten- to twelve-month-old
+infants chose between two jars with the same number of preferred objects
+but different probabilities of drawing one; 18 chose the higher-proportion
+jar.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the proportion of infants choosing the higher-probability jar when p = 0.5 for n = 24, observed 0.75 shaded in the right tail
+boots, p_rand = rand_prop(24, 0.5, 18 / 24, "right")
+tail_plot(boots, 0.75, "right", "Randomization sample proportions",
+          bins=np.arange(0.0, 1.05, 1 / 24))
+p_row("Proportion choosing higher-probability jar", 18 / 24, boots,
+      "right").to_string()
+```
+
+```{python}
+#| echo: false
+ht_row(18 / 24, 24, 0.5, "right").to_string()
+pd.Series({"Exact randomization p-value, P(X >= 18) for Bin(24, 0.5)":
+           round(float(stats.binom.sf(17, 24, 0.5)), 4)}).to_string()
+```
+
+- **(a)** $H_0\colon p = 0.5$ vs $H_a\colon p > 0.5$, where $p$ is the
+  proportion of all such infants who choose the jar with the higher
+  proportion of their preferred color.
+- **(b)** Statistic: $\hat p = 18/24 = 0.75$.
+- **(c)** **Either one.** The counts $np_0 = 12$ and $n(1-p_0) = 12$ just
+  satisfy the large-sample conditions, so the normal test is acceptable —
+  but with only 24 infants the exact randomization (binomial) test is just
+  as easy and slightly safer.
+- **(d)** Normal: $z = (0.75 - 0.5)/0.102 = 2.45$, **p-value ≈ 0.0072**;
+  exact randomization: $P(X \ge 18)$ for $X \sim \text{Bin}(24, 0.5)$ =
+  **0.0113** (simulation above agrees).
+- **(e)** Both p-values are below $\alpha = 0.05$, so we reject $H_0$:
+  the infants choose the higher-probability jar **more often than chance**,
+  evidence that even pre-verbal babies reason probabilistically.
+
+## Exercise 6.63
+
+**Percent of Smokers.** The `NutritionStudy` dataset records whether each
+of 315 people smokes. Use technology to test whether the data provide
+evidence that the proportion of smokers is different from 20%.
+
+*Data:* `data/ch02/NutritionStudy.csv`, from
+<https://www.lock5stat.com/datasets3e/NutritionStudy.csv>:
+
+```{python}
+#| echo: false
+ns = pd.read_csv("data/ch02/NutritionStudy.csv")
+smk = ns.Smoke.dropna().to_numpy()
+pd.Series({"n": len(smk), "Smokers (yes)": int((smk == "Yes").sum()),
+           "Proportion": round(float((smk == "Yes").mean()), 4)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the smoker proportion when p = 0.2 for n = 315, observed 0.137 marked
+boots, p_rand = rand_prop(315, 0.2, (smk == "Yes").mean(), "two")
+tail_plot(boots, (smk == "Yes").mean(), "two",
+          "Randomization sample proportions", null=0.2, bins=26)
+p_row("Proportion of smokers", (smk == "Yes").mean(), boots, "two",
+      null=0.2).to_string()
+```
+
+```{python}
+#| echo: false
+ht_row((smk == "Yes").mean(), 315, 0.2, "two").to_string()
+```
+
+$\hat p = 43/315 = 0.137$; conditions $np_0 = 63$, $n(1-p_0) = 252$ pass.
+$z = (0.137 - 0.2)/0.0225 = -2.82$ and **p-value ≈ 0.005** (two-tailed;
+shuffling the actual data above agrees). Since $0.005 < 0.05$ we reject
+$H_0$: the proportion of smokers in this sample is significantly
+**different from 20%** — in fact, distinctly lower.
+
+## Exercise 6.64
+
+**Regular Vitamin Use.** The same `NutritionStudy` dataset records
+whether each person takes a multivitamin pill regularly. Test whether the
+data provide evidence that the proportion taking vitamins regularly is
+different from 35%.
+
+*Data:* `data/ch02/NutritionStudy.csv`, from
+<https://www.lock5stat.com/datasets3e/NutritionStudy.csv>:
+
+```{python}
+#| echo: false
+vit = ns.VitaminUse.dropna().to_numpy()
+pd.Series({"n": len(vit),
+           "Counts": vit.tolist().count("Regular"),
+           "Proportion regular": round(float((vit == "Regular").mean()), 4)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the regular vitamin-use proportion when p = 0.35 for n = 315, observed 0.387 marked
+boots, p_rand = rand_prop(315, 0.35, (vit == "Regular").mean(), "two")
+tail_plot(boots, (vit == "Regular").mean(), "two",
+          "Randomization sample proportions", null=0.35, bins=26)
+p_row("Proportion taking vitamins regularly", (vit == "Regular").mean(),
+      boots, "two", null=0.35).to_string()
+```
+
+```{python}
+#| echo: false
+ht_row((vit == "Regular").mean(), 315, 0.35, "two").to_string()
+```
+
+$\hat p = 122/315 = 0.387$; conditions $np_0 = 110.25$,
+$n(1-p_0) = 204.75$ pass. $z = (0.387 - 0.35)/0.0269 = 1.39$ and
+**p-value ≈ 0.165** (two-tailed; shuffling the actual data above agrees).
+Since $0.165 > 0.05$ we do not reject $H_0$: the data provide **no
+evidence** that the proportion of people taking a vitamin pill regularly
+differs from 35%.
+
+:::

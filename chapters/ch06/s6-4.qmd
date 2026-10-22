@@ -1,0 +1,1485 @@
+---
+execute-dir: project
+title: "Chapter 6 · Section 6.4"
+subtitle: "Inference for a Difference in Means — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 6.4 moves from one sample to two: comparing the means of two
+*independent* groups through the difference in means
+$\mu_1-\mu_2$. The sample statistic is $\bar x_1-\bar x_2$ and, as
+Section 6.4-D shows, its standard error is estimated from the two samples by
+$$SE=\sqrt{\frac{s_1^2}{n_1}+\frac{s_2^2}{n_2}}.$$
+Because the population standard deviations are estimated from the samples,
+the standardized statistic follows a **$t$-distribution** rather than a
+standard normal. For degrees of freedom the book uses the conservative
+**smaller of $n_1-1$ and $n_2-1$**, while technology uses the more precise
+**Welch–Satterthwaite** approximation — below we report both. A confidence
+interval is $(\bar x_1-\bar x_2)\pm t^*\cdot SE$, and a hypothesis test uses
+$$t=\frac{(\bar x_1-\bar x_2)-0}{SE}$$
+with $H_0\colon \mu_1=\mu_2$. The conditions are random samples, reasonably
+normal populations (or large samples, $n_1\ge 30$ and $n_2\ge 30$), and
+*independent* groups — the SE formula applies only to two separate samples,
+not to paired data (the cautionary wetsuit example that opens Section 6.5).
+Below every interval and test is computed with `scipy.stats`
+(`ttest_ind` with `equal_var=False` when raw data are available), and the
+$t$-based answers are verified against randomization shuffles
+(10000 reps, seed 2026) wherever the data allow. The 58 exercises run from
+**6.198 to 6.255**: Skill Builders 6.198–6.205 practice the SE formula and
+$t$-curves; 6.206–6.226 build and interpret confidence intervals; and
+6.227–6.255 carry out full two-sample $t$-tests, ending with output-reading
+and raw-data comparisons.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+from scipy import stats
+sns.set_theme(style="whitegrid")
+
+def t_p(t, df, tail):
+    """p-value for a t-statistic on a t-distribution with df degrees of freedom."""
+    if tail == "right":
+        return float(stats.t.sf(t, df))
+    if tail == "left":
+        return float(stats.t.cdf(t, df))
+    return float(2 * stats.t.sf(abs(t), df))
+
+def se_diff(s1, n1, s2, n2):
+    """Formula SE for a difference in means."""
+    return float(np.sqrt(s1**2 / n1 + s2**2 / n2))
+
+def welch_df(s1, n1, s2, n2):
+    """Welch-Satterthwaite degrees of freedom."""
+    v1, v2 = s1**2 / n1, s2**2 / n2
+    return float((v1 + v2)**2 / (v1**2 / (n1 - 1) + v2**2 / (n2 - 1)))
+
+def ttest_row(x1, s1, n1, x2, s2, n2, tail, digits=4):
+    """Two-sample t-test from summary statistics: t, conservative df (min),
+    Welch df, and both p-values."""
+    se = se_diff(s1, n1, s2, n2)
+    t = (x1 - x2) / se
+    dfmin = min(n1 - 1, n2 - 1)
+    dfw = welch_df(s1, n1, s2, n2)
+    return pd.Series({"Difference (x1 - x2)": round(float(x1 - x2), 4),
+                      "SE": round(se, 4),
+                      "t-statistic": round(float(t), 3),
+                      "df (min)": dfmin,
+                      "p (t, df=min)": round(t_p(t, dfmin, tail), digits),
+                      "df (Welch)": round(dfw, 1),
+                      "p (t, Welch df)": round(t_p(t, dfw, tail), digits)})
+
+def tci_row(x1, s1, n1, x2, s2, n2, conf, digits=4):
+    """Confidence interval for mu1 - mu2 using the book's conservative
+    df = min(n1-1, n2-1), plus the Welch-df version."""
+    se = se_diff(s1, n1, s2, n2)
+    est = float(x1 - x2)
+    dfmin = min(n1 - 1, n2 - 1)
+    dfw = welch_df(s1, n1, s2, n2)
+    tm = float(stats.t.ppf((1 + conf) / 2, dfmin))
+    tw = float(stats.t.ppf((1 + conf) / 2, dfw))
+    return pd.Series({"Best estimate": round(est, 4),
+                      "SE": round(se, 4),
+                      "t* (df=min)": round(tm, 3),
+                      "Margin of error": round(tm * se, 4),
+                      f"{int(conf*100)}% CI (df=min)":
+                          f"({est - tm*se:.4f}, {est + tm*se:.4f})",
+                      "df (Welch)": round(dfw, 1),
+                      f"{int(conf*100)}% CI (Welch)":
+                          f"({est - tw*se:.4f}, {est + tw*se:.4f})"})
+
+def welch_test(a, b, tail, label, digits=4):
+    """Two-sample t-test from raw data via scipy (Welch) plus the conservative
+    df = min(n1-1, n2-1) p-value."""
+    r = stats.ttest_ind(a, b, equal_var=False)
+    t, dfw = float(r.statistic), float(r.df)
+    dfmin = len(a) + len(b) - 2 if False else min(len(a), len(b)) - 1
+    return pd.Series({label: round(float(a.mean() - b.mean()), 4),
+                      "SE": round(se_diff(a.std(ddof=1), len(a),
+                                          b.std(ddof=1), len(b)), 4),
+                      "t-statistic": round(t, 3),
+                      "df (Welch)": round(dfw, 1),
+                      "p (t, Welch df)": round(t_p(t, dfw, tail), digits),
+                      "df (min)": dfmin,
+                      "p (t, df=min)": round(t_p(t, dfmin, tail), digits)})
+
+def shuffle_stats(pooled, n1, stat_fn, reps=10000, seed=2026):
+    """Randomization distribution by shuffling group labels: permute `pooled`,
+    give the first n1 values to group 1, and apply stat_fn(group1, group2)."""
+    r = np.random.default_rng(seed)
+    pooled = np.asarray(pooled, float)
+    out = np.empty(reps)
+    for i in range(reps):
+        perm = r.permutation(pooled)
+        out[i] = stat_fn(perm[:n1], perm[n1:])
+    return out
+
+def tail_plot(boots, observed, tail, xlabel, null=0.0, bins=40, figsize=(6, 3)):
+    """Histogram of a randomization/bootstrap distribution with the tail beyond
+    the observed statistic shaded."""
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.histplot(x=boots, bins=bins, ax=ax, color="#4c72b0")
+    if tail == "right":
+        mask = boots >= observed
+    elif tail == "left":
+        mask = boots <= observed
+    else:
+        mask = np.abs(boots - null) >= abs(observed - null)
+    if mask.any():
+        sns.histplot(x=boots[mask], bins=bins, ax=ax, color="#c44e52")
+    ax.axvline(observed, color="black", lw=1.5)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Simulated statistics")
+    plt.tight_layout()
+    plt.show()
+
+def p_row(label, stat, boots, tail, null=0.0, digits=4):
+    """One-row summary: statistic and randomization p-value."""
+    if tail == "right":
+        p = (boots >= stat).mean()
+    elif tail == "left":
+        p = (boots <= stat).mean()
+    else:
+        p = (np.abs(boots - null) >= abs(stat - null)).mean()
+    return pd.Series({label: round(float(stat), 4),
+                      "Randomization p-value": round(float(p), digits),
+                      "Simulated samples": len(boots)})
+
+def tcurve(t, df, tail, figsize=(6, 2.6)):
+    """t-curve with the p-value tail beyond t shaded."""
+    x = np.linspace(stats.t.ppf(0.0005, df), stats.t.ppf(0.9995, df), 500)
+    y = stats.t.pdf(x, df)
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.plot(x, y, color="#4c72b0", lw=2)
+    if tail == "right":
+        mask = x >= t
+    elif tail == "left":
+        mask = x <= t
+    else:
+        mask = (x >= abs(t)) | (x <= -abs(t))
+    if mask.any():
+        ax.fill_between(x[mask], y[mask], color="#c44e52", alpha=0.65)
+    ax.axvline(np.clip(t, x[0], x[-1]), color="black", lw=1)
+    ax.set_xlabel("t")
+    ax.set_ylabel("Density")
+    plt.tight_layout()
+    plt.show()
+```
+
+::: {.panel-tabset}
+
+## Exercise 6.198
+
+*(Skill Builder 1)* Samples of size 100 from Population 1 ($\mu_1 = 87$,
+$\sigma_1 = 12$) and size 80 from Population 2 ($\mu_2 = 81$,
+$\sigma_2 = 15$). Find the standard error of $\bar x_1 - \bar x_2$.
+
+```{python}
+#| echo: false
+round(se_diff(12, 100, 15, 80), 3)
+```
+
+$$SE=\sqrt{\frac{12^2}{100}+\frac{15^2}{80}}=\sqrt{1.44+2.8125}\approx 2.06$$
+
+## Exercise 6.199
+
+*(Skill Builder 1)* Samples of size 25 from Population 1 ($\mu_1 = 6.2$,
+$\sigma_1 = 3.7$) and size 40 from Population 2 ($\mu_2 = 8.1$,
+$\sigma_2 = 7.6$).
+
+```{python}
+#| echo: false
+round(se_diff(3.7, 25, 7.6, 40), 3)
+```
+
+$$SE=\sqrt{\frac{3.7^2}{25}+\frac{7.6^2}{40}}=\sqrt{0.5476+1.444}\approx 1.41$$
+
+## Exercise 6.200
+
+*(Skill Builder 1)* Samples of size 50 from Population 1 ($\mu_1 = 3.2$,
+$\sigma_1 = 1.7$) and size 50 from Population 2 ($\mu_2 = 2.8$,
+$\sigma_2 = 1.3$).
+
+```{python}
+#| echo: false
+round(se_diff(1.7, 50, 1.3, 50), 3)
+```
+
+$$SE=\sqrt{\frac{1.7^2}{50}+\frac{1.3^2}{50}}=\sqrt{0.0578+0.0338}\approx 0.303$$
+
+## Exercise 6.201
+
+*(Skill Builder 1)* Samples of size 300 from Population 1 ($\mu_1 = 75$,
+$\sigma_1 = 18$) and size 500 from Population 2 ($\mu_2 = 83$,
+$\sigma_2 = 22$).
+
+```{python}
+#| echo: false
+round(se_diff(18, 300, 22, 500), 3)
+```
+
+$$SE=\sqrt{\frac{18^2}{300}+\frac{22^2}{500}}=\sqrt{1.08+0.968}\approx 1.43$$
+
+## Exercise 6.202
+
+*(Skill Builder 2)* Find the endpoints of a $t$-distribution with 2.5%
+beyond them in each tail if the samples have sizes $n_1 = 15$ and $n_2 = 25$.
+
+```{python}
+#| echo: false
+df = min(15 - 1, 25 - 1)
+pd.Series({"df (min)": df,
+           "Endpoints": f"±{stats.t.ppf(0.975, df):.3f}"}).to_string()
+```
+
+Degrees of freedom $= \min(15-1,\ 25-1) = 14$, and the endpoints with 2.5%
+beyond each are $\pm t_{0.975} = $ **±2.145** (a 95% central interval).
+
+## Exercise 6.203
+
+*(Skill Builder 2)* Endpoints with 5% beyond them in each tail for
+$n_1 = 8$ and $n_2 = 10$.
+
+```{python}
+#| echo: false
+df = min(8 - 1, 10 - 1)
+pd.Series({"df (min)": df,
+           "Endpoints": f"±{stats.t.ppf(0.95, df):.3f}"}).to_string()
+```
+
+Degrees of freedom $= \min(7,\ 9) = 7$; the endpoints are
+$\pm t_{0.95} = $ **±1.895**.
+
+## Exercise 6.204
+
+*(Skill Builder 2)* Proportion of a $t$-distribution less than $-1.4$ if
+the samples have sizes $n_1 = 30$ and $n_2 = 40$.
+
+```{python}
+#| echo: false
+df = min(30 - 1, 40 - 1)
+round(float(stats.t.cdf(-1.4, df)), 4)
+```
+
+Degrees of freedom $= \min(29,\ 39) = 29$, and the area below $-1.4$ is
+**≈ 0.0862**.
+
+## Exercise 6.205
+
+*(Skill Builder 2)* Proportion of a $t$-distribution above $2.1$ if the
+samples have sizes $n_1 = n_2 = 12$.
+
+```{python}
+#| echo: false
+df = 12 - 1
+round(float(stats.t.sf(2.1, df)), 4)
+```
+
+Degrees of freedom $= 11$, and the area above $2.1$ is **≈ 0.0296**.
+
+## Exercise 6.206
+
+*(Skill Builder 1, CI)* A 95% confidence interval for $\mu_1-\mu_2$ using
+$\bar x_1 = 75.2$, $s_1 = 10.7$, $n_1 = 30$ and $\bar x_2 = 69.0$,
+$s_2 = 8.3$, $n_2 = 20$.
+
+```{python}
+#| echo: false
+tci_row(75.2, 10.7, 30, 69.0, 8.3, 20, 0.95).to_string()
+```
+
+Best estimate $6.2$, margin of error $\approx 5.64$, and
+**95% CI ≈ (0.56, 11.84)** (using $t^* = 2.093$ with the conservative
+$df = 19$). We are 95% sure that $\mu_1$ exceeds $\mu_2$ by somewhere
+between about 0.6 and 11.8 units.
+
+## Exercise 6.207
+
+*(Skill Builder 1, CI)* A 90% confidence interval for $\mu_1-\mu_2$ using
+$\bar x_1 = 10.1$, $s_1 = 2.3$, $n_1 = 50$ and $\bar x_2 = 12.4$,
+$s_2 = 5.7$, $n_2 = 50$.
+
+```{python}
+#| echo: false
+tci_row(10.1, 2.3, 50, 12.4, 5.7, 50, 0.90).to_string()
+```
+
+Best estimate $-2.3$, margin of error $\approx 1.46$, and
+**90% CI ≈ (−3.76, −0.84)** ($t^* = 1.677$ with $df = 49$). The entire
+interval is negative: $\mu_1$ is likely smaller than $\mu_2$.
+
+## Exercise 6.208
+
+*(Skill Builder 1, CI)* A 99% confidence interval for $\mu_1-\mu_2$ using
+$\bar x_1 = 501$, $s_1 = 115$, $n_1 = 400$ and $\bar x_2 = 469$,
+$s_2 = 96$, $n_2 = 200$.
+
+```{python}
+#| echo: false
+tci_row(501, 115, 400, 469, 96, 200, 0.99).to_string()
+```
+
+Best estimate $32$, margin of error $\approx 23.1$, and
+**99% CI ≈ (8.9, 55.1)** ($t^* = 2.601$ with $df = 199$).
+
+## Exercise 6.209
+
+*(Skill Builder 1, CI)* A 95% confidence interval for $\mu_1-\mu_2$ using
+$\bar x_1 = 5.2$, $s_1 = 2.7$, $n_1 = 10$ and $\bar x_2 = 4.9$,
+$s_2 = 2.8$, $n_2 = 8$.
+
+```{python}
+#| echo: false
+tci_row(5.2, 2.7, 10, 4.9, 2.8, 8, 0.95).to_string()
+```
+
+Best estimate $0.3$, margin of error $\approx 3.09$, and
+**95% CI ≈ (−2.79, 3.39)** ($t^* = 2.365$ with $df = 7$). Small samples and
+large SDs make the interval much wider than the estimate.
+
+## Exercise 6.210
+
+**Is Fast Food Messing With Your Hormones? (DEHP)** Find and interpret a 95%
+CI for $\mu_F - \mu_N$, the difference in mean DEHP concentration (ng/mL)
+between the 3095 participants who ate fast food ($\bar x_F = 83.6$,
+$s_F = 194.7$) and the 5782 who did not ($\bar x_N = 59.1$,
+$s_N = 152.1$).
+
+```{python}
+#| echo: false
+tci_row(83.6, 194.7, 3095, 59.1, 152.1, 5782, 0.95).to_string()
+```
+
+Best estimate $24.5$ ng/mL, margin of error $\approx 7.9$, giving
+**95% CI ≈ (16.6, 32.4)**. We are 95% sure that people who recently ate fast
+food have, on average, between about 16.6 and 32.4 ng/mL *more* DEHP in
+their urine than people who did not — consistent with fast food increasing
+exposure to this phthalate byproduct.
+
+## Exercise 6.211
+
+**Is Fast Food Messing With Your Hormones? (DiNP)** Same setup, now for the
+byproduct DiNP: $\bar x_F = 10.1$, $s_F = 38.9$ ($n_F = 3095$) vs
+$\bar x_N = 7.0$, $s_N = 22.8$ ($n_N = 5782$).
+
+```{python}
+#| echo: false
+tci_row(10.1, 38.9, 3095, 7.0, 22.8, 5782, 0.95).to_string()
+```
+
+**95% CI ≈ (1.6, 4.6)** ng/mL for $\mu_F - \mu_N$. Since the interval
+contains only positive values, fast-food eaters have significantly higher
+average DiNP concentrations — by roughly 1.6 to 4.6 ng/mL.
+
+## Exercise 6.212
+
+**Fluoride Exposure in Drinking Water** Table 6.17: fluoridated tap water
+($n = 141$, $\bar x = 0.69$, $s = 0.42$) vs non-fluoridated ($n = 228$,
+$\bar x = 0.40$, $s = 0.27$), fluoride concentration in mg/L. Find and
+interpret a 99% CI for the mean increase in fluoride for those with
+fluoridated tap water.
+
+```{python}
+#| echo: false
+tci_row(0.69, 0.42, 141, 0.40, 0.27, 228, 0.99).to_string()
+```
+
+Difference (fluoridated − non-fluoridated) $= 0.29$ mg/L with
+**99% CI ≈ (0.19, 0.39)** ($t^* = 2.610$ with $df = 140$). We are 99% sure
+that women with fluoridated tap water have mean fluoride concentration
+between about 0.19 and 0.39 mg/L higher than those without — the entire
+interval is above zero, so fluoridated water is clearly associated with
+higher fluoride levels in the women.
+
+## Exercise 6.213
+
+**Dark Chocolate for Good Health** In a randomized, double-blind,
+placebo-controlled study, 11 people ate flavonoid-rich dark chocolate daily
+for two weeks (mean vascular-health increase 1.3, $s = 2.32$) and 10 got a
+low-flavonoid placebo (mean change $-0.96$, $s = 1.58$).
+
+- **(a)** *Randomized* — participants were randomly assigned to the two
+  groups; *double-blind* — neither participants nor those measuring outcomes
+  knew who got the real dark chocolate; *placebo-controlled* — the control
+  group received an indistinguishable low-flavonoid chocolate, so any
+  difference can be attributed to the flavonoids rather than to chocolate
+  itself or expectations.
+- **(b)** Parameter: $\mu_D - \mu_C$, the difference in mean two-week change
+  in vascular health (flow-mediated dilation) between dark chocolate and
+  placebo.
+
+```{python}
+#| echo: false
+tci_row(1.3, 2.32, 11, -0.96, 1.58, 10, 0.95).to_string()
+```
+
+Best estimate $2.26$ with **95% CI ≈ (0.32, 4.20)** ($t^* = 2.262$,
+$df = 9$): we are 95% sure the mean increase is between about 0.3 and 4.2
+units larger for the dark-chocolate group.
+- **(c)** "No difference" ($\mu_D - \mu_C = 0$) is **not plausible** at the
+  5% level, because the confidence interval contains only positive values
+  and excludes 0.
+
+## Exercise 6.214
+
+**Close Confidants and Social Networking Sites** Among 2006 US adults, the
+947 using a social networking site averaged 2.5 close confidants
+($s = 1.4$) vs 1.9 ($s = 1.3$) for the 1059 non-users. Find and interpret a
+90% CI for the difference in means.
+
+```{python}
+#| echo: false
+tci_row(2.5, 1.4, 947, 1.9, 1.3, 1059, 0.90).to_string()
+```
+
+Best estimate $0.6$ with **90% CI ≈ (0.50, 0.70)**. We are 90% sure that
+users of social networking sites have, on average, between 0.5 and 0.7 more
+close confidants than non-users. (This is an observational comparison, so it
+shows association, not that the sites *cause* larger networks.)
+
+## Exercise 6.215
+
+**Effect of Splitting the Bill** In the experiment, the 24 people paying
+individually averaged 37.29 shekels ($s = 12.54$) while the 24 splitting the
+bill averaged 50.92 ($s = 14.33$). Find and interpret a 95% CI for the
+difference in mean meal cost.
+
+*Data:* `data/ch01/SplitBill.csv`, from
+<https://www.lock5stat.com/datasets3e/SplitBill.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Meal cost by payment method in the SplitBill experiment, with group means marked
+sb = pd.read_csv("data/ch01/SplitBill.csv")
+fig, ax = plt.subplots(figsize=(6, 3))
+sns.boxplot(data=sb, x="Payment", y="Cost", hue="Payment",
+            palette={"Individual": "#4c72b0", "Split": "#c44e52"},
+            fill=False, gap=0.1, ax=ax, legend=False)
+sns.stripplot(data=sb, x="Payment", y="Cost", hue="Payment",
+              palette={"Individual": "#4c72b0", "Split": "#c44e52"},
+              alpha=0.6, ax=ax, legend=False)
+for grp, col in [("Individual", "#4c72b0"), ("Split", "#c44e52")]:
+    m = sb.loc[sb.Payment == grp, "Cost"].mean()
+    ax.plot([sb.Payment.unique().tolist().index(grp) - 0.25,
+             sb.Payment.unique().tolist().index(grp) + 0.25], [m, m],
+            color=col, lw=2)
+ax.set_xlabel("Payment method")
+ax.set_ylabel("Cost (Israeli shekels)")
+plt.tight_layout()
+plt.show()
+sb.groupby("Payment")["Cost"].agg(["count", "mean", "std"]).round(2).to_string()
+```
+
+```{python}
+#| echo: false
+tci_row(50.92, 14.33, 24, 37.29, 12.54, 24, 0.95).to_string()
+```
+
+The boxplots confirm both distributions are reasonably bell-shaped with no
+extreme outliers, so the $t$-interval is appropriate. For
+$\mu_{\text{split}} - \mu_{\text{individual}}$: best estimate $13.63$
+shekels, margin of error $\approx 8.04$, and **95% CI ≈ (5.59, 21.67)**. We
+are 95% sure that meals cost between about 5.6 and 21.7 shekels *more*, on
+average, when the bill is split evenly than when each person pays
+individually — an incentive effect of shared payment.
+
+## Exercise 6.216
+
+**Impact of College Roommates on Grades (I)** Considering only students who
+do *not* bring a videogame: roommate does not bring (88 students, mean GPA
+3.128, $s = 0.590$) vs roommate does bring (38 students, mean 2.932,
+$s = 0.699$). Find and interpret a 95% CI for the difference in means.
+
+*Summary statistics (Table 6.18):*
+
+```{python}
+#| echo: false
+vg = pd.DataFrame({"Student brought": ["No", "Yes", "No", "Yes"],
+                   "Roommate brought": ["No", "No", "Yes", "Yes"],
+                   "n": [88, 44, 38, 40],
+                   "Mean GPA": [3.128, 3.039, 2.932, 2.754],
+                   "St.Dev.": [0.590, 0.689, 0.699, 0.639]})
+vg.to_string(index=False)
+```
+
+```{python}
+#| echo: false
+tci_row(3.128, 0.590, 88, 2.932, 0.699, 38, 0.95).to_string()
+```
+
+For $\mu_{\text{rm}}-\mu_{\text{rm+vgame}}$ among non-bringing students:
+best estimate $0.196$, **95% CI ≈ (−0.07, 0.46)**. The interval contains 0,
+so even among students who do not bring a videogame themselves, we cannot
+conclude that having a videogame-playing roommate lowers mean GPA — the
+effect (if any) is within random-chance range.
+
+## Exercise 6.217
+
+**Impact of College Roommates on Grades (II)** Considering only students who
+*do* bring a videogame: roommate does not bring (44 students, mean 3.039,
+$s = 0.689$) vs roommate does bring (40 students, mean 2.754, $s = 0.639$).
+95% CI.
+
+```{python}
+#| echo: false
+tci_row(3.039, 0.689, 44, 2.754, 0.639, 40, 0.95).to_string()
+```
+
+Best estimate $0.285$, **95% CI ≈ (−0.01, 0.58)**. Again the interval
+includes 0 (barely), so there is not quite convincing evidence that a
+videogame-playing roommate hurts the GPA of students who themselves bring a
+videogame — though the entire plausible range favors the non-gaming
+roommates.
+
+## Exercise 6.218
+
+**Impact of College Roommates on Grades (III)** Considering only students
+whose roommate does *not* bring a videogame: student brings (44, mean 3.039,
+$s = 0.689$) vs student does not bring (88, mean 3.128, $s = 0.590$). 95% CI.
+
+```{python}
+#| echo: false
+tci_row(3.039, 0.689, 44, 3.128, 0.590, 88, 0.95).to_string()
+```
+
+Best estimate $-0.089$, **95% CI ≈ (−0.33, 0.16)**. The interval straddles
+0 comfortably: among students whose roommate does not bring a videogame,
+there is no evidence that bringing one's own videogame changes mean GPA.
+
+## Exercise 6.219
+
+**Impact of College Roommates on Grades (IV)** Considering only students
+whose roommate *does* bring a videogame: student brings (40, mean 2.754,
+$s = 0.639$) vs student does not bring (38, mean 2.932, $s = 0.699$). 95% CI.
+
+```{python}
+#| echo: false
+tci_row(2.754, 0.639, 40, 2.932, 0.699, 38, 0.95).to_string()
+```
+
+Best estimate $-0.178$, **95% CI ≈ (−0.49, 0.13)**. Again 0 is in the
+interval: no convincing evidence that bringing a videogame matters for
+students whose roommates also bring one.
+
+## Exercise 6.220
+
+**Impact of College Roommates on Grades (V)** Compare rooms where *neither*
+student brings a videogame (88, mean 3.128, $s = 0.590$) with rooms where
+*both* bring one (40, mean 2.754, $s = 0.639$).
+
+- **(a)** 95% CI for $\mu_{\text{neither}}-\mu_{\text{both}}$:
+
+```{python}
+#| echo: false
+tci_row(3.128, 0.590, 88, 2.754, 0.639, 40, 0.95).to_string()
+```
+
+Best estimate $0.374$ with **95% CI ≈ (0.13, 0.62)**: we are 95% sure that
+students in all-video-game-free rooms average between about 0.13 and 0.62
+more GPA points than students in rooms where both bring videogames.
+- **(b)** We **cannot** conclude that bringing videogames *causes* lower
+  GPA. Although roommates were randomly assigned, whether a student (or
+  roommate) brought a videogame was a *choice*, not a random assignment —
+  students who bring videogames may differ in other ways (study habits,
+  priorities), so confounding variables remain a plausible explanation.
+
+## Exercise 6.221
+
+**Standard Error from a Formula and a Bootstrap Distribution (Time)**
+Bootstrap the difference in mean commute time, Atlanta vs St. Louis
+($n = 500$ each; $\bar x_1 = 29.11$, $s_1 = 20.72$; $\bar x_2 = 21.97$,
+$s_2 = 14.23$), and compare the bootstrap SE to the CLT formula.
+
+*Data:* `data/ch03/CommuteAtlanta.csv` and `data/ch03/CommuteStLouis.csv`,
+from <https://www.lock5stat.com/datasets3e/CommuteAtlanta.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the difference in mean commute time, Atlanta minus St Louis, from 10000 resamples
+atl = pd.read_csv("data/ch03/CommuteAtlanta.csv").Time.to_numpy(float)
+stl = pd.read_csv("data/ch03/CommuteStLouis.csv").Time.to_numpy(float)
+r = np.random.default_rng(2026)
+boots = np.array([atl[r.integers(0, 500, 500)].mean()
+                  - stl[r.integers(0, 500, 500)].mean() for _ in range(10000)])
+tail_plot(boots, atl.mean() - stl.mean(), "two",
+          "Difference in mean commute time (Atlanta - St Louis)", bins=32)
+pd.Series({"Bootstrap SE": round(float(boots.std(ddof=1)), 3),
+           "Formula SE": round(se_diff(20.72, 500, 14.23, 500), 3)}).to_string()
+```
+
+The bootstrap SE ($\approx 1.12$ minutes) matches the formula
+$$SE=\sqrt{\frac{20.72^2}{500}+\frac{14.23^2}{500}}\approx 1.124$$
+almost exactly — the CLT formula is doing its job for these large, skewed
+samples.
+
+## Exercise 6.222
+
+**Standard Error from a Formula and a Bootstrap Distribution (Distance)**
+Same comparison for mean commute *distance*: $\bar x_1 = 18.16$,
+$s_1 = 13.80$ vs $\bar x_2 = 14.16$, $s_2 = 10.75$ ($n = 500$ each).
+
+*Data:* `data/ch03/CommuteAtlanta.csv` and `data/ch03/CommuteStLouis.csv`
+(`Distance` column):
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the difference in mean commute distance, Atlanta minus St Louis, from 10000 resamples
+atl = pd.read_csv("data/ch03/CommuteAtlanta.csv").Distance.to_numpy(float)
+stl = pd.read_csv("data/ch03/CommuteStLouis.csv").Distance.to_numpy(float)
+r = np.random.default_rng(2026)
+boots = np.array([atl[r.integers(0, 500, 500)].mean()
+                  - stl[r.integers(0, 500, 500)].mean() for _ in range(10000)])
+tail_plot(boots, atl.mean() - stl.mean(), "two",
+          "Difference in mean commute distance (Atlanta - St Louis)", bins=32)
+pd.Series({"Bootstrap SE": round(float(boots.std(ddof=1)), 3),
+           "Formula SE": round(se_diff(13.80, 500, 10.75, 500), 3)}).to_string()
+```
+
+Again the bootstrap SE ($\approx 0.78$ miles) agrees closely with the
+formula $SE=\sqrt{13.80^2/500+10.75^2/500}\approx 0.782$.
+
+## Exercise 6.223
+
+**Who Exercises More: Males or Females?** The `StudentSurvey` descriptive
+output gives Exercise hours/week: females $n = 168$, mean 8.110,
+$s = 5.199$; males $n = 193$, mean 9.876, $s = 6.069$.
+
+*Data:* `data/ch01/StudentSurvey.csv`, from
+<https://www.lock5stat.com/datasets3e/StudentSurvey.csv>:
+
+```{python}
+#| echo: false
+ss = pd.read_csv("data/ch01/StudentSurvey.csv").dropna(subset=["Exercise"])
+f = ss.loc[ss.Sex == "F", "Exercise"].to_numpy(float)
+m = ss.loc[ss.Sex == "M", "Exercise"].to_numpy(float)
+pd.Series({"(a) Females with Exercise data": len(f),
+           "(a) Males with Exercise data": len(m),
+           "(b) Difference (F - M)": round(f.mean() - m.mean(), 3)}).to_string()
+```
+
+```{python}
+#| echo: false
+tci_row(8.110, 5.199, 168, 9.876, 6.069, 193, 0.95).to_string()
+```
+
+- **(a)** 168 females and 193 males recorded exercise hours.
+- **(b)** Males exercise more: $9.876 - 8.110 = 1.766$ hours/week more, on
+  average.
+- **(c)** For $\mu_F - \mu_M$: best estimate $-1.766$, SE
+  $\approx 0.593$, $t^* = 1.974$ (conservative $df = 167$), margin of error
+  $\approx 1.17$, giving **95% CI ≈ (−2.94, −0.60)**.
+- **(d)** This agrees almost exactly with the computer output's
+  $(−2.932, −0.599)$ — the software's more elaborate df formula changes
+  nothing visible at this sample size.
+- **(e)** We are 95% sure that female students exercise between about 0.6
+  and 2.9 hours per week *less*, on average, than male students.
+
+## Exercise 6.224
+
+**Who Watches More TV: Males or Females?** The `StudentSurvey` TV output:
+females $n = 169$, mean 5.237, $s = 4.100$; males $n = 192$, mean 7.620,
+$s = 6.427$.
+
+*Data:* `data/ch01/StudentSurvey.csv` (`TV` column):
+
+```{python}
+#| echo: false
+ss = pd.read_csv("data/ch01/StudentSurvey.csv").dropna(subset=["TV"])
+f = ss.loc[ss.Sex == "F", "TV"].to_numpy(float)
+m = ss.loc[ss.Sex == "M", "TV"].to_numpy(float)
+pd.Series({"TV sample: F / M": f"{len(f)} / {len(m)}",
+           "(a) Difference (F - M)": round(f.mean() - m.mean(), 3)}).to_string()
+```
+
+```{python}
+#| echo: false
+tci_row(5.237, 4.100, 169, 7.620, 6.427, 192, 0.99).to_string()
+```
+
+- **(a)** Males watch more TV: $7.620 - 5.237 = 2.383$ hours/week more, on
+  average.
+- **(b)** For $\mu_F - \mu_M$: best estimate $-2.383$, SE $\approx 0.561$,
+  $t^* = 2.605$ (conservative $df = 168$), margin of error $\approx 1.46$,
+  giving **99% CI ≈ (−3.84, −0.92)**.
+- **(c)** This matches the computer output's $(−3.836, −0.930)$ almost
+  exactly.
+- **(d)** We are 99% sure that female students watch between about 0.9 and
+  3.8 hours less TV per week, on average, than male students.
+
+## Exercise 6.225
+
+**Who Eats More Fiber: Males or Females?** Use the `NutritionStudy` data to
+find a 95% CI for the difference in mean grams of fiber per day between
+males and females. Is "no difference" plausible?
+
+*Data:* `data/ch02/NutritionStudy.csv`, from
+<https://www.lock5stat.com/datasets3e/NutritionStudy.csv>:
+
+```{python}
+#| echo: false
+ns = pd.read_csv("data/ch02/NutritionStudy.csv").dropna(subset=["Fiber"])
+f = ns.loc[ns.Sex == "Female", "Fiber"].to_numpy(float)
+m = ns.loc[ns.Sex == "Male", "Fiber"].to_numpy(float)
+welch_test(f, m, "two", "Difference (F - M)").to_string()
+```
+
+Mean fiber intake is 12.69 g/day for the 273 females and 13.41 g/day for the
+42 males. The 95% CI for $\mu_F-\mu_M$ is about **(−2.37, 0.93)** — it
+contains 0, so "no difference" between males and females is a plausible
+option for the population difference in mean fiber eaten (males eat slightly
+more on average, but not significantly so).
+
+## Exercise 6.226
+
+**Systolic Blood Pressure and Survival Status** Use the `ICUAdmissions` data
+to find a 95% CI for the difference in mean systolic blood pressure on
+admission between patients who lived ($Status = 0$) and died ($Status = 1$).
+
+*Data:* `data/ch03/ICUAdmissions.csv`, from
+<https://www.lock5stat.com/datasets3e/ICUAdmissions.csv>:
+
+```{python}
+#| echo: false
+icu = pd.read_csv("data/ch03/ICUAdmissions.csv")
+lived = icu.loc[icu.Status == 0, "Systolic"].dropna().to_numpy(float)
+died = icu.loc[icu.Status == 1, "Systolic"].dropna().to_numpy(float)
+welch_test(lived, died, "two", "Difference (lived - died)").to_string()
+```
+
+Patients who lived averaged 135.6 mm Hg vs 118.8 for those who died
+(difference 16.8). The 95% CI for $\mu_{\text{lived}}-\mu_{\text{died}}$ is
+about **(2.9, 30.8)**. "No difference" is **not** plausible — the interval
+excludes 0 — and the *died* group arrived with significantly **lower**
+systolic blood pressure, on average.
+
+## Exercise 6.227
+
+*(Skill Builder 1, HT)* Test $H_0\colon \mu_1 = \mu_2$ vs
+$H_a\colon \mu_1 > \mu_2$ using $\bar x_1 = 56$, $s_1 = 8.2$, $n_1 = 30$ and
+$\bar x_2 = 51$, $s_2 = 6.9$, $n_2 = 40$.
+
+```{python}
+#| echo: false
+ttest_row(56, 8.2, 30, 51, 6.9, 40, "right").to_string()
+```
+
+$SE = 1.853$, $t = 5/1.853 = 2.70$. With the conservative $df = 29$ the
+right-tail p-value is **≈ 0.006** (Welch df 56 gives 0.005). Strong evidence
+that $\mu_1 > \mu_2$.
+
+## Exercise 6.228
+
+*(Skill Builder 1, HT)* Test $H_0\colon \mu_1 = \mu_2$ vs
+$H_a\colon \mu_1 \ne \mu_2$ using $\bar x_1 = 15.3$, $s_1 = 11.6$,
+$n_1 = 100$ and $\bar x_2 = 18.4$, $s_2 = 14.3$, $n_2 = 80$.
+
+```{python}
+#| echo: false
+ttest_row(15.3, 11.6, 100, 18.4, 14.3, 80, "two").to_string()
+```
+
+$SE = 1.975$, $t = -3.1/1.975 = -1.57$. Two-tail p-value **≈ 0.12**
+(either df choice). No evidence of a difference in means.
+
+## Exercise 6.229
+
+*(Skill Builder 1, HT)* Test $H_0\colon \mu_A = \mu_B$ vs
+$H_a\colon \mu_A \ne \mu_B$; Group A: $n = 8$, mean 125, $s = 18$;
+Group B: $n = 15$, mean 118, $s = 14$.
+
+```{python}
+#| echo: false
+ttest_row(125, 18, 8, 118, 14, 15, "two").to_string()
+```
+
+$SE = 7.319$, $t = 7/7.319 = 0.96$. With $df = 7$ the two-tail p-value is
+**≈ 0.37** (Welch df 11.6 gives 0.36). No evidence that the group means
+differ.
+
+## Exercise 6.230
+
+*(Skill Builder 1, HT)* Test $H_0\colon \mu_T = \mu_C$ vs
+$H_a\colon \mu_T < \mu_C$; treatment: $n = 25$, mean 8.6, $s = 4.1$;
+control: $n = 25$, mean 11.2, $s = 3.4$.
+
+```{python}
+#| echo: false
+ttest_row(8.6, 4.1, 25, 11.2, 3.4, 25, "left").to_string()
+```
+
+$SE = 1.065$, $t = -2.6/1.065 = -2.44$. With $df = 24$ the lower-tail
+p-value is **≈ 0.011** (Welch df 46 gives 0.009). Evidence that the
+treatment mean is lower than the control mean.
+
+## Exercise 6.231
+
+**Take Your Notes Longhand!** Test scores after note-taking: longhand
+$n = 38$, $\bar x = 25.6$, $s = 10.8$; laptop $n = 40$, $\bar x = 18.3$,
+$s = 9.0$ (Table 6.20). Does the data provide evidence that longhand
+note-taking is more effective?
+
+$H_0\colon \mu_L = \mu_{Lp}$ vs $H_a\colon \mu_L > \mu_{Lp}$, where the $\mu$
+parameters are the mean test scores for all students who would take notes
+longhand vs on a laptop.
+
+```{python}
+#| echo: false
+ttest_row(25.6, 10.8, 38, 18.3, 9.0, 40, "right").to_string()
+```
+
+$SE = 2.257$ and $t = (25.6 - 18.3)/2.257 = 3.23$. With $df = 37$ the
+p-value is **≈ 0.001** (Welch df 72 gives 0.0010). Reject $H_0$: the
+randomized experiment provides strong evidence that students who take notes
+longhand score, on average, about 7.3 points higher on the test than laptop
+note-takers.
+
+## Exercise 6.232
+
+**How Compassionate Is Your Dog?** Time (seconds) for dogs to open the door
+to reach their owner (Table 6.21): distress $n = 72$, mean 3.43, $s = 7.77$;
+control $n = 99$, mean 5.89, $s = 9.09$. Test whether mean time is
+significantly less for dogs with owners in distress (5% level).
+
+$H_0\colon \mu_D = \mu_C$ vs $H_a\colon \mu_D < \mu_C$.
+
+```{python}
+#| echo: false
+ttest_row(3.43, 7.77, 72, 5.89, 9.09, 99, "left").to_string()
+```
+
+$SE = 1.293$ and $t = (3.43 - 5.89)/1.293 = -1.90$. With $df = 71$ the
+lower-tail p-value is **≈ 0.030** (Welch df 164 gives 0.029). Since
+$0.030 < 0.05$ we reject $H_0$: dogs whose owners are in distress open the
+door significantly faster — evidence that dogs respond to human distress.
+
+## Exercise 6.233
+
+**Can a Brief Diet Intervention Help Depression?** Reduction in CESD
+depression scores after three weeks (Table 6.22): diet group $n = 37$,
+mean 6.03, $s = 10.53$; control $n = 38$, mean $-0.13$, $s = 12.39$. Test at
+5% whether improvement is higher for the healthy-diet group.
+
+$H_0\colon \mu_D = \mu_C$ vs $H_a\colon \mu_D > \mu_C$.
+
+```{python}
+#| echo: false
+ttest_row(6.03, 10.53, 37, -0.13, 12.39, 38, "right").to_string()
+```
+
+$SE = 2.652$ and $t = (6.03 - (-0.13))/2.652 = 2.32$. With $df = 36$ the
+p-value is **≈ 0.013** (Welch df 72 gives 0.012). Since $0.013 < 0.05$ we
+reject $H_0$: the randomized experiment shows that a brief healthy diet
+yields significantly greater average improvement in depression symptoms.
+
+## Exercise 6.234
+
+**Active Learning vs Passive Learning: Feelings of Learning** Ratings (1–5)
+of "I feel like I learned a great deal": active $n = 142$, mean 3.338,
+$s = 0.922$; passive $n = 154$, mean 3.753, $s = 0.873$. Test whether
+feelings of learning are significantly lower with active learning.
+
+$H_0\colon \mu_A = \mu_P$ vs $H_a\colon \mu_A < \mu_P$.
+
+```{python}
+#| echo: false
+ttest_row(3.338, 0.922, 142, 3.753, 0.873, 154, "left").to_string()
+```
+
+$SE = 0.105$ and $t = -0.415/0.105 = -3.97$, p-value **< 0.0001**. Reject
+$H_0$: students *felt* they learned much less in the active-learning class —
+a striking mismatch with the next exercise.
+
+## Exercise 6.235
+
+**Active Learning vs Passive Learning: Who Learns More?** Test grades (0–1)
+after the same classes: active $n = 140$, mean 0.702, $s = 0.178$; passive
+$n = 154$, mean 0.600, $s = 0.191$. Test whether actual learning is higher
+with active learning.
+
+$H_0\colon \mu_A = \mu_P$ vs $H_a\colon \mu_A > \mu_P$.
+
+```{python}
+#| echo: false
+ttest_row(0.702, 0.178, 140, 0.600, 0.191, 154, "right").to_string()
+```
+
+$SE = 0.0215$ and $t = 0.102/0.0215 = 4.74$, p-value **< 0.0001**. Reject
+$H_0$: students in the active-learning section actually *learned more*
+(about 10 percentage points higher on the test) even though they *felt* they
+learned less — a famous demonstration that feelings of learning can be
+misleading.
+
+## Exercise 6.236
+
+**Pennsylvania Seniors TV Hours: 2010 vs 2019** From `PASeniors`, compare
+mean weekly TV hours, 2010 ($n = 30$, mean 8.12, $s = 7.68$) vs 2019
+($n = 37$, mean 5.50, $s = 6.44$) — Table 6.23. Test for a difference.
+
+*Data:* `data/ch01/PASeniors.csv`, from
+<https://www.lock5stat.com/datasets3e/PASeniors.csv>:
+
+```{python}
+#| echo: false
+ps = pd.read_csv("data/ch01/PASeniors.csv")
+y10 = ps.loc[ps.Year == 2010, "TVHours"].dropna().to_numpy(float)
+y19 = ps.loc[ps.Year == 2019, "TVHours"].dropna().to_numpy(float)
+pd.Series({"n 2010 / 2019": f"{len(y10)} / {len(y19)}",
+           "Means": f"{y10.mean():.2f} / {y19.mean():.2f}"}).to_string()
+```
+
+```{python}
+#| echo: false
+ttest_row(8.12, 7.68, 30, 5.50, 6.44, 37, "two").to_string()
+```
+
+The raw data match Table 6.23. $SE = 1.757$ and
+$t = (8.12 - 5.50)/1.757 = 1.49$; two-tail p-value **≈ 0.14**. Fail to
+reject $H_0$: a 2.6-hour gap is not unusual by random-chance standards at
+these sample sizes, so the data do not show a significant difference in mean
+TV hours between 2010 and 2019 Pennsylvania seniors.
+
+## Exercise 6.237
+
+**Multitasking in the Classroom** Final-exam grades on material taught with
+devices not allowed ($n = 118$, mean 86.6, $s = 8.1$) vs allowed ($n = 118$,
+mean 80.1, $s = 10.4$) — Table 6.24. Test whether grades are higher without
+devices.
+
+$H_0\colon \mu_N = \mu_A$ vs $H_a\colon \mu_N > \mu_A$.
+
+```{python}
+#| echo: false
+ttest_row(86.6, 8.1, 118, 80.1, 10.4, 118, "right").to_string()
+```
+
+$SE = 1.214$ and $t = 6.5/1.214 = 5.36$, p-value **< 0.0001**. Reject
+$H_0$: strong evidence that students learned more (about 6.5 points higher
+exam grades, on average) when electronic devices were not allowed as
+classroom distractions.
+
+## Exercise 6.238
+
+**Can Linguistic Form Affect Emotional Reaction in Conflict Resolution?**
+Anger ratings (1–6) after hearing statements as nouns vs verbs (Table 6.25):
+noun form $n = 65$, mean 3.21, $s = 1.30$; verb form $n = 64$, mean 3.67,
+$s = 1.43$. Test at 5% whether mean anger is lower with noun form.
+
+$H_0\colon \mu_1 = \mu_2$ vs $H_a\colon \mu_1 < \mu_2$ (noun vs verb).
+
+```{python}
+#| echo: false
+ttest_row(3.21, 1.30, 65, 3.67, 1.43, 64, "left").to_string()
+```
+
+$SE = 0.241$ and $t = -0.46/0.241 = -1.91$. With $df = 63$ the lower-tail
+p-value is **≈ 0.030** (Welch df 125 gives 0.029). Since $0.030 < 0.05$ we
+reject $H_0$: phrasing policies in noun form rather than verb form
+significantly lowers average anger — a subtle linguistic cue with a
+measurable emotional effect.
+
+## Exercise 6.239
+
+**Transgender Surgery** Mean age at beginning gender-affirming surgery:
+trans women $n = 155$, mean 41.3, $s = 16.3$; trans men $n = 55$, mean 35.4,
+$s = 10.8$. Test whether the mean age of surgery differs.
+
+$H_0\colon \mu_W = \mu_M$ vs $H_a\colon \mu_W \ne \mu_M$.
+
+```{python}
+#| echo: false
+ttest_row(41.3, 16.3, 155, 35.4, 10.8, 55, "two").to_string()
+```
+
+$SE = 1.958$ and $t = 5.9/1.958 = 3.01$. With $df = 54$ the two-tail
+p-value is **≈ 0.004** (Welch df 144 gives 0.003). Reject $H_0$: trans men
+begin surgery significantly earlier, on average, than trans women (by about
+6 years in this sample).
+
+## Exercise 6.240
+
+**Transgender Children: Age of First Experience** Mean age of first
+experience of gender dysphoria: trans women $n = 155$, mean 6.7, $s = 3.6$;
+trans men $n = 55$, mean 6.2, $s = 3.1$. Test for a difference.
+
+$H_0\colon \mu_W = \mu_M$ vs $H_a\colon \mu_W \ne \mu_M$.
+
+```{python}
+#| echo: false
+ttest_row(6.7, 3.6, 155, 6.2, 3.1, 55, "two").to_string()
+```
+
+$SE = 0.508$ and $t = 0.5/0.508 = 0.98$, two-tail p-value **≈ 0.33**. Fail
+to reject $H_0$: no evidence that the mean age of first gender-dysphoria
+experience differs between trans women and trans men — the gap in surgery
+age (Exercise 6.239) arises later in the process, not at first experience.
+
+## Exercise 6.241
+
+**Statistical Inference in Babies** 8-month-olds saw samples of 4-of-one
+color + 1-of-other drawn from an opaque box, then saw the true population.
+Looking time (seconds): unexpected populations $n = 20$, mean 9.9,
+$s = 4.5$; expected populations $n = 20$, mean 7.5, $s = 4.2$ (roughly
+normal data).
+
+- **(a)** $H_0\colon \mu_U = \mu_E$ vs $H_a\colon \mu_U > \mu_E$, where
+  $\mu_U$ and $\mu_E$ are the mean looking times at unexpected vs expected
+  populations.
+- **(b)** Sample statistic: $\bar x_U - \bar x_E = 9.9 - 7.5 = 2.4$ seconds.
+- **(c)–(d)** $t$-statistic and p-value:
+
+```{python}
+#| echo: false
+#| fig-cap: t-distribution with 19 degrees of freedom, right tail beyond t = 1.74 shaded
+se = se_diff(4.5, 20, 4.2, 20)
+t = (9.9 - 7.5) / se
+tcurve(t, 19, "right")
+ttest_row(9.9, 4.5, 20, 7.5, 4.2, 20, "right").to_string()
+```
+
+$SE = 1.376$ and $t = 2.4/1.376 = 1.74$. With the conservative $df = 19$
+the right-tail p-value is **≈ 0.049** (Welch df 38 gives 0.044).
+- **(e)** Since the p-value is below $\alpha = 0.10$, we reject $H_0$.
+- **(f)** Babies look significantly longer at populations that mismatch the
+  sample — evidence at the 10% level (in fact close to 5%) that infants
+  make inferences from sample to population and are surprised when the
+  population contradicts the sample.
+
+## Exercise 6.242
+
+**Mind-Set Matters** 75 hotel maids: 41 were told their work satisfies the
+Surgeon General's exercise recommendations; 34 were told nothing. After four
+weeks (habits unchanged), the informed group lost an average of 1.79 lbs
+($s = 2.88$) vs 0.2 lbs ($s = 2.32$) for the uninformed. Does mind-set
+matter?
+
+*Data:* `data/ch06/MindsetMatters.csv`, from
+<https://www.lock5stat.com/datasets3e/MindsetMatters.csv> (weight change
+computed as `Wt - Wt2`, positive = pounds lost):
+
+```{python}
+#| echo: false
+mm = pd.read_csv("data/ch06/MindsetMatters.csv")
+mm["WtChange"] = mm.Wt - mm.Wt2
+inf_ = mm.loc[mm.Cond == 1, "WtChange"].dropna().to_numpy(float)
+uninf = mm.loc[mm.Cond == 0, "WtChange"].dropna().to_numpy(float)
+welch_test(inf_, uninf, "right", "Difference (informed - uninformed)").to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in mean weight change, informed minus uninformed, from shuffling the MindsetMatters data
+boots = shuffle_stats(np.concatenate([inf_, uninf]), len(inf_),
+                      lambda a, b: a.mean() - b.mean())
+tail_plot(boots, inf_.mean() - uninf.mean(), "right",
+          "Difference in mean weight change (informed - uninformed)")
+p_row("Difference (informed - uninformed)", inf_.mean() - uninf.mean(),
+      boots, "right").to_string()
+```
+
+$H_0\colon \mu_I = \mu_U$ vs $H_a\colon \mu_I > \mu_U$. With the raw data,
+$SE = 0.579$ and $t = 1.585/0.579 = 2.64$; with the conservative $df = 33$
+the p-value is **≈ 0.006** (Welch df 73 gives 0.005), and the shuffle of
+group labels above agrees. Reject $H_0$: the randomized experiment shows
+that simply *thinking* of work as good exercise caused the maids to lose
+significantly more weight — mind-set matters.
+
+## Exercise 6.243
+
+**Exercise and Stress** Mice randomly assigned to an enriched environment
+with an exercise wheel (EE) or a standard one (SE), then exposed to a
+"bully" mouse; anxiety measured as time in darkness (Table 6.26 /
+`StressedMice`). Test whether EE mice spend significantly less time in
+darkness.
+
+*Data:* `data/ch06/StressedMice.csv`, from
+<https://www.lock5stat.com/datasets3e/StressedMice.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Time in darkness for mice from enriched vs standard environments
+sm = pd.read_csv("data/ch06/StressedMice.csv")
+fig, ax = plt.subplots(figsize=(6, 3))
+sns.boxplot(data=sm, x="Environment", y="Time", hue="Environment",
+            palette={"Enriched": "#4c72b0", "Standard": "#c44e52"},
+            fill=False, gap=0.1, ax=ax, legend=False)
+sns.stripplot(data=sm, x="Environment", y="Time", hue="Environment",
+              palette={"Enriched": "#4c72b0", "Standard": "#c44e52"},
+              alpha=0.7, ax=ax, legend=False)
+ax.set_xlabel("Environment")
+ax.set_ylabel("Time in darkness (seconds)")
+plt.tight_layout()
+plt.show()
+sm.groupby("Environment")["Time"].agg(["count", "mean", "std"]).round(2).to_string()
+```
+
+```{python}
+#| echo: false
+ee = sm.loc[sm.Environment == "Enriched", "Time"].to_numpy(float)
+se_ = sm.loc[sm.Environment == "Standard", "Time"].to_numpy(float)
+welch_test(ee, se_, "left", "Difference (EE - SE)").to_string()
+```
+
+$H_0\colon \mu_{EE} = \mu_{SE}$ vs $H_a\colon \mu_{EE} < \mu_{SE}$. The
+boxplots show no extreme skew or outliers, so a $t$-test is reasonable.
+$SE = 28.85$ and $t = (231.7 - 438.7)/28.85 = -6.8$; with $df = 6$ the
+p-value is **≈ 0.0002** (Welch df 9 gives 0.00004). Reject $H_0$: strong
+evidence that mice with exercise options spend far less time hiding in
+darkness after stress — exercise appears to build stress resilience in a
+causal way (randomized experiment).
+
+## Exercise 6.244
+
+**Diet Cola and Calcium** Calcium excretion (mg) in three hours of urine
+after drinking 24 oz of diet cola ($n = 8$, $\bar x_C = 56.0$,
+$s_C = 4.93$) or water ($n = 8$, $\bar x_W = 49.1$, $s_W = 3.64$). Use a
+$t$-distribution, after checking conditions.
+
+*Data:* `data/ch04/ColaCalcium.csv`, from
+<https://www.lock5stat.com/datasets3e/ColaCalcium.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Dotplots of calcium excretion for the diet cola and water groups
+cc = pd.read_csv("data/ch04/ColaCalcium.csv")
+fig, ax = plt.subplots(figsize=(6, 2.6))
+for i, (grp, col) in enumerate([("Diet cola", "#c44e52"), ("Water", "#4c72b0")]):
+    vals = cc.loc[cc.Drink == grp, "Calcium"].to_numpy(float)
+    ax.plot(vals, np.full(len(vals), i), "o", color=col, alpha=0.75, ms=8)
+ax.set_yticks([0, 1], ["Diet cola", "Water"])
+ax.set_xlabel("Calcium excreted (mg)")
+plt.tight_layout()
+plt.show()
+cc.groupby("Drink")["Calcium"].agg(["count", "mean", "std"]).round(2).to_string()
+```
+
+```{python}
+#| echo: false
+cola = cc.loc[cc.Drink == "Diet cola", "Calcium"].to_numpy(float)
+water = cc.loc[cc.Drink == "Water", "Calcium"].to_numpy(float)
+welch_test(cola, water, "right", "Difference (cola - water)").to_string()
+```
+
+**Conditions:** this is a randomized experiment; the dotplots show both
+samples roughly symmetric with no outliers, so normality is plausible even
+at $n = 8$, and the two groups are independent — a $t$-distribution is
+appropriate. $H_0\colon \mu_C = \mu_W$ vs $H_a\colon \mu_C > \mu_W$: with
+$SE = 2.167$, $t = 6.9/2.167 = 3.18$, p-value **≈ 0.008** (conservative
+$df = 7$; Welch df 13 gives 0.004). Reject $H_0$: diet cola leaches
+calcium out of the system, increasing urinary calcium compared to water.
+
+## Exercise 6.245
+
+**Drink Tea for a Stronger Immune System** Interferon-gamma production after
+two weeks of drinking tea ($n = 11$) vs coffee ($n = 10$), Table 6.27 /
+`ImmuneTea`.
+
+*Data:* `data/ch03/ImmuneTea.csv`, from
+<https://www.lock5stat.com/datasets3e/ImmuneTea.csv>:
+
+```{python}
+#| echo: false
+it = pd.read_csv("data/ch03/ImmuneTea.csv")
+tea = it.loc[it.Drink == "Tea", "InterferonGamma"].to_numpy(float)
+cof = it.loc[it.Drink == "Coffee", "InterferonGamma"].to_numpy(float)
+pd.DataFrame({"Tea": pd.Series(tea), "Coffee": pd.Series(cof)}).to_string()
+```
+
+- **(a)** This is an **experiment**: participants were randomly assigned to
+  drink tea or coffee.
+- **(b)** $H_0\colon \mu_T = \mu_C$ vs $H_a\colon \mu_T > \mu_C$, where the
+  parameters are the mean interferon-gamma production for tea vs coffee
+  drinkers.
+- **(c)** Standardized test statistic and p-value:
+
+```{python}
+#| echo: false
+welch_test(tea, cof, "right", "Difference (tea - coffee)").to_string()
+```
+
+$SE = 8.26$ and $t = 17.12/8.26 = 2.07$; with the conservative $df = 10$
+the p-value is **≈ 0.032** (Welch df 19 gives 0.026) — reject $H_0$ at 5%.
+- **(d)** Plot the data:
+
+```{python}
+#| echo: false
+#| fig-cap: Interferon gamma production for tea and coffee drinkers
+fig, ax = plt.subplots(figsize=(6, 2.6))
+for i, (grp, col) in enumerate([("Tea", "#4c72b0"), ("Coffee", "#dd8452")]):
+    vals = it.loc[it.Drink == grp, "InterferonGamma"].to_numpy(float)
+    ax.plot(vals, np.full(len(vals), i), "o", color=col, alpha=0.75, ms=8)
+ax.set_yticks([0, 1], ["Tea", "Coffee"])
+ax.set_xlabel("Interferon gamma production")
+plt.tight_layout()
+plt.show()
+```
+
+Both groups are visibly **right-skewed** (the coffee group contains 0, 0, 3
+…; the tea group has 51–58 clumped high) with $n$ of only 11 and 10 — the
+normality condition is questionable.
+- **(e)** A randomization test fits better: shuffle the 21 values into
+  groups of 11 and 10, 10000 times:
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in mean interferon gamma, tea minus coffee, from shuffling the ImmuneTea data
+boots = shuffle_stats(np.concatenate([tea, cof]), len(tea),
+                      lambda a, b: a.mean() - b.mean())
+tail_plot(boots, tea.mean() - cof.mean(), "right",
+          "Difference in mean interferon gamma (tea - coffee)")
+p_row("Difference (tea - coffee)", tea.mean() - cof.mean(),
+      boots, "right").to_string()
+```
+
+The randomization p-value is **≈ 0.027**, close to the $t$-test answer.
+- **(f)** Conclusion: whether judged by the $t$-distribution (p ≈ 0.03) or
+  by randomization (p ≈ 0.03), the data provide evidence that drinking tea
+  — not caffeine — enhances production of interferon gamma, and since this
+  was a randomized experiment the effect is plausibly causal.
+
+## Exercise 6.246
+
+**Metal Tags on Penguins and Length of Foraging Trips** Mean foraging-trip
+length: metal tag $n = 344$, mean 12.70, $s = 3.71$ days; electronic tag
+$n = 512$, mean 11.60, $s = 4.53$ days. Do metal-tagged penguins forage
+longer?
+
+$H_0\colon \mu_M = \mu_E$ vs $H_a\colon \mu_M > \mu_E$.
+
+```{python}
+#| echo: false
+ttest_row(12.70, 3.71, 344, 11.60, 4.53, 512, "right").to_string()
+```
+
+$SE = 0.283$ and $t = 1.10/0.283 = 3.89$, p-value **< 0.0001**. Reject
+$H_0$: strong evidence that penguins with metal tags make significantly
+longer foraging trips (about 1.1 days longer on average), consistent with
+metal tags being detrimental.
+
+## Exercise 6.247
+
+**Metal Tags on Penguins and Arrival Dates** Mean arrival date at the
+breeding site (days after Nov 1): metal tag $n = 167$, mean 37, $s = 38.77$;
+electronic tag $n = 189$, mean 21, $s = 27.50$. Do metal-tagged penguins
+arrive later?
+
+$H_0\colon \mu_M = \mu_E$ vs $H_a\colon \mu_M > \mu_E$.
+
+```{python}
+#| echo: false
+ttest_row(37, 38.77, 167, 21, 27.50, 189, "right").to_string()
+```
+
+$SE = 3.606$ and $t = 16/3.606 = 4.44$, p-value **< 0.0001**. Reject
+$H_0$: strong evidence that metal-tagged penguins arrive at the breeding
+site significantly later (about 16 days later on average) — another sign
+that metal tags harm the penguins.
+
+## Exercise 6.248
+
+**Split the Bill?** Test at 5% whether the mean meal cost is higher when
+people split the bill (Table 6.28): individual $n = 24$, mean 37.29,
+$s = 12.54$; split $n = 24$, mean 50.92, $s = 14.33$.
+
+*Data:* `data/ch01/SplitBill.csv` (same file as Exercise 6.215):
+
+```{python}
+#| echo: false
+sb = pd.read_csv("data/ch01/SplitBill.csv")
+ind = sb.loc[sb.Payment == "Individual", "Cost"].to_numpy(float)
+spl = sb.loc[sb.Payment == "Split", "Cost"].to_numpy(float)
+welch_test(spl, ind, "right", "Difference (split - individual)").to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in mean meal cost, split minus individual, from shuffling the SplitBill data
+boots = shuffle_stats(np.concatenate([spl, ind]), len(spl),
+                      lambda a, b: a.mean() - b.mean())
+tail_plot(boots, spl.mean() - ind.mean(), "right",
+          "Difference in mean meal cost (split - individual)")
+p_row("Difference (split - individual)", spl.mean() - ind.mean(),
+      boots, "right").to_string()
+```
+
+$H_0\colon \mu_S = \mu_I$ vs $H_a\colon \mu_S > \mu_I$. $SE = 3.887$ and
+$t = 13.63/3.887 = 3.51$; with $df = 23$ the p-value is **≈ 0.001**
+(Welch df 45 gives 0.0006), matching the shuffle above. Reject $H_0$:
+strong evidence that people order significantly more expensive meals when
+the bill is split evenly.
+
+## Exercise 6.249
+
+**Restaurant Bill by Sex** In the same experiment, diners were balanced by
+sex: females $n_f = 24$, mean 44.46, $s_f = 15.48$; males $n_m = 24$, mean
+43.75, $s_m = 14.81$. Test for a difference in mean meal cost.
+
+*Data:* `data/ch01/SplitBill.csv` (`Sex` column):
+
+```{python}
+#| echo: false
+fem = sb.loc[sb.Sex == "F", "Cost"].to_numpy(float)
+mal = sb.loc[sb.Sex == "M", "Cost"].to_numpy(float)
+pd.Series({"n F / M": f"{len(fem)} / {len(mal)}",
+           "Means": f"{fem.mean():.2f} / {mal.mean():.2f}"}).to_string()
+```
+
+```{python}
+#| echo: false
+ttest_row(44.46, 15.48, 24, 43.75, 14.81, 24, "two").to_string()
+```
+
+$H_0\colon \mu_F = \mu_M$ vs $H_a\colon \mu_F \ne \mu_M$. $SE = 4.373$ and
+$t = 0.71/4.373 = 0.16$, two-tail p-value **≈ 0.87**. Fail to reject
+$H_0$: no evidence of any difference in mean meal cost between female and
+male diners.
+
+## Exercise 6.250
+
+**What Gives a Small P-value?** For a two-tail difference-in-means test,
+which option yields the smaller p-value?
+
+```{python}
+#| echo: false
+def p_demo(x1, x2, s1, s2, n1, n2):
+    t = (x1 - x2) / se_diff(s1, n1, s2, n2)
+    return round(float(2 * stats.t.sf(abs(t), min(n1 - 1, n2 - 1))), 6)
+pd.Series({
+    "(a) Option 1 (means 25 vs 23)": p_demo(25, 23, 10, 10, 50, 50),
+    "(a) Option 2 (means 25 vs 11)": p_demo(25, 11, 10, 10, 50, 50),
+    "(b) Option 1 (s = 15, 14)": p_demo(22, 17, 15, 14, 50, 50),
+    "(b) Option 2 (s = 3, 4)": p_demo(22, 17, 3, 4, 50, 50),
+    "(c) Option 1 (n = 800, 1000)": p_demo(22, 17, 10, 10, 800, 1000),
+    "(c) Option 2 (n = 25, 30)": p_demo(22, 17, 10, 10, 25, 30)}).to_string()
+```
+
+- **(a)** **Option 2** ($\bar x_1 = 25$, $\bar x_2 = 11$): a larger gap
+  between the sample means makes $t$ larger and the p-value smaller.
+- **(b)** **Option 2** ($s_1 = 3$, $s_2 = 4$): smaller standard deviations
+  shrink the SE, inflating $|t|$ and shrinking the p-value.
+- **(c)** **Option 1** ($n_1 = 800$, $n_2 = 1000$): larger samples shrink
+  the SE and produce smaller p-values.
+
+## Exercise 6.251
+
+**Quiz Timing** Computer output for quiz grades by timing: Late
+$n = 32$, mean 22.56, $s = 5.13$; Early $n = 30$, mean 19.73, $s = 6.61$;
+difference (Late − Early) $= 2.83$, 95% CI $(−0.20, 5.86)$,
+$T = 1.87$, DF $= 54$, P-Value $= 0.066$.
+
+- **Hypotheses:** $H_0\colon \mu_L = \mu_E$ vs $H_a\colon \mu_L \ne \mu_E$,
+  where $\mu_L$ and $\mu_E$ are the mean quiz grades if quizzes are taken at
+  the end vs the beginning of class.
+- **Test statistic and p-value (read from the output):** $t = 1.87$ with
+  $df = 54$ and **p-value $= 0.066$**.
+- **Conclusion:** since $0.066 > 0.05$, we fail to reject $H_0$: there is
+  not enough evidence that mean quiz grade depends on quiz timing. (The
+  95% CI $(−0.20, 5.86)$ contains 0, consistent with this conclusion;
+  late-quizzing students did average 2.83 points higher, so a larger study
+  might detect a real effect.)
+
+## Exercise 6.252
+
+**Survival Status and Heart Rate in the ICU** Computer output for
+`HeartRate` by `Status`: lived ($Status = 0$) $n = 160$, mean 98.5,
+$s = 27.0$; died ($Status = 1$) $n = 40$, mean 100.6, $s = 26.5$;
+difference (0 − 1) $= -2.13$, 95% CI $(−11.53, 7.28)$, $T = -0.45$,
+DF $= 60$, P-Value $= 0.653$.
+
+*Data:* `data/ch03/ICUAdmissions.csv` (verification):
+
+```{python}
+#| echo: false
+icu = pd.read_csv("data/ch03/ICUAdmissions.csv")
+hr0 = icu.loc[icu.Status == 0, "HeartRate"].dropna().to_numpy(float)
+hr1 = icu.loc[icu.Status == 1, "HeartRate"].dropna().to_numpy(float)
+welch_test(hr0, hr1, "two", "Difference (lived - died)").to_string()
+```
+
+- **Hypotheses:** $H_0\colon \mu_0 = \mu_1$ vs $H_a\colon \mu_0 \ne \mu_1$,
+  where $\mu_0$ and $\mu_1$ are the mean heart rates of all ICU patients who
+  live vs die.
+- **Test statistic and p-value (from the output):** $t = -0.45$ with
+  $df = 60$ and **p-value $= 0.653$** — our recomputation from the raw data
+  ($t = -0.45$, p ≈ 0.653) matches.
+- **Conclusion:** the p-value is far above any reasonable significance
+  level, so we fail to reject $H_0$: mean admission heart rate shows no
+  detectable difference between patients who lived and those who died.
+
+## Exercise 6.253
+
+**Who Exercises More: Males or Females?** Use `StudentSurvey` to test for a
+difference in mean weekly exercise hours between males and females.
+
+*Data:* `data/ch01/StudentSurvey.csv`:
+
+```{python}
+#| echo: false
+ss = pd.read_csv("data/ch01/StudentSurvey.csv").dropna(subset=["Exercise"])
+f = ss.loc[ss.Sex == "F", "Exercise"].to_numpy(float)
+m = ss.loc[ss.Sex == "M", "Exercise"].to_numpy(float)
+welch_test(f, m, "two", "Difference (F - M)").to_string()
+```
+
+- **Hypotheses:** $H_0\colon \mu_F = \mu_M$ vs $H_a\colon \mu_F \ne \mu_M$,
+  where $\mu_F$ and $\mu_M$ are the mean weekly exercise hours of all
+  female vs male students represented by this sample.
+- **p-value from the software:** with $t = -2.98$ on
+  $df \approx 359$, **p-value ≈ 0.003**.
+- **Conclusion:** reject $H_0$ — there is convincing evidence of a
+  difference: male students exercise significantly more, by about 1.8 hours
+  per week on average (matching Exercises 6.223's confidence interval).
+
+## Exercise 6.254
+
+**Who Watches More TV: Males or Females?** Same test for weekly TV hours.
+
+*Data:* `data/ch01/StudentSurvey.csv` (`TV` column):
+
+```{python}
+#| echo: false
+ss = pd.read_csv("data/ch01/StudentSurvey.csv").dropna(subset=["TV"])
+f = ss.loc[ss.Sex == "F", "TV"].to_numpy(float)
+m = ss.loc[ss.Sex == "M", "TV"].to_numpy(float)
+welch_test(f, m, "two", "Difference (F - M)").to_string()
+```
+
+- **Hypotheses:** $H_0\colon \mu_F = \mu_M$ vs $H_a\colon \mu_F \ne \mu_M$
+  for mean weekly TV hours.
+- **p-value from the software:** with $t = -4.25$ on
+  $df \approx 329$, **p-value < 0.0001**.
+- **Conclusion:** reject $H_0$ — very strong evidence of a difference: male
+  students watch significantly more TV, by about 2.4 hours per week on
+  average.
+
+## Exercise 6.255
+
+**Sex and Atlanta Commutes** The `CommuteAtlanta` data record each
+commuter's sex. Test at 5% whether mean commute time differs between female
+and male commuters in Atlanta.
+
+*Data:* `data/ch03/CommuteAtlanta.csv`:
+
+```{python}
+#| echo: false
+ca = pd.read_csv("data/ch03/CommuteAtlanta.csv")
+f = ca.loc[ca.Sex == "F", "Time"].to_numpy(float)
+m = ca.loc[ca.Sex == "M", "Time"].to_numpy(float)
+welch_test(f, m, "two", "Difference (F - M)").to_string()
+```
+
+$H_0\colon \mu_F = \mu_M$ vs $H_a\colon \mu_F \ne \mu_M$, where $\mu_F$ and
+$\mu_M$ are the mean commute times of all female vs male Atlanta commuters.
+Females average 26.8 minutes and males 31.3 minutes; with $t = -2.47$ on
+$df \approx 465$ the p-value is **≈ 0.014**. Since $0.014 < 0.05$ we reject
+$H_0$: there is evidence of a difference in mean commute time — male
+commuters in Atlanta average about 4.5 minutes longer than female commuters.
+
+:::

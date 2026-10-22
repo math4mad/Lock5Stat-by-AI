@@ -1,0 +1,1362 @@
+---
+execute-dir: project
+title: "Chapter 6 · Section 6.3"
+subtitle: "Inference for a Difference in Proportions — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 6.3 moves from *one* proportion to the comparison of *two*: the
+parameter of interest is a difference in proportions between two groups,
+$p_1 - p_2$, estimated by the difference in sample proportions
+$\hat p_1 - \hat p_2$. Because the two samples are independent, their
+variations **add**:
+$$SE=\sqrt{\frac{p_1(1-p_1)}{n_1}+\frac{p_2(1-p_2)}{n_2}}$$
+estimated by substituting the sample proportions (giving the **unpooled**
+SE used for confidence intervals, $\hat p_1 - \hat p_2 \pm z^*\cdot SE$).
+For a **hypothesis test** of $H_0\colon p_1 = p_2$ the null specifies no
+common value, so we estimate the shared proportion by the **pooled
+proportion** $\hat p = (x_1+x_2)/(n_1+n_2)$, use it for *both* terms of the
+SE, and read the p-value of
+$z=(\hat p_1-\hat p_2)/SE_{\text{pooled}}$ off a standard normal curve —
+valid when each group has at least 10 successes and 10 failures. Below we
+compute every interval and test with `scipy.stats.norm`, and verify the
+tests with a randomization simulation (10000 shuffles of the combined
+successes, seed 2026). The exercises span 6.143–6.197: Skill Builders on
+the SE formula (6.143–6.148), the two-groups-or-one distinction
+(6.149–6.150), confidence intervals (6.151–6.167), full pooled z-tests
+(6.168–6.197) — from crows, penguins and fruit flies to face masks, HRT
+and the ICU — ending with the section's subtle lesson that *statistical
+significance depends on the difference relative to its standard error,
+not its absolute size*.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+from scipy import stats
+sns.set_theme(style="whitegrid")
+
+def se_diff(p1, n1, p2, n2):
+    """Unpooled SE for a difference in proportions (used for CIs)."""
+    return float(np.sqrt(p1*(1-p1)/n1 + p2*(1-p2)/n2))
+
+def pooled_prop(x1, n1, x2, n2):
+    """Pooled proportion under H0: p1 = p2."""
+    return (x1 + x2) / (n1 + n2)
+
+def pooled_se(x1, n1, x2, n2):
+    """Pooled SE for a two-proportion z-test."""
+    p = pooled_prop(x1, n1, x2, n2)
+    return float(np.sqrt(p*(1-p)*(1/n1 + 1/n2)))
+
+def norm_p(z, tail):
+    if tail == "right":
+        return float(stats.norm.sf(z))
+    if tail == "left":
+        return float(stats.norm.cdf(z))
+    return float(2 * stats.norm.sf(abs(z)))
+
+def prop_row(label, x1, n1, x2, n2, tail, sim=True, digits=4):
+    """Two-proportion pooled z-test summary plus a randomization check."""
+    p1, p2 = x1/n1, x2/n2
+    se = pooled_se(x1, n1, x2, n2)
+    z = (p1 - p2) / se
+    out = {"p-hat 1": round(float(p1), 4), "p-hat 2": round(float(p2), 4),
+           "Difference": round(float(p1 - p2), 4),
+           "Pooled p-hat": round(float(pooled_prop(x1, n1, x2, n2)), 4),
+           "SE (pooled)": round(se, 5), "z-statistic": round(float(z), 3),
+           "p-value (normal)": round(norm_p(z, tail), digits)}
+    if sim:
+        out["p-value (randomization)"] = round(rand_diff_p(x1, n1, x2, n2, tail), digits)
+    return pd.Series(out, name=label)
+
+def ci_row(label, x1, n1, x2, n2, conf=0.95):
+    """Confidence interval for p1 - p2 using the unpooled SE."""
+    p1, p2 = x1/n1, x2/n2
+    se = se_diff(p1, n1, p2, n2)
+    z = float(stats.norm.ppf(1 - (1 - conf)/2))
+    d = p1 - p2
+    return pd.Series({"Best estimate": round(float(d), 4),
+                      "SE (unpooled)": round(se, 4), "z*": round(z, 3),
+                      "Margin of error": round(float(z*se), 4),
+                      "CI low": round(float(d - z*se), 4),
+                      "CI high": round(float(d + z*se), 4)}, name=label)
+
+def rand_diffs(x1, n1, x2, n2, reps=10000, seed=2026):
+    """Randomization differences: shuffle the combined successes of the two
+    groups (hypergeometric) and recompute p-hat1 - p-hat2 each time."""
+    K, N = x1 + x2, n1 + n2
+    r = np.random.default_rng(seed)
+    g1 = r.hypergeometric(K, N - K, n1, reps)
+    return g1/n1 - (K - g1)/n2
+
+def rand_diff_p(x1, n1, x2, n2, tail, reps=10000, seed=2026):
+    """Randomization p-value for a difference in proportions."""
+    d = rand_diffs(x1, n1, x2, n2, reps, seed)
+    obs = x1/n1 - x2/n2
+    if tail == "right":
+        return float((d >= obs - 1e-9).mean())
+    if tail == "left":
+        return float((d <= obs + 1e-9).mean())
+    return float((np.abs(d) >= abs(obs) - 1e-9).mean())
+
+def boot_diff(x1, n1, x2, n2, reps=10000, seed=2026):
+    """Bootstrap differences in proportions: resample each binary group."""
+    r = np.random.default_rng(seed)
+    return (r.binomial(n1, x1/n1, reps)/n1 - r.binomial(n2, x2/n2, reps)/n2)
+
+def tail_plot(boots, observed, tail, xlabel, null=0.0, bins=40, figsize=(6, 3)):
+    """Histogram of a randomization distribution with the p-value tail shaded."""
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.histplot(x=boots, bins=bins, ax=ax, color="#4c72b0")
+    if tail == "right":
+        mask = boots >= observed
+    elif tail == "left":
+        mask = boots <= observed
+    else:
+        mask = np.abs(boots - null) >= abs(observed - null)
+    if mask.any():
+        sns.histplot(x=boots[mask], bins=bins, ax=ax, color="#c44e52")
+    ax.axvline(observed, color="black", lw=1.5)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Simulated statistics")
+    plt.tight_layout()
+    plt.show()
+```
+
+::: {.panel-tabset}
+
+## Exercise 6.143
+
+*(Skill Builder 1)* Samples of size $n_A=50$ from population A with
+proportion $p_A=0.70$ and size $n_B=75$ from population B with
+$p_B=0.60$. Find the SE of $\hat p_A-\hat p_B$ and check the CLT
+conditions.
+
+```{python}
+#| echo: false
+nA, pA, nB, pB = 50, 0.70, 75, 0.60
+pd.Series({"SE": round(se_diff(pA, nA, pB, nB), 4),
+           "A: successes / failures": f"{nA*pA:.0f} / {nA*(1-pA):.0f}",
+           "B: successes / failures": f"{nB*pB:.0f} / {nB*(1-pB):.0f}",
+           "CLT ok?": min(nA*pA, nA*(1-pA), nB*pB, nB*(1-pB)) >= 10}).to_string()
+```
+
+**(a)** $SE=\sqrt{0.70(0.30)/50+0.60(0.40)/75}=\sqrt{0.0074}\approx$ **0.086**.
+**(b)** Yes — group A expects 35 successes and 15 failures, group B 45 and
+30, all well above 10, so the CLT applies.
+
+## Exercise 6.144
+
+*(Skill Builder 1)* Samples of size $n_A=n_B=300$ from populations with
+$p_A=0.15$ and $p_B=0.20$.
+
+```{python}
+#| echo: false
+nA, pA, nB, pB = 300, 0.15, 300, 0.20
+pd.Series({"SE": round(se_diff(pA, nA, pB, nB), 4),
+           "A: successes / failures": f"{nA*pA:.0f} / {nA*(1-pA):.0f}",
+           "B: successes / failures": f"{nB*pB:.0f} / {nB*(1-pB):.0f}",
+           "CLT ok?": min(nA*pA, nA*(1-pA), nB*pB, nB*(1-pB)) >= 10}).to_string()
+```
+
+**(a)** $SE=\sqrt{0.15(0.85)/300+0.20(0.80)/300}\approx$ **0.031**.
+**(b)** Yes — the smallest expected count is 45, so the normal model is fine.
+
+## Exercise 6.145
+
+*(Skill Builder 1)* Samples of size $n_A=100$ from population A with
+$p_A=0.20$ and size $n_B=50$ from population B with $p_B=0.30$.
+
+```{python}
+#| echo: false
+nA, pA, nB, pB = 100, 0.20, 50, 0.30
+pd.Series({"SE": round(se_diff(pA, nA, pB, nB), 4),
+           "A: successes / failures": f"{nA*pA:.0f} / {nA*(1-pA):.0f}",
+           "B: successes / failures": f"{nB*pB:.1f} / {nB*(1-pB):.1f}",
+           "CLT ok?": min(nA*pA, nA*(1-pA), nB*pB, nB*(1-pB)) >= 10}).to_string()
+```
+
+**(a)** $SE=\sqrt{0.20(0.80)/100+0.30(0.70)/50}=\sqrt{0.0058}\approx$
+**0.076**. **(b)** Yes — the smallest expected count is 15 (successes in
+group B), above 10 in all four cells.
+
+## Exercise 6.146
+
+*(Skill Builder 1)* Samples of size $n_A=80$ from population A with
+$p_A=0.40$ and size $n_B=60$ from population B with $p_B=0.10$.
+
+```{python}
+#| echo: false
+nA, pA, nB, pB = 80, 0.40, 60, 0.10
+pd.Series({"SE": round(se_diff(pA, nA, pB, nB), 4),
+           "A: successes / failures": f"{nA*pA:.0f} / {nA*(1-pA):.0f}",
+           "B: successes / failures": f"{nB*pB:.1f} / {nB*(1-pB):.1f}",
+           "CLT ok?": min(nA*pA, nA*(1-pA), nB*pB, nB*(1-pB)) >= 10}).to_string()
+```
+
+**(a)** $SE=\sqrt{0.40(0.60)/80+0.10(0.90)/60}=\sqrt{0.0045}\approx$
+**0.067**. **(b)** **No** — group B expects only $60(0.10)=6$ successes,
+below 10, so the sample sizes are not large enough for the CLT.
+
+## Exercise 6.147
+
+*(Skill Builder 1)* Samples of size $n_A=40$ from population A with
+$p_A=0.30$ and size $n_B=30$ from population B with $p_B=0.24$.
+
+```{python}
+#| echo: false
+nA, pA, nB, pB = 40, 0.30, 30, 0.24
+pd.Series({"SE": round(se_diff(pA, nA, pB, nB), 4),
+           "A: successes / failures": f"{nA*pA:.0f} / {nA*(1-pA):.0f}",
+           "B: successes / failures": f"{nB*pB:.1f} / {nB*(1-pB):.1f}",
+           "CLT ok?": min(nA*pA, nA*(1-pA), nB*pB, nB*(1-pB)) >= 10}).to_string()
+```
+
+**(a)** $SE=\sqrt{0.30(0.70)/40+0.24(0.76)/30}\approx$ **0.106**.
+**(b)** **No** — group B expects only $30(0.24)=7.2$ successes, below 10.
+
+## Exercise 6.148
+
+*(Skill Builder 1)* Samples of size $n_A=500$ from population A with
+$p_A=0.58$ and size $n_B=200$ from population B with $p_B=0.49$.
+
+```{python}
+#| echo: false
+nA, pA, nB, pB = 500, 0.58, 200, 0.49
+pd.Series({"SE": round(se_diff(pA, nA, pB, nB), 4),
+           "A: successes / failures": f"{nA*pA:.0f} / {nA*(1-pA):.0f}",
+           "B: successes / failures": f"{nB*pB:.0f} / {nB*(1-pB):.0f}",
+           "CLT ok?": min(nA*pA, nA*(1-pA), nB*pB, nB*(1-pB)) >= 10}).to_string()
+```
+
+**(a)** $SE=\sqrt{0.58(0.42)/500+0.49(0.51)/200}\approx$ **0.042**.
+**(b)** Yes — the smallest expected count is 98, far above 10.
+
+## Exercise 6.149
+
+*(Two Groups or One?)* Which comparisons involve two *separate* groups,
+and which compare two proportions *within the same* group?
+
+- **(a)** iPhone users vs other-phone users among students: the two
+  proportions come from **the same group** (complementary categories of
+  one variable on one sample) — the methods of this section do **not**
+  apply to $\hat p_1-\hat p_2$.
+- **(b)** Study abroad at public vs private universities: **two groups** —
+  methods apply.
+- **(c)** In-state vs out-of-state proportion at a university: again
+  **the same group** split into complementary categories — do **not**
+  apply.
+- **(d)** Financial aid rate among in-state students vs among out-of-state
+  students: **two groups** measured on the same response — methods apply.
+
+```{python}
+#| echo: false
+pd.Series({"(a)": "Same group — not applicable",
+           "(b)": "Two groups — applicable",
+           "(c)": "Same group — not applicable",
+           "(d)": "Two groups — applicable"}).to_string()
+```
+
+## Exercise 6.150
+
+*(Two Groups or One?)* Same task, four new situations.
+
+```{python}
+#| echo: false
+pd.Series({"(a)": "Same group — not applicable",
+           "(b)": "Two groups — applicable",
+           "(c)": "Two groups — applicable",
+           "(d)": "Same group — not applicable"}).to_string()
+```
+
+- **(a)** Tasters preferring cola A vs cola B: one group of tasters,
+  complementary preferences — do **not** apply.
+- **(b)** Voter turnout of males vs females: **two groups** — apply.
+- **(c)** Graduation rate, scholarship athletes vs non-athletes:
+  **two groups** — apply.
+- **(d)** Voters in favor of the school budget vs against it: one group of
+  voters, complementary categories — do **not** apply.
+
+## Exercise 6.151
+
+*(Skill Builder, CI)* 95% confidence interval for $p_1-p_2$ with
+$\hat p_1=0.72$, $n_1=500$ and $\hat p_2=0.68$, $n_2=300$.
+
+```{python}
+#| echo: false
+ci_row("95% CI", 0.72*500, 500, 0.68*300, 300).to_string()
+```
+
+Best estimate $\hat p_1-\hat p_2 = 0.04$, SE $\approx 0.0336$, margin of
+error $1.96(0.0336)\approx$ **0.066**, giving the interval
+$$0.04 \pm 0.066 \;=\; (-0.026 \text{ to } 0.106).$$
+
+## Exercise 6.152
+
+*(Skill Builder, CI)* 90% confidence interval for $p_1-p_2$ with
+$\hat p_1=0.20$, $n_1=50$ and $\hat p_2=0.32$, $n_2=100$.
+
+```{python}
+#| echo: false
+ci_row("90% CI", 0.20*50, 50, 0.32*100, 100, conf=0.90).to_string()
+```
+
+Best estimate $-0.12$, SE $\approx 0.0733$, margin of error
+$1.645(0.0733)\approx$ **0.121**, giving
+$$-0.12 \pm 0.121 \;=\; (-0.241 \text{ to } 0.001).$$
+The interval *just barely* includes 0, so at 90% confidence we cannot rule
+out an equal proportion in the two populations.
+
+## Exercise 6.153
+
+*(Skill Builder, CI)* 99% confidence interval for $p_1-p_2$ from counts of
+114 yes out of 150 (Group 1) and 135 yes out of 150 (Group 2).
+
+```{python}
+#| echo: false
+ci_row("99% CI", 114, 150, 135, 150, conf=0.99).to_string()
+```
+
+$\hat p_1=0.76$, $\hat p_2=0.90$, best estimate $-0.14$, SE $\approx 0.0426$,
+margin of error $2.576(0.0426)\approx$ **0.110**, giving
+$$-0.14 \pm 0.110 \;=\; (-0.250 \text{ to } -0.030).$$
+
+## Exercise 6.154
+
+*(Skill Builder, CI)* 95% confidence interval for $p_1-p_2$ from counts of
+240 yes out of 500 (Group 1) and 450 yes out of 1000 (Group 2).
+
+```{python}
+#| echo: false
+ci_row("95% CI", 240, 500, 450, 1000).to_string()
+```
+
+$\hat p_1=0.48$, $\hat p_2=0.45$, best estimate $0.03$, SE $\approx 0.0273$,
+margin of error $\approx$ **0.054**, giving
+$$0.03 \pm 0.054 \;=\; (-0.024 \text{ to } 0.084).$$
+
+## Exercise 6.155
+
+**Who Is More Trusting: Internet Users or Non-users?** Of 1754 regular
+internet users, 807 agree that most people can be trusted; of 483
+non-users, 130 agree. Find and interpret a 90% CI for the difference in
+proportions.
+
+```{python}
+#| echo: false
+ci_row("90% CI (users - non-users)", 807, 1754, 130, 483, conf=0.90).to_string()
+```
+
+$\hat p_U - \hat p_N = 0.460 - 0.269 = 0.191$ with SE $\approx 0.0234$ and
+margin of error $1.645(0.0234)\approx 0.039$, giving the interval
+**(0.152 to 0.229)**. We are 90% confident that regular internet users are
+between 15 and 23 percentage points *more* likely to agree that most
+people can be trusted than non-users. Since the interval contains only
+positive values, "no difference" is not a plausible value at this level.
+
+## Exercise 6.156
+
+**Juvenile Diabetes Treatment.** Table 6.4: of 38 control children 26
+developed diabetes; of 38 receiving teplizumab 16 did.
+
+```{python}
+#| echo: false
+ci_row("99% CI (control - teplizumab)", 26, 38, 16, 38, conf=0.99).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: 99 percent confidence interval for the difference in diabetes proportions, control minus teplizumab, with zero marked
+d = 26/38 - 16/38; se = se_diff(26/38, 38, 16/38, 38); me = 2.576*se
+fig, ax = plt.subplots(figsize=(6, 2.2))
+ax.errorbar([d], [0], xerr=[[me], [me]], fmt="o", color="#4c72b0",
+            capsize=6, lw=2)
+ax.axvline(0, color="#c44e52", ls="--", lw=1.5)
+ax.set_xlabel("Difference in proportions (control - teplizumab)")
+ax.set_yticks([])
+ax.set_xlim(-0.12, 0.66)
+plt.tight_layout()
+plt.show()
+```
+
+- **(a)** $\hat p_1-\hat p_2 = 26/38 - 16/38 = 0.684 - 0.421 = $ **0.263**.
+- **(b)** The 99% CI is $0.263 \pm 2.576(0.110) = 0.263 \pm 0.283$, i.e.
+  **(−0.020 to 0.547)**.
+- **(c)** Best estimate **0.263**; margin of error **0.283** — the margin
+  exceeds the estimate, a consequence of the very small samples
+  ($n_1=n_2=38$) and the high 99% level.
+- **(d)** **No.** The interval includes 0, so even at 99% confidence we
+  cannot rule out equal diabetes rates; the data are encouraging but do
+  not establish teplizumab as more effective at this confidence level.
+
+## Exercise 6.157
+
+**Are Errors Less Likely with Electronic Prescriptions?** Table 6.5:
+254 of 3848 e-prescriptions had errors vs 1478 of 3848 written ones.
+Find and interpret a 95% CI; is "no difference" plausible?
+
+```{python}
+#| echo: false
+ci_row("95% CI (electronic - written)", 254, 3848, 1478, 3848).to_string()
+```
+
+$\hat p_E - \hat p_W = 0.066 - 0.384 = -0.318$ with SE $\approx 0.0088$ and
+margin of error $\approx 0.017$, giving **(−0.335 to −0.301)**. We are 95%
+confident that the error rate for electronic prescribing is between 30.1
+and 33.5 percentage points *lower* than for written prescriptions.
+**No** — "no difference" ($p_E = p_W$) is not plausible: the entire
+interval lies far from 0.
+
+## Exercise 6.158
+
+**Public Libraries and Sex.** Table 6.6: 726 of 1423 females and 505 of
+1329 males had visited a public library in the last 12 months.
+
+```{python}
+#| echo: false
+ci_row("95% CI (female - male)", 726, 1423, 505, 1329).to_string()
+```
+
+- **(a)** $\hat p_f = 726/1423 = 0.510$, $\hat p_m = 505/1329 = 0.380$;
+  $\hat p_f - \hat p_m =$ **0.130**.
+- **(b)** SE $\approx 0.0188$, margin of error $1.96(0.0188)\approx 0.037$:
+  the 95% CI is **(0.093 to 0.167)**.
+- **(c)** **Yes** — the interval excludes 0, so we conclude a real
+  difference in proportions: **females** are more likely to have visited
+  the public library, by roughly 9 to 17 percentage points.
+
+## Exercise 6.159
+
+**Public Libraries and Children.** Same survey, broken down by whether
+children live in the house: 421 of 832 with children visited the library
+vs 810 of 1920 without. Find and interpret a 90% CI for $p_C - p_N$.
+
+```{python}
+#| echo: false
+ci_row("90% CI (children - no children)", 421, 832, 810, 1920, conf=0.90).to_string()
+```
+
+$\hat p_C - \hat p_N = 0.506 - 0.422 = 0.084$ with SE $\approx 0.0207$ and
+margin of error $1.645(0.0207)\approx 0.034$, giving **(0.050 to 0.118)**.
+We are 90% confident that adults with children in the house are between 5
+and 12 percentage points more likely to visit the library — consistent
+with the sex difference in Exercise 6.158 pointing to household
+composition as a confounding variable.
+
+## Exercise 6.160
+
+**Metal Tags on Penguins and Survival.** 10 of 50 metal-tagged penguins
+survived 10 years vs 18 of 50 electronic-tagged. Build a 90% CI for
+$p_M - p_E$ and interpret.
+
+```{python}
+#| echo: false
+ci_row("90% CI (metal - electronic)", 10, 50, 18, 50, conf=0.90).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: 90 percent confidence interval for the survival difference, metal minus electronic, with zero marked
+d = 10/50 - 18/50; me = 1.645*se_diff(10/50, 50, 18/50, 50)
+fig, ax = plt.subplots(figsize=(6, 2.2))
+ax.errorbar([d], [0], xerr=[[me], [me]], fmt="o", color="#4c72b0",
+            capsize=6, lw=2)
+ax.axvline(0, color="#c44e52", ls="--", lw=1.5)
+ax.set_xlabel("Difference in 10-year survival (metal - electronic)")
+ax.set_yticks([])
+ax.set_xlim(-0.42, 0.18)
+plt.tight_layout()
+plt.show()
+```
+
+$\hat p_M - \hat p_E = 0.20 - 0.36 = -0.16$ with SE $\approx 0.0884$ and
+margin of error $\approx 0.145$: the 90% CI is **(−0.305 to −0.015)**. We
+are 90% confident that metal-tagged penguins have a 10-year survival rate
+between 1.5 and 30.5 percentage points *lower* than electronic-tagged
+ones. Since the interval contains only negative values, metal tags appear
+genuinely detrimental to survival (though the interval is wide with only
+50 penguins per group).
+
+## Exercise 6.161
+
+**Metal Tags on Penguins and Breeding Success.** Metal-tagged penguins
+produced offspring in 32% of 122 breeding seasons vs 44% of 160 for
+electronic-tagged. Build a 95% CI for $p_M - p_E$ and interpret.
+
+```{python}
+#| echo: false
+ci_row("95% CI (metal - electronic)", 0.32*122, 122, 0.44*160, 160).to_string()
+```
+
+$\hat p_M - \hat p_E = 0.32 - 0.44 = -0.12$ with SE $\approx 0.0577$ and
+margin of error $1.96(0.0577)\approx 0.113$: the 95% CI is
+**(−0.233 to −0.007)**. We are 95% confident that metal-tagged penguins'
+breeding success is between 0.7 and 23.3 percentage points lower. The
+interval just barely excludes 0 — consistent with Exercise 6.160, metal
+tags also appear to harm breeding success, though the evidence is
+marginal.
+
+## Exercise 6.162
+
+*(SE from a Formula and a Bootstrap Distribution)* Sample A: 30 successes
+in $n=100$; Sample B: 50 successes in $n=250$. Compare the bootstrap SE of
+$\hat p_A-\hat p_B$ to the formula SE.
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the difference in proportions for Exercise 6.162 with the fitted normal curve overlaid
+d = boot_diff(30, 100, 50, 250)
+fig, ax = plt.subplots(figsize=(6.5, 3))
+sns.histplot(x=d, bins=30, ax=ax, color="#4c72b0", stat="density")
+xg = np.linspace(d.min() - 0.03, d.max() + 0.03, 300)
+ax.plot(xg, stats.norm.pdf(xg, d.mean(), d.std(ddof=1)), color="black", lw=2)
+ax.axvline(30/100 - 50/250, color="#c44e52", lw=1.5)
+ax.set_xlabel("Bootstrap differences in proportions (A - B)")
+ax.set_ylabel("Density")
+plt.tight_layout()
+plt.show()
+pd.Series({"Formula SE": round(se_diff(0.30, 100, 0.20, 250), 4),
+           "Bootstrap SE": round(float(d.std(ddof=1)), 4),
+           "Bootstrap mean": round(float(d.mean()), 4)}).to_string()
+```
+
+The formula gives
+$SE=\sqrt{0.30(0.70)/100+0.20(0.80)/250}\approx$ **0.052**; the bootstrap
+distribution of 10000 resamples (above) has SE $\approx$ **0.052** as
+well. The two estimates agree closely, as they should when the samples
+are large enough for the normal model.
+
+## Exercise 6.163
+
+*(SE from a Formula and a Bootstrap Distribution)* Sample A: 90 successes
+in $n=120$; Sample B: 180 successes in $n=300$.
+
+```{python}
+#| echo: false
+d = boot_diff(90, 120, 180, 300)
+pd.Series({"Formula SE": round(se_diff(0.75, 120, 0.60, 300), 4),
+           "Bootstrap SE": round(float(d.std(ddof=1)), 4),
+           "Bootstrap mean": round(float(d.mean()), 4)}).to_string()
+```
+
+The formula gives
+$SE=\sqrt{0.75(0.25)/120+0.60(0.40)/300}\approx$ **0.049**, and the
+bootstrap SE from 10000 resamples is $\approx$ **0.049** — again an
+excellent match.
+
+## Exercise 6.164
+
+*(Comparing Normal and Bootstrap CIs)* Difference in the proportion who
+use text messaging, teens $\hat p_t=0.87$ ($n=800$) vs adults
+$\hat p_a=0.72$ ($n=2252$): find a 95% CI two ways and compare.
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the teen minus adult difference in text-messaging proportions with the 95 percent percentile interval shaded
+d = boot_diff(696, 800, 1621, 2252)
+lo, hi = np.quantile(d, 0.025), np.quantile(d, 0.975)
+fig, ax = plt.subplots(figsize=(6.5, 3))
+sns.histplot(x=d, bins=30, ax=ax, color="#4c72b0")
+sns.histplot(x=d[(d >= lo) & (d <= hi)], bins=30, ax=ax, color="#55a868")
+for v in (lo, hi):
+    ax.axvline(v, color="black", lw=1)
+ax.set_xlabel("Bootstrap differences in proportions (teens - adults)")
+ax.set_ylabel("Simulated statistics")
+plt.tight_layout()
+plt.show()
+pd.Series({"Statistic": round(0.87 - 0.72, 4),
+           "Formula SE": round(se_diff(0.87, 800, 0.72, 2252), 4),
+           "Normal 95% CI": f"({0.15 - 1.96*se_diff(0.87, 800, 0.72, 2252):.3f}, {0.15 + 1.96*se_diff(0.87, 800, 0.72, 2252):.3f})",
+           "Bootstrap SE": round(float(d.std(ddof=1)), 4),
+           "Bootstrap 95% CI": f"({lo:.3f}, {hi:.3f})"}).to_string()
+```
+
+Both methods give the same interval: the normal formula yields
+$0.15 \pm 1.96(0.0152) =$ **(0.120 to 0.180)** and the bootstrap
+percentile interval is **(0.120 to 0.180)**. With samples this large the
+bootstrap distribution is essentially normal and the two intervals
+coincide: teens text more, by roughly 12 to 18 percentage points.
+
+## Exercise 6.165
+
+*(Comparing Normal and Bootstrap CIs)* Difference in the proportion
+favoring a gun control proposal: females 379/460 ($\hat p_f=0.82$) vs
+males 318/520 ($\hat p_m=0.61$).
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the female minus male difference in support for the gun control proposal with the 95 percent percentile interval shaded
+d = boot_diff(379, 460, 318, 520)
+lo, hi = np.quantile(d, 0.025), np.quantile(d, 0.975)
+fig, ax = plt.subplots(figsize=(6.5, 3))
+sns.histplot(x=d, bins=30, ax=ax, color="#4c72b0")
+sns.histplot(x=d[(d >= lo) & (d <= hi)], bins=30, ax=ax, color="#55a868")
+for v in (lo, hi):
+    ax.axvline(v, color="black", lw=1)
+ax.set_xlabel("Bootstrap differences in proportions (females - males)")
+ax.set_ylabel("Simulated statistics")
+plt.tight_layout()
+plt.show()
+se = se_diff(379/460, 460, 318/520, 520)
+pd.Series({"Statistic": round(379/460 - 318/520, 4),
+           "Formula SE": round(se, 4),
+           "Normal 95% CI": f"({379/460 - 318/520 - 1.96*se:.3f}, {379/460 - 318/520 + 1.96*se:.3f})",
+           "Bootstrap SE": round(float(d.std(ddof=1)), 4),
+           "Bootstrap 95% CI": f"({lo:.3f}, {hi:.3f})"}).to_string()
+```
+
+The normal formula gives $0.212 \pm 1.96(0.0278) =$ **(0.158 to 0.267)**
+and the bootstrap percentile interval is **(0.158 to 0.265)** — nearly
+identical. We are 95% confident that support for the proposal is between
+16 and 27 percentage points higher among females than among males.
+
+## Exercise 6.166
+
+**Survival in the ICU and Infection.** Using `ICUAdmissions`, find a 95%
+CI for the difference in the proportion who die between patients with an
+infection at admission and those without.
+
+*Data:* `data/ch03/ICUAdmissions.csv`, from
+<https://www.lock5stat.com/datasets3e/ICUAdmissions.csv>:
+
+```{python}
+#| echo: false
+icu = pd.read_csv("data/ch03/ICUAdmissions.csv")
+inf = icu.loc[icu.Infection == 1, "Status"]
+noi = icu.loc[icu.Infection == 0, "Status"]
+x1, n1 = int(inf.sum()), len(inf)
+x2, n2 = int(noi.sum()), len(noi)
+pd.Series({"Died, infected": f"{x1} / {n1} = {x1/n1:.3f}",
+           "Died, no infection": f"{x2} / {n2} = {x2/n2:.3f}"}).to_string()
+```
+
+```{python}
+#| echo: false
+ci_row("95% CI (infection - no infection)", x1, n1, x2, n2).to_string()
+```
+
+The death proportions are $24/84 = 0.286$ with an infection vs
+$16/116 = 0.138$ without; the 95% CI for the difference is
+**(0.033 to 0.263)**. Since the interval excludes 0, ICU patients admitted
+with an infection have a genuinely higher death rate — roughly 3 to 26
+percentage points higher.
+
+## Exercise 6.167
+
+**Survival in the ICU and Sex.** Using `ICUAdmissions`, find a 95% CI for
+the difference in the proportion who die between males and females.
+
+```{python}
+#| echo: false
+fem = icu.loc[icu.Sex == 1, "Status"]
+mal = icu.loc[icu.Sex == 0, "Status"]
+xf, nf = int(fem.sum()), len(fem)
+xm, nm = int(mal.sum()), len(mal)
+pd.Series({"Died, female": f"{xf} / {nf} = {xf/nf:.3f}",
+           "Died, male": f"{xm} / {nm} = {xm/nm:.3f}"}).to_string()
+```
+
+```{python}
+#| echo: false
+ci_row("95% CI (female - male)", xf, nf, xm, nm).to_string()
+```
+
+Death proportions are $16/76 = 0.211$ for females and $24/124 = 0.194$ for
+males; the 95% CI for the difference (female − male) is
+**(−0.098 to 0.132)**. The interval contains 0, so these data provide no
+evidence of a sex difference in ICU mortality.
+
+## Exercise 6.168
+
+*(Skill Builder, HT)* Test whether there is a difference between two
+groups in the proportion who voted: 45 of 70 in Group 1 voted, 56 of 100
+in Group 2 did.
+
+```{python}
+#| echo: false
+prop_row("Voted", 45, 70, 56, 100, "two").to_string()
+```
+
+- **(a)** $\hat p_1 = 45/70 = 0.643$, $\hat p_2 = 56/100 = 0.560$; pooled
+  $\hat p = 101/170 = 0.594$.
+- **(b)** $H_0\colon p_1 = p_2$ vs $H_a\colon p_1 \ne p_2$;
+  $z = 0.083/0.0765 = 1.08$ and **p-value ≈ 0.279** (two-tailed; the
+  randomization check gives about 0.35 — small-sample discreteness, same
+  conclusion). Since $0.279 > 0.05$ we fail to reject $H_0$: the data do
+  not show a difference in turnout between the groups.
+
+## Exercise 6.169
+
+*(Skill Builder, HT)* Test whether patients getting Treatment A are more
+likely to survive: 63 of 82 on Treatment A survived vs 31 of 67 on
+Treatment B.
+
+```{python}
+#| echo: false
+prop_row("Survived", 63, 82, 31, 67, "right").to_string()
+```
+
+- **(a)** $\hat p_A = 63/82 = 0.768$, $\hat p_B = 31/67 = 0.463$; pooled
+  $\hat p = 94/149 = 0.631$.
+- **(b)** $H_0\colon p_A = p_B$ vs $H_a\colon p_A > p_B$;
+  $z = 0.306/0.0795 = 3.85$ and **p-value ≈ 0.0001**. We reject $H_0$:
+  strong evidence that patients on Treatment A are more likely to
+  survive.
+
+## Exercise 6.170
+
+*(Skill Builder, HT)* Test whether people with a specific genetic marker
+are more likely to have suffered clinical depression: 38% of 42 with the
+marker vs 12% of 758 without.
+
+```{python}
+#| echo: false
+prop_row("Depression", 16, 42, 91, 758, "right").to_string()
+```
+
+- **(a)** $\hat p_1 = 0.38$ ($\approx 16$ of 42), $\hat p_2 = 0.12$
+  ($\approx 91$ of 758); pooled
+  $\hat p = (16+91)/800 = 0.134$.
+- **(b)** $H_0\colon p_1 = p_2$ vs $H_a\colon p_1 > p_2$;
+  $z = 0.26/0.0540 = 4.84$ and **p-value $< 0.0001$**. We reject $H_0$:
+  very strong evidence that people carrying the marker are more likely to
+  have suffered clinical depression.
+
+## Exercise 6.171
+
+*(Skill Builder, HT)* Test whether males are *less* likely than females
+to support a ballot initiative: 24% of 50 males plan to vote yes vs 32%
+of 50 females.
+
+```{python}
+#| echo: false
+prop_row("Vote yes", 12, 50, 16, 50, "left").to_string()
+```
+
+- **(a)** $\hat p_M = 0.24$, $\hat p_F = 0.32$; pooled $\hat p = 28/100 = 0.28$.
+- **(b)** $H_0\colon p_M = p_F$ vs $H_a\colon p_M < p_F$;
+  $z = -0.08/0.0898 = -0.89$ and **p-value ≈ 0.187** (randomization check
+  ≈ 0.26 — same conclusion). Since $0.187 > 0.05$ we fail to reject
+  $H_0$: no evidence that males are less likely to support the
+  initiative.
+
+## Exercise 6.172
+
+*(Skill Builder, HT)* Table 6.9: Airline A had 151 of 700 flights arrive
+late; Airline B had 87 of 500 late. Test for a difference in the percent
+of late flights.
+
+```{python}
+#| echo: false
+prop_row("Arrived late", 151, 700, 87, 500, "two").to_string()
+```
+
+- **(a)** $\hat p_A = 151/700 = 0.216$, $\hat p_B = 87/500 = 0.174$; pooled
+  $\hat p = 238/1200 = 0.198$.
+- **(b)** $H_0\colon p_A = p_B$ vs $H_a\colon p_A \ne p_B$;
+  $z = 0.042/0.0233 = 1.79$ and **p-value ≈ 0.074** (randomization check
+  ≈ 0.078). Since $0.074 > 0.05$ we fail to reject $H_0$ at the 5% level:
+  the 4-percentage-point gap is not quite big enough to rule out chance.
+
+## Exercise 6.173
+
+*(Skill Builder, HT)* Table 6.10: 36 of 75 patients felt pain relief with
+the treatment vs 21 of 75 with a placebo (randomized, double-blind). Test
+whether the treatment is significantly better.
+
+```{python}
+#| echo: false
+prop_row("Pain relieved", 36, 75, 21, 75, "right").to_string()
+```
+
+- **(a)** $\hat p_T = 36/75 = 0.48$, $\hat p_P = 21/75 = 0.28$; pooled
+  $\hat p = 57/150 = 0.38$.
+- **(b)** $H_0\colon p_T = p_P$ vs $H_a\colon p_T > p_P$;
+  $z = 0.20/0.0793 = 2.52$ and **p-value ≈ 0.006**. We reject $H_0$:
+  good evidence that the treatment relieves pain more often than the
+  placebo.
+
+## Exercise 6.174
+
+**Babies Learn Early Who They Can Trust.** Of 30 babies shown a reliable
+adult, 18 imitated her forehead-touch action; of 30 shown an unreliable
+adult, 10 did (Table 6.11). Test at 5% whether babies are more likely to
+imitate the reliable person.
+
+```{python}
+#| echo: false
+prop_row("Imitated", 18, 30, 10, 30, "right").to_string()
+```
+
+$H_0\colon p_R = p_U$ vs $H_a\colon p_R > p_U$; $\hat p_R = 0.60$,
+$\hat p_U = 0.333$, pooled $\hat p = 28/60 = 0.467$;
+$z = 0.267/0.1288 = 2.07$ and **p-value ≈ 0.019** (the randomization test
+on the shuffled 60 babies gives ≈ 0.035 — still below 0.05). We reject
+$H_0$: babies are significantly more likely to imitate an adult who has
+proven reliable, consistent with infants choosing *not* to learn from
+someone they distrust.
+
+## Exercise 6.175
+
+**Do Rats Understand Hide-and-Seek?** Table 6.12: when hiding, rats chose
+the opaque box 38 of 53 times; when seeking, only 14 of 31 times. Test
+whether the proportion choosing opaque is higher when hiding.
+
+```{python}
+#| echo: false
+prop_row("Chose opaque box", 38, 53, 14, 31, "right").to_string()
+```
+
+$H_0\colon p_H = p_S$ vs $H_a\colon p_H > p_S$; $\hat p_H = 38/53 = 0.717$,
+$\hat p_S = 14/31 = 0.452$, pooled $\hat p = 52/84 = 0.619$;
+$z = 0.265/0.1098 = 2.42$ and **p-value ≈ 0.008** (randomization check
+≈ 0.016). We reject $H_0$: rats choose the see-through box more when
+hiding would be pointless — evidence they genuinely understand the rules
+of the game.
+
+## Exercise 6.176
+
+**Pennsylvania Seniors Favorite Subject.** From `PASeniors`, 39 of 186
+students in 2010–2014 chose mathematics and statistics as a favorite
+subject vs 69 of 268 in 2015–2019. Has the proportion changed?
+
+*Data:* `data/ch01/PASeniors.csv`, from
+<https://www.lock5stat.com/datasets3e/PASeniors.csv>:
+
+```{python}
+#| echo: false
+pa = pd.read_csv("data/ch01/PASeniors.csv")
+sub = pa.dropna(subset=["FavSubject"]).copy()
+sub["math"] = sub.FavSubject.str.strip().str.lower().str.contains("math")
+first = sub[sub.Year <= 2014]; second = sub[sub.Year >= 2015]
+x1, n1 = int(first.math.sum()), len(first)
+x2, n2 = int(second.math.sum()), len(second)
+pd.Series({"2010-2014": f"{x1} / {n1} = {x1/n1:.3f}",
+           "2015-2019": f"{x2} / {n2} = {x2/n2:.3f}"}).to_string()
+```
+
+```{python}
+#| echo: false
+prop_row("Math or statistics favorite", x1, n1, x2, n2, "two").to_string()
+```
+
+The dataset reproduces the exercise's counts exactly (39/186 and 69/268).
+$H_0\colon p_1 = p_2$ vs $H_a\colon p_1 \ne p_2$; pooled
+$\hat p = 108/454 = 0.238$; $z = -0.048/0.0406 = -1.18$ and
+**p-value ≈ 0.240** (randomization check ≈ 0.26). Since $0.240 > 0.05$ we
+fail to reject $H_0$: no evidence that the popularity of
+mathematics/statistics as a favorite subject changed between the two
+halves of the decade.
+
+## Exercise 6.177
+
+**Physician's Health Study.** Randomized, double-blind trial of 22071
+male physicians: 104 of 11037 on daily low-dose aspirin had a heart
+attack within five years vs 189 of 11034 on placebo. Does aspirin reduce
+the risk? Why can we infer causation?
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in heart-attack proportions, aspirin minus placebo, observed difference marked
+d = rand_diffs(104, 11037, 189, 11034)
+tail_plot(d, 104/11037 - 189/11034, "left",
+          "Randomization differences in proportions (aspirin - placebo)",
+          bins=30, figsize=(6.5, 3))
+prop_row("Heart attack", 104, 11037, 189, 11034, "left").to_string()
+```
+
+$H_0\colon p_A = p_P$ vs $H_a\colon p_A < p_P$; $\hat p_A = 0.0094$,
+$\hat p_P = 0.0171$, pooled $\hat p = 293/22071 = 0.0133$;
+$z = -0.0077/0.00154 = -5.00$ and **p-value $\approx 3\times10^{-7}$**
+(the randomization histogram above shows essentially nothing beyond the
+observed difference). We reject $H_0$: very strong evidence that a daily
+low-dose aspirin reduces the risk of heart attack. **Causal inference is
+warranted** because the men were *randomly assigned* to aspirin or
+placebo (and the study was double-blind), so the only systematic
+difference between the groups is the treatment itself.
+
+## Exercise 6.178
+
+**Effect of Organic Raisins after 15 Days.** Testing
+$H_0\colon p_o = p_c$ vs $H_a\colon p_o > p_c$ with $n_1 = n_2 = 500$:
+320 of 500 flies on organic raisins are alive vs 300 of 500 on
+conventional. 5% level.
+
+```{python}
+#| echo: false
+prop_row("Alive after 15 days", 320, 500, 300, 500, "right").to_string()
+```
+
+$\hat p_o - \hat p_c = 0.64 - 0.60 = 0.04$; pooled $\hat p = 620/1000 =
+0.62$; $SE = 0.0307$; $z = 1.30$ and **p-value ≈ 0.096** (randomization
+check ≈ 0.107). Since $0.096 > 0.05$ we fail to reject $H_0$: the 4-point
+survival advantage for organic raisins is within random-chance range.
+
+## Exercise 6.179
+
+**Effect of Organic Bananas after 15 Days.** Same test: 345 of 500 on
+organic bananas alive vs 320 of 500 on conventional.
+
+```{python}
+#| echo: false
+prop_row("Alive after 15 days", 345, 500, 320, 500, "right").to_string()
+```
+
+$\hat p_o - \hat p_c = 0.69 - 0.64 = 0.05$; pooled $\hat p = 0.665$;
+$SE = 0.0299$; $z = 1.68$ and **p-value ≈ 0.047** on the normal curve —
+just below 0.05. The randomization check gives ≈ 0.055, so the evidence
+sits **right at the boundary**: using the normal approximation we reject
+$H_0$ at the 5% level, but the evidence for organic bananas at 15 days is
+marginal at best.
+
+## Exercise 6.180
+
+**Effect of Organic Raisins after 20 Days.** Same test: 275 of 500 on
+organic raisins alive vs 170 of 500 on conventional.
+
+```{python}
+#| echo: false
+prop_row("Alive after 20 days", 275, 500, 170, 500, "right").to_string()
+```
+
+$\hat p_o - \hat p_c = 0.55 - 0.34 = 0.21$; pooled $\hat p = 0.445$;
+$SE = 0.0314$; $z = 6.68$ and **p-value $\approx 10^{-11}$** — essentially
+zero in the simulation as well. We reject $H_0$ emphatically: by day 20
+organic raisins confer a dramatic and highly significant survival
+advantage.
+
+## Exercise 6.181
+
+**Effect of Organic Potatoes after 20 Days.** Same test: 250 of 500 on
+organic potatoes alive vs 130 of 500 on conventional.
+
+```{python}
+#| echo: false
+prop_row("Alive after 20 days", 250, 500, 130, 500, "right").to_string()
+```
+
+$\hat p_o - \hat p_c = 0.50 - 0.26 = 0.24$; pooled $\hat p = 0.38$;
+$SE = 0.0307$; $z = 7.82$ and **p-value $\approx 10^{-15}$**. We reject
+$H_0$ overwhelmingly: organic potatoes show the largest survival
+advantage of the series, some 8 standard errors above the null.
+
+## Exercise 6.182
+
+**Autism and Maternal Antidepressant Use.** Of 298 children with autism
+spectrum disorder, 20 mothers used antidepressants in the year before
+pregnancy or the first trimester; of 1507 controls, 50 mothers did.
+
+```{python}
+#| echo: false
+prop_row("Antidepressant use", 20, 298, 50, 1507, "two").to_string()
+```
+
+- **(a)** $H_0\colon p_1 = p_2$ vs $H_a\colon p_1 \ne p_2$;
+  $\hat p_1 = 20/298 = 0.067$ vs $\hat p_2 = 50/1507 = 0.033$; pooled
+  $\hat p = 70/1805 = 0.039$; $z = 2.77$ and **p-value ≈ 0.006** — a
+  significant association at the 5% level.
+- **(b)** **No.** These are observational data (children with autism vs
+  randomly selected controls), not a randomized experiment; confounding
+  (e.g., mothers who take antidepressants may differ in many other ways)
+  or reverse causation cannot be ruled out, so we cannot conclude the
+  drugs *increase* the risk.
+- **(c)** To separate the effect of the *drug* from the effect of the
+  *underlying mental health condition*: if the association appeared
+  whenever mothers received mental health treatment, it might reflect the
+  illness rather than the antidepressant. Finding no increased risk among
+  mothers with mental health treatment but no antidepressant exposure
+  suggests the association is specific to the drug exposure — still only
+  an observational refinement, not proof of causation.
+
+## Exercise 6.183
+
+**Electrical Stimulation for Fresh Insight?** Table 6.13: with sham
+stimulation 4 of 20 solved the insight problem; with real stimulation 12
+of 20 did. Explain why the normal methods of this section are
+inappropriate.
+
+```{python}
+#| echo: false
+pp = pooled_prop(4, 20, 12, 20)
+pd.Series({"Pooled proportion": round(pp, 3),
+           "Expected solved, sham": round(pp*20, 1),
+           "Expected solved, electrical": round(pp*20, 1),
+           "Observed solved, sham": 4,
+           "Observed solved, electrical": 12}).to_string()
+```
+
+The success/failure condition fails badly. With only 40 observations the
+pooled proportion is $16/40 = 0.4$, so each group *expects*
+$0.4(20) = 8$ solved cases — fewer than 10 — and the sham group actually
+observed just 4 successes. With so few successes the randomization
+distribution of $\hat p_1 - \hat p_2$ takes only a handful of very
+discrete, skewed values and a normal curve is a poor model. The correct
+tool is the randomization test of Section 4.3 (as done in Exercise
+4.138), not the normal formula.
+
+## Exercise 6.184
+
+**Green Tea and Prostate Cancer.** Table 6.14: after one year, 1 of 30
+men on green tea extract had developed prostate cancer vs 9 of 30 on
+placebo (randomized, double-blind). Does green tea reduce the risk?
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in cancer proportions, green tea minus placebo, with the observed difference in the left tail
+d = rand_diffs(1, 30, 9, 30)
+tail_plot(d, 1/30 - 9/30, "left",
+          "Randomization differences in proportions (green tea - placebo)",
+          bins=24, figsize=(6, 3))
+pd.Series({"Normal z-statistic": round((1/30 - 9/30)/pooled_se(1, 30, 9, 30), 3),
+           "Normal p-value (invalid here)": round(norm_p((1/30 - 9/30)/pooled_se(1, 30, 9, 30), "left"), 4),
+           "Randomization p-value": round(rand_diff_p(1, 30, 9, 30, "left"), 4),
+           "Exact hypergeometric p-value": round(float(stats.hypergeom.cdf(1, 60, 10, 30)), 4)}).to_string()
+```
+
+The pooled proportion is $10/60 = 0.167$, so each group *expects* only 5
+cancers — the success/failure condition fails and the normal p-value
+(0.003) is unreliable. Using a randomization test instead (shuffling the
+10 cancer cases between two groups of 30, histogram above): the exact
+probability of 1 or fewer cancers landing in the green tea group is
+**≈ 0.006** (10000 shuffles agree). Since $0.006 < 0.05$ and the men were
+randomized, we conclude the study provides good evidence that green tea
+extract reduces the risk of developing prostate cancer.
+
+## Exercise 6.185
+
+**Can Malaria Parasites Control Mosquito Behavior?** Mosquitoes were
+randomized to feed on a malaria-infected or uninfected mouse, then given
+the chance to approach a human.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distributions of the difference in proportions approaching the human for the Oocyst stage (left) and Sporozoite stage (right)
+fig, axes = plt.subplots(1, 2, figsize=(7, 3))
+for ax, (ttl, x1, n1, x2, n2) in zip(
+        axes, [("Oocyst stage", 20, 113, 36, 117),
+               ("Sporozoite stage", 37, 149, 14, 144)]):
+    dd = rand_diffs(x1, n1, x2, n2)
+    sns.histplot(x=dd, bins=24, ax=ax, color="#4c72b0")
+    ax.axvline(x1/n1 - x2/n2, color="#c44e52", lw=1.5)
+    ax.set_title(ttl)
+    ax.set_xlabel("Exposed - not exposed")
+plt.tight_layout()
+plt.show()
+pd.concat([
+    prop_row("Oocyst (a, b)", 20, 113, 36, 117, "left"),
+    prop_row("Sporozoite (c, d)", 37, 149, 14, 144, "right")], axis=1).to_string()
+```
+
+- **(a)** Oocyst stage: $\hat p_{exp} = 20/113 = 0.177$ vs
+  $\hat p_{unexp} = 36/117 = 0.308$; pooled $\hat p = 56/230 = 0.243$;
+  $z = -0.131/0.0566 = $ **−2.31**.
+- **(b)** $H_a\colon p_{exp} < p_{unexp}$: **p-value ≈ 0.011** (exact
+  shuffles ≈ 0.016).
+- **(c)** Sporozoite stage: $\hat p_{exp} = 37/149 = 0.248$ vs
+  $\hat p_{unexp} = 14/144 = 0.097$; pooled $\hat p = 51/293 = 0.174$;
+  $z = 0.151/0.0443 = $ **3.41**.
+- **(d)** $H_a\colon p_{exp} > p_{unexp}$: **p-value ≈ 0.0003** (shuffles
+  ≈ 0.0006).
+- **(e)** In the Oocyst stage (not yet infectious) exposed mosquitoes are
+  significantly *less* likely to risk a human blood meal; in the
+  Sporozoite stage (now infectious) they are significantly *more* likely.
+  Both behaviors favor the parasite's transmission — striking evidence
+  that the parasite alters mosquito behavior in stage-specific ways.
+- **(f)** **Yes** — mosquitoes were randomized to infected vs uninfected
+  mice, so the behavior differences can be attributed causally to
+  exposure to malaria.
+
+## Exercise 6.186
+
+**HRT and Cardiovascular Disease.** Of 8506 women randomized to hormone
+replacement therapy, 164 developed cardiovascular disease within five
+years; of 8102 on placebo, 122 did (Table 6.15). Does HRT influence the
+chance of cardiovascular disease?
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in cardiovascular disease proportions, HRT minus placebo
+d = rand_diffs(164, 8506, 122, 8102)
+tail_plot(d, 164/8506 - 122/8102, "two",
+          "Randomization differences in proportions (HRT - placebo)",
+          bins=31, figsize=(6.5, 3))
+prop_row("Cardiovascular disease", 164, 8506, 122, 8102, "two").to_string()
+```
+
+$H_0\colon p_H = p_P$ vs $H_a\colon p_H \ne p_P$; $\hat p_H = 0.0193$ vs
+$\hat p_P = 0.0151$; pooled $\hat p = 286/16608 = 0.0172$;
+$z = 2.09$ and **p-value ≈ 0.037**. Since $0.037 < 0.05$ we reject $H_0$:
+HRT significantly *increases* the risk of cardiovascular disease — one of
+the just-below-0.05 p-values that led to the early termination of the
+trial.
+
+## Exercise 6.187
+
+**HRT and Invasive Breast Cancer.** Table 6.15: 166 cases in the HRT
+group vs 124 in the placebo group.
+
+```{python}
+#| echo: false
+prop_row("Invasive breast cancer", 166, 8506, 124, 8102, "two").to_string()
+```
+
+$\hat p_H = 0.0195$ vs $\hat p_P = 0.0153$; pooled $\hat p = 0.0175$;
+$z = 2.07$ and **p-value ≈ 0.038**. Since $0.038 < 0.05$ we reject $H_0$:
+HRT significantly increases the chance of invasive breast cancer.
+
+## Exercise 6.188
+
+**HRT and Cancer (All Types).** Table 6.15: 502 cancers in the HRT group
+vs 458 in the placebo group.
+
+```{python}
+#| echo: false
+prop_row("Cancer (all)", 502, 8506, 458, 8102, "two").to_string()
+```
+
+$\hat p_H = 0.0590$ vs $\hat p_P = 0.0565$; pooled $\hat p = 0.0578$;
+$z = 0.69$ and **p-value ≈ 0.49**. We fail to reject $H_0$: overall
+cancer incidence shows no significant difference between the groups —
+HRT shifts risk from one type (lower colon/other cancers) to another
+(more breast cancer) rather than changing the total.
+
+## Exercise 6.189
+
+**HRT and Fractures.** Table 6.15: 650 fractures in the HRT group vs 788
+in the placebo group.
+
+```{python}
+#| echo: false
+prop_row("Fractures", 650, 8506, 788, 8102, "two").to_string()
+```
+
+$\hat p_H = 0.0764$ vs $\hat p_P = 0.0973$; pooled $\hat p = 0.0866$;
+$z = -4.77$ and **p-value $\approx 2\times10^{-6}$**. We reject $H_0$
+decisively: HRT significantly *reduces* fractures — the trial's one clear
+benefit, and with a p-value nowhere near the 0.05 boundary.
+
+## Exercise 6.190
+
+**Infections in the ICU and Sex.** Using `ICUAdmissions`, test at 5%
+whether the proportion of ICU patients with an infection differs between
+males and females.
+
+```{python}
+#| echo: false
+f = icu[icu.Sex == 1]; m = icu[icu.Sex == 0]
+xf, nf = int(f.Infection.sum()), len(f)
+xm, nm = int(m.Infection.sum()), len(m)
+pd.Series({"Females": f"{xf} / {nf} = {xf/nf:.3f}",
+           "Males": f"{xm} / {nm} = {xm/nm:.3f}"}).to_string()
+```
+
+```{python}
+#| echo: false
+prop_row("Infection", xf, nf, xm, nm, "two").to_string()
+```
+
+$H_0\colon p_F = p_M$ vs $H_a\colon p_F \ne p_M$; infection proportions
+are $33/76 = 0.434$ for females and $51/124 = 0.411$ for males; pooled
+$\hat p = 84/200 = 0.42$; $z = 0.32$ and **p-value ≈ 0.75**. We fail to
+reject $H_0$: no evidence of a sex difference in admission infection
+rates.
+
+## Exercise 6.191
+
+**Surgery in the ICU and Sex.** Using `ICUAdmissions`, test at 5% whether
+the proportion of ICU patients who have surgery differs by sex.
+
+```{python}
+#| echo: false
+xf, nf = int(f.Service.sum()), len(f)
+xm, nm = int(m.Service.sum()), len(m)
+pd.Series({"Females": f"{xf} / {nf} = {xf/nf:.3f}",
+           "Males": f"{xm} / {nm} = {xm/nm:.3f}"}).to_string()
+```
+
+```{python}
+#| echo: false
+prop_row("Surgery", xf, nf, xm, nm, "two").to_string()
+```
+
+$H_0\colon p_F = p_M$ vs $H_a\colon p_F \ne p_M$; surgery proportions are
+$37/76 = 0.487$ for females and $70/124 = 0.565$ for males; pooled
+$\hat p = 107/200 = 0.535$; $z = -1.07$ and **p-value ≈ 0.285**. We fail
+to reject $H_0$: no evidence of a sex difference in surgery rates.
+
+## Exercise 6.192
+
+**Does Buying Organic Food Improve Your Health?** From the `NHANES`
+sample, build the two-way table for `HealthBinary` by `Organic`, compute
+the difference in proportions, and test against the "random chance"
+explanation.
+
+*Data:* `data/ch01/NHANES.csv`, from
+<https://www.lock5stat.com/datasets3e/NHANES.csv>:
+
+```{python}
+#| echo: false
+nh = pd.read_csv("data/ch01/NHANES.csv")
+t = pd.crosstab(nh.Organic, nh.HealthBinary)
+t.index.name = "Bought organic"; t.columns.name = "Self-rated health"
+print(t.to_string())
+x1, n1 = int(t.loc["Yes", "Very good / Excellent"]), int(t.loc["Yes"].sum())
+x2, n2 = int(t.loc["No", "Very good / Excellent"]), int(t.loc["No"].sum())
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Proportion reporting very good or excellent health by whether the respondent buys organic food
+fig, ax = plt.subplots(figsize=(5.5, 3))
+bars = ax.bar(["No organic", "Organic"], [x2/n2, x1/n1],
+              color=["#9aa0a6", "#55a868"])
+for b, v in zip(bars, [x2/n2, x1/n1]):
+    ax.text(b.get_x() + b.get_width()/2, v + 0.008, f"{v:.3f}",
+            ha="center", fontsize=10)
+ax.set_ylim(0, 0.55)
+ax.set_ylabel("Proportion very good / excellent")
+plt.tight_layout()
+plt.show()
+prop_row("Very good / excellent health", x1, n1, x2, n2, "two").to_string()
+```
+
+- **(a)** The table above: organic buyers 786/1711 very good/excellent;
+  non-buyers 991/3005.
+- **(b)** Difference (organic − no):
+  $0.459 - 0.330 = $ **0.130**.
+- **(c)** Test $H_0\colon p_1 = p_2$ vs $H_a\colon p_1 \ne p_2$ against
+  explanation (iii): pooled $\hat p = 1777/4716 = 0.377$;
+  $z = 0.130/0.0147 = 8.83$ and **p-value $\approx 10^{-18}$** — the
+  observed association is essentially impossible to explain by random
+  chance alone.
+- **(d)** **No.** Ruling out chance does *not* establish the causal story:
+  these are survey (observational) data, so explanation (ii) — confounding
+  (organic buyers tend to be wealthier, more health-conscious, etc.) —
+  remains fully viable. The evidence is against explanation (iii) only.
+
+## Exercise 6.193
+
+**Cloth vs Medical Masks and Confounding Variables.** Do we have evidence
+against alternative explanation (ii) — that the mask groups differed to
+begin with?
+
+Health care workers were **randomized** to medical vs cloth masks, so any
+differences between the groups at the outset are limited to chance — this
+is by *design*, not something the data must demonstrate. Randomization
+does not make confounding impossible in any single trial, but it makes it
+unlikely and, crucially, gives us no reason to believe the groups
+differed on variables such as exposure or baseline health. So we have
+good (design-based) grounds to set aside explanation (ii) — and no data
+here suggesting otherwise.
+
+## Exercise 6.194
+
+**Cloth vs Medical Masks and Clinical Respiratory Infection (CRI).**
+Table 6.16: 28 of 580 medical-mask wearers developed CRI vs 43 of 569
+cloth-mask wearers.
+
+```{python}
+#| echo: false
+prop_row("CRI", 28, 580, 43, 569, "left").to_string()
+```
+
+- **(a)** $\hat p_{med} - \hat p_{cloth} = 0.048 - 0.076 = $ **−0.027**.
+- **(b)** $H_a\colon p_{med} < p_{cloth}$ (medical masks protect more):
+  pooled $\hat p = 71/1149 = 0.062$; $z = -0.027/0.0142 = -1.92$;
+  **p-value ≈ 0.027** (randomization check ≈ 0.034; the success/failure
+  condition holds with ≈ 36 expected cases per group).
+- **(c)** **Yes** — $0.027 < 0.05$, so chance alone is an unlikely
+  explanation: we have evidence against explanation (iii).
+- **(d)** **Yes.** With explanation (ii) defused by randomization
+  (Exercise 6.193) and explanation (iii) now contradicted by the data,
+  the study provides convincing evidence that medical masks protect
+  better than cloth masks against clinical respiratory illness.
+
+## Exercise 6.195
+
+**Cloth vs Medical Masks and Influenza-Like Illness (ILI).** Table 6.16:
+1 of 580 medical-mask wearers developed ILI vs 13 of 569 cloth-mask
+wearers.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the ILI difference in proportions, medical minus cloth, observed difference in the left tail
+d = rand_diffs(1, 580, 13, 569)
+tail_plot(d, 1/580 - 13/569, "left",
+          "Randomization differences in proportions (medical - cloth)",
+          bins=24, figsize=(6, 3))
+p1, p2, se = 1/580, 13/569, pooled_se(1, 580, 13, 569)
+pd.Series({"(a) Difference": round(p1 - p2, 4),
+           "(b) Normal z (invalid here)": round((p1 - p2)/se, 3),
+           "(b) Normal p-value": round(norm_p((p1 - p2)/se, "left"), 4),
+           "(d) Randomization p-value": round(rand_diff_p(1, 580, 13, 569, "left"), 4),
+           "Expected ILI per group": round(pooled_prop(1, 580, 13, 569)*580, 1)}).to_string()
+```
+
+- **(a)** $\hat p_{med} - \hat p_{cloth} = 0.0017 - 0.0228 = $ **−0.021**.
+- **(b)** Naively, pooled $\hat p = 14/1149 = 0.0122$,
+  $SE = 0.0065$, $z = -3.26$, normal p-value ≈ 0.0006.
+- **(c)** **No** — the condition fails: only 14 ILI cases in total, so
+  each group *expects* about 7 cases ($< 10$), and the medical group
+  observed just 1. The normal curve is a poor model for such a sparse,
+  discrete statistic; the p-value should be computed by a **randomization
+  test** instead.
+- **(d)** Shuffling the 14 ILI cases among the 1149 workers (histogram
+  above): the one-sided **randomization p-value ≈ 0.001**.
+- **(e)** **Yes** — $0.001 < 0.05$: strong evidence against explanation
+  (iii) for ILI.
+- **(f)** **Yes** — with confounding ruled out by randomization
+  (Exercise 6.193) and chance now effectively excluded, the study
+  provides convincing causal evidence that medical masks protect better
+  against influenza-like illness than cloth masks.
+
+## Exercise 6.196
+
+**Cloth vs Medical Masks and Virus Illness (LCI).** Table 6.16: 19 of 580
+medical-mask wearers had laboratory-confirmed viral illness vs 31 of 569
+cloth-mask wearers.
+
+```{python}
+#| echo: false
+prop_row("LCI", 19, 580, 31, 569, "left").to_string()
+```
+
+- **(a)** $\hat p_{med} - \hat p_{cloth} = 0.0328 - 0.0545 = $ **−0.022**.
+- **(b)** Pooled $\hat p = 50/1149 = 0.0435$ (≈ 25 expected cases per
+  group, so the normal model is fine); $z = -1.80$; **p-value ≈ 0.036**
+  (randomization check ≈ 0.046).
+- **(c)** **Yes** — $0.036 < 0.05$, evidence against explanation (iii),
+  though closer to the boundary than for CRI.
+- **(d)** **Yes** — randomization (6.193) plus a p-value below 0.05 gives
+  convincing evidence that medical masks protect better against
+  laboratory-confirmed virus illness than cloth masks.
+
+## Exercise 6.197
+
+**Cloth vs Medical Masks: Comparing Results.** The difference in
+proportions is farther from 0 for CRI (−0.027) and LCI (−0.022) than for
+ILI (−0.021), yet the causal evidence is much stronger for ILI. How can
+this be true?
+
+Because statistical strength of evidence depends on the difference
+*relative to its standard error*, not on its absolute size. ILI is a much
+rarer outcome (14 cases in 1149 vs 71 and 50), so the pooled proportion
+sits close to 0 and the standard error is only about half as large
+($SE \approx 0.0065$ vs $0.014$ and $0.012$). The roughly equal-sized
+differences therefore translate into very different z-statistics:
+$z \approx -3.26$ for ILI versus $-1.92$ (CRI) and $-1.80$ (LCI), and
+p-values of about 0.001, 0.027 and 0.036. A small difference measured
+with great precision can be far more convincing than a larger difference
+measured with less — which is exactly what the randomization distributions
+in Exercises 6.194–6.196 show.
+
+:::

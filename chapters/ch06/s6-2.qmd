@@ -1,0 +1,1775 @@
+---
+execute-dir: project
+title: "Chapter 6 · Section 6.2"
+subtitle: "Inference for a Mean — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 6.2 of Lock⁵ turns the simulations of Chapter 4 into formulas. For
+inference about a population mean $\mu$ we no longer need a randomization
+or bootstrap distribution on screen: the **standard error for a sample mean**
+has a formula,
+$$SE=\frac{s}{\sqrt{n}},$$
+and because $s$ (the sample standard deviation) is only an *estimate* of the
+unknown $\sigma$, the standardized statistic
+$$t=\frac{\bar x-\mu_0}{s/\sqrt{n}}$$
+follows a **$t$-distribution with $n-1$ degrees of freedom** rather than a
+standard normal — a slightly heavier-tailed curve that charges a small
+penalty for not knowing $\sigma$. The same curve powers both tasks of this
+section. A **confidence interval for a mean** is
+$\bar x \pm t^*\cdot s/\sqrt{n}$, where $t^*$ is the endpoint of a
+$t$-distribution with $n-1$ df holding the desired confidence (for 95%,
+$t^*=2.052$ at $n=28$ vs the normal $z^*=1.96$; the gap shrinks as $n$
+grows). A **t-test** for $H_0\colon \mu=\mu_0$ computes $t$ and reads the
+p-value as a tail area (one tail or two) of $T_{n-1}$. The t-tools are
+valid when the population is reasonably normal, or when the sample is
+large ($n\ge 30$), where the Central Limit Theorem makes the sampling
+distribution of $\bar x$ nearly normal even for skewed populations — so a
+skewed dotplot only rules out $t$ when the sample is small or carries
+extreme outliers, in which case we fall back on bootstrap methods. A final
+formula answers the design question: to achieve a margin of error $ME$ at
+a given confidence level, collect about $n=(z^*\tilde\sigma/ME)^2$
+observations, where $\tilde\sigma$ is a pre-study guess at the population
+standard deviation. Below we compute every endpoint, interval, and p-value
+exactly with `scipy.stats.t`, and, wherever the exercise references a real
+Lock⁵ dataset, we load the data and verify the formula answer against a
+bootstrap or randomization simulation (10000 resamples, seed 2026). The
+exercises are from *Statistics: Unlocking the Power of Data* (Lock⁵, 3rd
+ed., pp. 452–468): 6.65–6.88 build the $SE = s/\sqrt{n}$ and
+$t$-distribution skills; 6.89–6.125 work t-intervals and sample-size
+planning; 6.126–6.142 run full t-tests, from body temperature and
+Deflategate to mercury in Florida lakes.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+from scipy import stats
+sns.set_theme(style="whitegrid")
+
+def se_mean(s, n):
+    """SE for a sample mean: s / sqrt(n)."""
+    return s / np.sqrt(n)
+
+def t_endpoint(n, tail):
+    """Endpoint of a t-distribution (df = n-1) with `tail` probability beyond each end."""
+    return float(stats.t.ppf(1 - tail, n - 1))
+
+def t_area(value, n, side):
+    """Area of a t-distribution (df = n-1) above or below a value."""
+    df = n - 1
+    return float(stats.t.sf(value, df) if side == "above" else stats.t.cdf(value, df))
+
+def t_ci(xbar, s, n, conf, digits=3):
+    """t-interval for a mean: best estimate, t*, SE, margin of error, interval."""
+    df = n - 1
+    se = s / np.sqrt(n)
+    tstar = float(stats.t.ppf(0.5 + conf / 2, df))
+    me = tstar * se
+    return pd.Series({"Best estimate": round(float(xbar), digits),
+                      "t* (df=%d)" % df: round(tstar, 3),
+                      "SE": round(float(se), 4),
+                      "Margin of error": round(float(me), digits),
+                      "%d%% CI" % round(100 * conf): f"({round(xbar - me, 2)}, {round(xbar + me, 2)})"})
+
+def t_test(xbar, s, n, mu0, tail, digits=4):
+    """One-row t-test for a mean: statistic, t, df, p-value."""
+    df = n - 1
+    se = s / np.sqrt(n)
+    t = (xbar - mu0) / se
+    p = (float(stats.t.sf(t, df)) if tail == "right"
+         else float(stats.t.cdf(t, df)) if tail == "left"
+         else float(2 * stats.t.sf(abs(t), df)))
+    return pd.Series({"Sample mean": round(float(xbar), 3),
+                      "Null mean": mu0,
+                      "SE": round(float(se), 4),
+                      "t-statistic": round(float(t), 3),
+                      "df": df,
+                      "p-value": round(p, digits)})
+
+def t_curve(tstat, df, tail, figsize=(6, 2.6)):
+    """t-distribution with the p-value tail(s) beyond tstat shaded."""
+    x = np.linspace(-5, 5, 500)
+    y = stats.t.pdf(x, df)
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.plot(x, y, color="#4c72b0", lw=2)
+    if tail == "right":
+        mask = x >= tstat
+    elif tail == "left":
+        mask = x <= tstat
+    else:
+        mask = (x >= abs(tstat)) | (x <= -abs(tstat))
+    if mask.any():
+        ax.fill_between(x[mask], y[mask], color="#c44e52", alpha=0.65)
+    ax.axvline(np.clip(tstat, -5, 5), color="black", lw=1)
+    ax.set_xlabel("t")
+    ax.set_ylabel("Density")
+    plt.tight_layout()
+    plt.show()
+
+def boot_means(data, reps=10000, seed=2026):
+    """Bootstrap distribution of the sample mean: `reps` resamples of the data."""
+    r = np.random.default_rng(seed)
+    data = np.asarray(data, float)
+    idx = r.integers(0, len(data), (reps, len(data)))
+    return data[idx].mean(axis=1)
+
+def rand_means(data, null, reps=10000, seed=2026):
+    """Randomization distribution for a mean under H0: shift the data so the
+    sample mean equals the null value, then resample."""
+    data = np.asarray(data, float)
+    return boot_means(data - data.mean() + null, reps, seed)
+
+def tail_plot(boots, observed, tail, xlabel, null=0.0, bins=40, figsize=(6, 3)):
+    """Histogram of a simulated distribution with the p-value tail shaded."""
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.histplot(x=boots, bins=bins, ax=ax, color="#4c72b0")
+    if tail == "right":
+        mask = boots >= observed
+    elif tail == "left":
+        mask = boots <= observed
+    else:
+        mask = np.abs(boots - null) >= abs(observed - null)
+    if mask.any():
+        sns.histplot(x=boots[mask], bins=bins, ax=ax, color="#c44e52")
+    ax.axvline(observed, color="black", lw=1.5)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Simulated statistics")
+    plt.tight_layout()
+    plt.show()
+
+def p_row(label, stat, boots, tail, null=0.0, digits=4):
+    """One-row summary: statistic and simulation p-value."""
+    if tail == "right":
+        p = (boots >= stat).mean()
+    elif tail == "left":
+        p = (boots <= stat).mean()
+    else:
+        p = (np.abs(boots - null) >= abs(stat - null)).mean()
+    return pd.Series({label: round(float(stat), 4),
+                      "Simulation p-value": round(float(p), digits),
+                      "Simulated samples": len(boots)})
+
+def dotplot(vals, xlabel, figsize=(6, 1.6)):
+    """Dotplot of a small sample."""
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.stripplot(x=np.asarray(vals, float), ax=ax, color="#4c72b0",
+                  size=8, jitter=False, alpha=0.75)
+    ax.set_xlabel(xlabel)
+    ax.set_yticks([])
+    plt.tight_layout()
+    plt.show()
+
+def sample_n(me, conf, sigma):
+    """Sample size for a desired margin of error: n = (z* sigma-hat / ME)^2, rounded up."""
+    z = float(stats.norm.ppf(0.5 + conf / 2))
+    return int(np.ceil((z * sigma / me) ** 2))
+```
+
+::: {.panel-tabset}
+
+## Exercise 6.65
+
+*(Skill Builder 1)* Samples of size $n = 1000$ from a population with mean
+28 and standard deviation 5: find the SE of the distribution of sample means.
+
+```{python}
+#| echo: false
+round(se_mean(5, 1000), 3)
+```
+
+$$SE=\sigma/\sqrt{n}=5/\sqrt{1000}\approx 0.158$$ — with 1000 observations
+the sample means vary by only about 0.16 around the true mean of 28.
+
+## Exercise 6.66
+
+*(Skill Builder 1)* Samples of size $n = 10$ from a population with mean 6
+and standard deviation 2.
+
+```{python}
+#| echo: false
+round(se_mean(2, 10), 3)
+```
+
+$$SE=2/\sqrt{10}\approx 0.632$$ — a third of the population SD, since
+$\sqrt{10}\approx 3.16$.
+
+## Exercise 6.67
+
+*(Skill Builder 1)* Samples of size $n = 40$ from a population with mean
+250 and standard deviation 80.
+
+```{python}
+#| echo: false
+round(se_mean(80, 40), 3)
+```
+
+$$SE=80/\sqrt{40}\approx 12.65$$ — note the center (250) plays no role in
+the SE; only the spread $\sigma$ and the size $n$ matter.
+
+## Exercise 6.68
+
+*(Skill Builder 1)* Samples of size $n = 75$ from a population with mean 60
+and standard deviation 32.
+
+```{python}
+#| echo: false
+round(se_mean(32, 75), 3)
+```
+
+$$SE=32/\sqrt{75}\approx 3.70$$ — roughly $32/8.66$.
+
+## Exercise 6.69
+
+*(Skill Builder 2)* Endpoints of a $t$-distribution with 5% beyond them in
+each tail, sample size $n = 10$ (so df $= 9$).
+
+```{python}
+#| echo: false
+pd.Series({"Left endpoint": round(-t_endpoint(10, 0.05), 3),
+           "Right endpoint": round(t_endpoint(10, 0.05), 3)}).to_string()
+```
+
+$\pm t^* = \pm 1.833$ for $T_9$ — wider than the $\pm 1.645$ endpoints that
+leave 5% in each tail of a standard normal; the heavier $t$-tails push the
+endpoint out from 1.645 to 1.833.
+
+## Exercise 6.70
+
+*(Skill Builder 2)* Endpoints with 1% beyond them in each tail, $n = 18$
+(df $= 17$).
+
+```{python}
+#| echo: false
+pd.Series({"Left endpoint": round(-t_endpoint(18, 0.01), 3),
+           "Right endpoint": round(t_endpoint(18, 0.01), 3)}).to_string()
+```
+
+$\pm 2.567$ for $T_{17}$ (the normal counterpart would be $\pm 2.326$).
+
+## Exercise 6.71
+
+*(Skill Builder 2)* Endpoints with 0.025 beyond them in each tail, $n = 25$
+(df $= 24$).
+
+```{python}
+#| echo: false
+pd.Series({"Left endpoint": round(-t_endpoint(25, 0.025), 3),
+           "Right endpoint": round(t_endpoint(25, 0.025), 3)}).to_string()
+```
+
+$\pm 2.064$ for $T_{24}$ — this is the $t^*$ used in a 95% interval with
+$n = 25$ (vs the normal $z^* = 1.96$).
+
+## Exercise 6.72
+
+*(Skill Builder 2)* Endpoints with 0.005 beyond them in each tail, $n = 40$
+(df $= 39$).
+
+```{python}
+#| echo: false
+pd.Series({"Left endpoint": round(-t_endpoint(40, 0.005), 3),
+           "Right endpoint": round(t_endpoint(40, 0.005), 3)}).to_string()
+```
+
+$\pm 2.708$ for $T_{39}$ — the $t^*$ for a 99% interval when $n = 40$.
+
+## Exercise 6.73
+
+*(Skill Builder 2)* Area in a $t$-distribution above 2.3 when $n = 6$
+(df $= 5$).
+
+```{python}
+#| echo: false
+round(t_area(2.3, 6, "above"), 4)
+```
+
+**Area ≈ 0.0349.** For a standard normal the area above 2.3 is only 0.0107;
+the extra spread of $T_5$ roughly triples the tail.
+
+## Exercise 6.74
+
+*(Skill Builder 2)* Area in a $t$-distribution above 1.5 when $n = 8$
+(df $= 7$).
+
+```{python}
+#| echo: false
+round(t_area(1.5, 8, "above"), 4)
+```
+
+**Area ≈ 0.0886** (normal would give 0.0668).
+
+## Exercise 6.75
+
+*(Skill Builder 2)* Area in a $t$-distribution below $-1.0$ when $n = 20$
+(df $= 19$).
+
+```{python}
+#| echo: false
+round(t_area(-1.0, 20, "below"), 4)
+```
+
+**Area ≈ 0.1649** — already close to the normal answer 0.1587, since
+df $= 19$ is moderate.
+
+## Exercise 6.76
+
+*(Skill Builder 2)* Area in a $t$-distribution below $-3.2$ when $n = 50$
+(df $= 49$).
+
+```{python}
+#| echo: false
+round(t_area(-3.2, 50, "below"), 4)
+```
+
+**Area ≈ 0.0012** — far out in the tail; a $t$-statistic of $-3.2$ with 49
+df gives a one-tailed p-value of about 0.001.
+
+## Exercise 6.77
+
+**Impact of Sample Size on Accuracy.** Compute the SE for sample means from
+a population with $\mu = 100$, $\sigma = 25$, for $n = 30, 200, 1000$;
+discuss the effect of increasing $n$ on the SE and on the accuracy of
+$\bar x$ as an estimator of $\mu$.
+
+```{python}
+#| echo: false
+#| fig-cap: Standard error of the sample mean versus sample size for a population with sigma = 25
+ns = np.arange(5, 1000)
+fig, ax = plt.subplots(figsize=(6, 2.8))
+ax.plot(ns, 25 / np.sqrt(ns), color="#4c72b0", lw=2)
+for n0 in (30, 200, 1000):
+    ax.plot(n0, 25 / np.sqrt(n0), "o", color="#c44e52")
+    ax.annotate(f"n={n0}: SE={25/np.sqrt(n0):.2f}", (n0, 25 / np.sqrt(n0)),
+                textcoords="offset points", xytext=(8, 4), fontsize=9)
+ax.set_xlabel("Sample size n")
+ax.set_ylabel("SE = 25 / sqrt(n)")
+plt.tight_layout()
+plt.show()
+pd.Series({"SE at n=30": round(se_mean(25, 30), 3),
+           "SE at n=200": round(se_mean(25, 200), 3),
+           "SE at n=1000": round(se_mean(25, 1000), 3)}).to_string()
+```
+
+The SEs are 4.56, 1.77, and 0.79: increasing the sample size decreases the
+standard error like $1/\sqrt{n}$, so the curve above falls steeply at first
+and then flattens. Consequences: larger samples give more accurate estimates
+of $\mu$ (sample means cluster more tightly around 100), but with diminishing
+returns — to *halve* the SE you must *quadruple* $n$ (going from SE 4.56 at
+$n=30$ to 1.77 needs more than a sixfold increase in $n$).
+
+## Exercise 6.78
+
+**Impact of the Population Standard Deviation on SE.** Same population mean
+$\mu = 100$, sample size $n = 100$, but $\sigma = 5, 25, 75$.
+
+```{python}
+#| echo: false
+pd.Series({"SE when sigma = 5": se_mean(5, 100),
+           "SE when sigma = 25": se_mean(25, 100),
+           "SE when sigma = 75": se_mean(75, 100)}).to_string()
+```
+
+The SEs are 0.5, 2.5, and 7.5 — **directly proportional to $\sigma$**
+(they equal $\sigma/10$ here). More variability in the population means more
+variability in sample means and less accuracy for $\bar x$; a fifteen-fold
+increase in $\sigma$ multiplies the SE fifteen-fold.
+
+## Exercise 6.79
+
+**Is a t-distribution appropriate?** A sample with $n = 12$, $\bar x = 7.6$,
+$s = 1.6$; the dotplot (p. 453) runs from 5 to 11 with a single main hump and
+no extreme outliers.
+
+```{python}
+#| echo: false
+pd.Series({"t appropriate?": "Yes",
+           "df": 12 - 1,
+           "SE = s/sqrt(n)": round(se_mean(1.6, 12), 3)}).to_string()
+```
+
+**Yes** — the dotplot shows a single, roughly symmetric cluster with no
+outliers, so treating the population as reasonably normal is plausible for
+this modest sample. Use $t$ with **df $= 11$** and **SE $= 1.6/\sqrt{12}
+\approx 0.462$**.
+
+## Exercise 6.80
+
+**Is a t-distribution appropriate?** A sample with $n = 75$, $\bar x =
+18.92$, $s = 10.1$; the dotplot is clearly right-skewed, stretching out
+toward 60.
+
+```{python}
+#| echo: false
+pd.Series({"t appropriate?": "Yes",
+           "df": 75 - 1,
+           "SE = s/sqrt(n)": round(se_mean(10.1, 75), 3)}).to_string()
+```
+
+**Yes** — the skew would be a problem for a small sample, but
+$n = 75 \ge 30$ is large enough for the Central Limit Theorem to make the
+distribution of sample means approximately normal, so the t-tools are fine.
+Use $t$ with **df $= 74$** and **SE $= 10.1/\sqrt{75} \approx 1.166$**.
+
+## Exercise 6.81
+
+**Is a t-distribution appropriate?** A sample with $n = 18$, $\bar x =
+87.9$, $s = 10.6$; the dotplot clusters at 95–100 with a long left tail
+scattered down to 60.
+
+```{python}
+#| echo: false
+pd.Series({"t appropriate?": "No",
+           "df (would be)": 18 - 1,
+           "SE would be": round(se_mean(10.6, 18), 3)}).to_string()
+```
+
+**No.** The dotplot is clearly skewed left and $n = 18 < 30$ is not large
+enough for the CLT to rescue the t-tools. (If we used $t$ anyway it would
+have df $= 17$ and SE $= 10.6/\sqrt{18} \approx 2.50$, but the safe route is
+to build a **bootstrap** confidence interval instead.)
+
+## Exercise 6.82
+
+**Is a t-distribution appropriate?** A sample with $n = 10$, $\bar x =
+508.5$, $s = 21.5$; the dotplot huddles near 505–510 with isolated points
+near 535 and 565–570.
+
+```{python}
+#| echo: false
+pd.Series({"t appropriate?": "No",
+           "df (would be)": 10 - 1,
+           "SE would be": round(se_mean(21.5, 10), 3)}).to_string()
+```
+
+**No.** With only $n = 10$ observations and two visible high outliers, the
+population cannot be considered normal — the outliers both inflate $s$ and
+wreck the normality condition. (Mechanically $t$ would have df $= 9$ and SE
+$= 21.5/\sqrt{10} \approx 6.80$, but a **bootstrap** interval is the
+appropriate tool.)
+
+## Exercise 6.83
+
+**Is a t-distribution appropriate?** A sample with $n = 150$, $\bar x =
+49.5$, $s = 10.6$; the dotplot is a single broad hump from about 28 to 75.
+
+```{python}
+#| echo: false
+pd.Series({"t appropriate?": "Yes",
+           "df": 150 - 1,
+           "SE = s/sqrt(n)": round(se_mean(10.6, 150), 3)}).to_string()
+```
+
+**Yes** — $n = 150$ is large, so the CLT applies regardless of mild
+irregularity in the dotplot. Use $t$ with **df $= 149$** and
+**SE $= 10.6/\sqrt{150} \approx 0.865$**.
+
+## Exercise 6.84
+
+**Advise a Fellow Student.** *My population is pretty right-skewed, but I am
+taking a large sample of 200 cases, so it is safe to assume the sample is
+normally distributed.*
+
+Discussion — no computation. The student has the right conclusion for the
+wrong reason. With $n = 200$ from a skewed population, the **sample itself**
+will look just as right-skewed as the population — it is *not* normally
+distributed, and no sample size changes that. What *is* true is that the
+**sampling distribution of the sample mean** becomes approximately normal
+for large $n$ by the Central Limit Theorem, so t-inference about the *mean*
+($\bar x \pm t^*s/\sqrt{n}$ or a t-test) is safe. The advice: do not claim
+the data are normal; claim the *distribution of $\bar x$* is approximately
+normal, which is the condition the t-tools actually need.
+
+## Exercise 6.85
+
+**College SAT Samples.** Suppose AvgSAT (mean combined SAT of four-year
+colleges) is fairly bell-shaped with $\mu = 1135$ and $\sigma = 130$.
+(a) Sketch the population distribution; (b) sketch the distribution of
+$\bar x$ for repeated samples of $n = 100$ colleges.
+
+*Data check:* `data/ch02/CollegeScores4yr.csv`, from
+<https://www.lock5stat.com/datasets3e/CollegeScores4yr.csv> (its 1277
+colleges with AvgSAT have mean 1135 and SD 129 — consistent with the
+supposed values):
+
+```{python}
+#| echo: false
+#| fig-cap: Population distribution of AvgSAT and the sampling distribution of the mean for samples of 100 colleges
+x = np.linspace(700, 1570, 600)
+fig, ax = plt.subplots(figsize=(6, 2.8))
+ax.plot(x, stats.norm.pdf(x, 1135, 130), color="#4c72b0", lw=2, label="Population: N(1135, 130)")
+ax.plot(x, stats.norm.pdf(x, 1135, 13), color="#c44e52", lw=2,
+        label="Sample means, n=100: N(1135, 13)")
+ax.set_xlabel("AvgSAT")
+ax.set_ylabel("Density")
+ax.legend(fontsize=9)
+plt.tight_layout()
+plt.show()
+cs = pd.read_csv("data/ch02/CollegeScores4yr.csv")
+sat = cs.AvgSAT.dropna()
+pd.Series({"AvgSAT n": len(sat), "mean": round(sat.mean(), 1),
+           "sd": round(sat.std(), 1),
+           "(b) SE for n = 100": se_mean(130, 100)}).to_string()
+```
+
+- **(a)** A normal curve centered at 1135 with SD 130 (blue curve above).
+- **(b)** By the CLT, the sample means follow $N(1135,\ 130/\sqrt{100}) =
+  N(1135,\ 13)$ (red curve): the **same center**, but one-tenth the spread.
+
+## Exercise 6.86
+
+**College ACT Samples.** Same setup for MidACT (median ACT), supposed
+$N(24, 4)$; sketch the population and the distribution of $\bar x$ for
+samples of $n = 100$ colleges.
+
+```{python}
+#| echo: false
+#| fig-cap: Population distribution of MidACT and the sampling distribution of the mean for samples of 100 colleges
+x = np.linspace(10, 38, 600)
+fig, ax = plt.subplots(figsize=(6, 2.8))
+ax.plot(x, stats.norm.pdf(x, 24, 4), color="#4c72b0", lw=2, label="Population: N(24, 4)")
+ax.plot(x, stats.norm.pdf(x, 24, 0.4), color="#c44e52", lw=2,
+        label="Sample means, n=100: N(24, 0.4)")
+ax.set_xlabel("MidACT")
+ax.set_ylabel("Density")
+ax.legend(fontsize=9)
+plt.tight_layout()
+plt.show()
+pd.Series({"(b) SE for n = 100": se_mean(4, 100)}).to_string()
+```
+
+- **(a)** Normal curve centered at 24 with SD 4 (blue).
+- **(b)** Sample means follow $N(24,\ 4/\sqrt{100}) = N(24,\ 0.4)$ (red):
+  same center, spread divided by $\sqrt{100} = 10$.
+
+## Exercise 6.87
+
+**AvgSAT over 1180?** Continuing Exercise 6.85 with $N(1135, 130)$ and
+$n = 100$.
+
+```{python}
+#| echo: false
+pd.Series({"(a) P(AvgSAT over 1180), one college": round(float(stats.norm.sf(1180, 1135, 130)), 4),
+           "(b) P(xbar over 1180), n = 100": float(f"{stats.norm.sf(1180, 1135, 13):.2e}")}).to_string()
+```
+
+- **(a)** $z = (1180 - 1135)/130 = 0.35$: about **36.5%** of colleges have
+  AvgSAT of 1180 or higher.
+- **(b)** $z = (1180 - 1135)/13 = 3.46$: only about **0.0003** (3 in 10000)
+  samples of 100 colleges average 1180 or higher — averaging 100 colleges
+  shrinks the spread ten-fold, so a sample mean that far above 1135 is rare.
+- **(c)** If AvgSAT were actually right-skewed: part **(a) would no longer
+  be appropriate** (it assumes the population itself is normal), but part
+  **(b) would still be fine** — with $n = 100$ the CLT makes the
+  distribution of $\bar x$ approximately normal even for a skewed
+  population, as long as the stated $\mu$ and $\sigma$ hold.
+
+## Exercise 6.88
+
+**MidACT over 25?** Continuing Exercise 6.86 with $N(24, 4)$ and $n = 100$.
+
+```{python}
+#| echo: false
+pd.Series({"(a) P(MidACT over 25), one college": round(float(stats.norm.sf(25, 24, 4)), 4),
+           "(b) P(xbar over 25), n = 100": round(float(stats.norm.sf(25, 24, 0.4)), 4)}).to_string()
+```
+
+- **(a)** $z = (25 - 24)/4 = 0.25$: about **40.1%** of colleges have MidACT
+  of 25 or higher.
+- **(b)** $z = (25 - 24)/0.4 = 2.5$: about **0.6%** of samples of 100
+  colleges average 25 or higher.
+- **(c)** Same logic as Exercise 6.87(c): a right-skewed MidACT would
+  invalidate **(a)** (normal-population assumption) but not **(b)**, which
+  relies only on the CLT for $n = 100$ sample means.
+
+## Exercise 6.89
+
+*(Skill Builder 1)* 95% t-interval for $\mu$ from $\bar x = 12.7$,
+$s = 5.6$, $n = 30$.
+
+```{python}
+#| echo: false
+t_ci(12.7, 5.6, 30, 0.95).to_string()
+```
+
+Best estimate 12.7, margin of error $2.045 \cdot 5.6/\sqrt{30} \approx 2.09$,
+95% CI **(10.61, 14.79)**.
+
+## Exercise 6.90
+
+*(Skill Builder 1)* 95% t-interval from $\bar x = 84.6$, $s = 7.8$, $n = 42$.
+
+```{python}
+#| echo: false
+t_ci(84.6, 7.8, 42, 0.95).to_string()
+```
+
+Best estimate 84.6, ME $\approx 2.43$, 95% CI **(82.17, 87.03)** ($t^* =
+2.020$ at df 41).
+
+## Exercise 6.91
+
+*(Skill Builder 1)* 90% t-interval from $\bar x = 3.1$, $s = 0.4$, $n = 100$.
+
+```{python}
+#| echo: false
+t_ci(3.1, 0.4, 100, 0.90, digits=4).to_string()
+```
+
+Best estimate 3.1, ME $\approx 0.066$, 90% CI **(3.03, 3.17)** ($t^* = 1.660$
+at df 99 — nearly the normal 1.645).
+
+## Exercise 6.92
+
+*(Skill Builder 1)* 90% t-interval from $\bar x = 137.0$, $s = 53.9$,
+$n = 50$.
+
+```{python}
+#| echo: false
+t_ci(137.0, 53.9, 50, 0.90).to_string()
+```
+
+Best estimate 137.0, ME $\approx 12.78$, 90% CI **(124.2, 149.8)** ($t^* =
+1.677$ at df 49).
+
+## Exercise 6.93
+
+*(Skill Builder 1)* 99% t-interval from $\bar x = 46.1$, $s = 12.5$, $n = 10$.
+
+```{python}
+#| echo: false
+t_ci(46.1, 12.5, 10, 0.99).to_string()
+```
+
+Best estimate 46.1, ME $\approx 12.85$, 99% CI **(33.3, 59.0)** — with df 9,
+$t^* = 3.250$, far above the normal 2.576: tiny samples pay a big t-penalty.
+
+## Exercise 6.94
+
+*(Skill Builder 1)* 99% t-interval from $\bar x = 88.3$, $s = 32.1$, $n = 15$.
+
+```{python}
+#| echo: false
+t_ci(88.3, 32.1, 15, 0.99).to_string()
+```
+
+Best estimate 88.3, ME $\approx 24.7$, 99% CI **(63.6, 113.0)** ($t^* = 2.977$
+at df 14).
+
+## Exercise 6.95
+
+*(Skill Builder 2)* Sample size for a margin of error within $\pm 5$ with
+95% confidence, using a previous sample with $s = 18$.
+
+```{python}
+#| echo: false
+sample_n(5, 0.95, 18)
+```
+
+$$n=\left(\frac{1.96\cdot 18}{5}\right)^2 = 49.8 \Rightarrow \textbf{50}$$
+(we round *up*, and use $z^* = 1.96$ in place of $t^*$ since $n$ is not yet
+known).
+
+## Exercise 6.96
+
+*(Skill Builder 2)* Sample size for ME within $\pm 1$ with 99% confidence,
+using a similar population with $s = 3.4$.
+
+```{python}
+#| echo: false
+sample_n(1, 0.99, 3.4)
+```
+
+$$n=\left(\frac{2.576\cdot 3.4}{1}\right)^2 = 76.7 \Rightarrow \textbf{77}$$
+
+## Exercise 6.97
+
+*(Skill Builder 2)* Sample size for ME within $\pm 0.5$ with 90% confidence,
+estimating $\sigma = 25$.
+
+```{python}
+#| echo: false
+sample_n(0.5, 0.90, 25)
+```
+
+$$n=\left(\frac{1.645\cdot 25}{0.5}\right)^2 \approx 6764$$ — demanding a
+very small margin of error relative to a large $\sigma$ gets expensive fast.
+
+## Exercise 6.98
+
+*(Skill Builder 2)* Sample size for ME within $\pm 12$ with 95% confidence,
+estimating $\sigma \approx 125$.
+
+```{python}
+#| echo: false
+sample_n(12, 0.95, 125)
+```
+
+$$n=\left(\frac{1.96\cdot 125}{12}\right)^2 \approx 417$$
+
+## Exercise 6.99
+
+**Forest Fires in Portugal.** For $n = 517$ fires the mean area burned was
+12.85 hectares with $s = 63.66$ (very right-skewed data). Find and interpret
+a 90% t-interval for the mean area burned.
+
+*Data:* `data/ch06/ForestFires.csv`, from
+<https://www.lock5stat.com/datasets3e/ForestFires.csv> (its 517 fires have
+mean 12.85 and SD 63.66 — matching the summary):
+
+```{python}
+#| echo: false
+ff = pd.read_csv("data/ch06/ForestFires.csv")
+area = ff.Area.dropna().to_numpy(float)
+pd.Series({"n": len(area), "mean": round(area.mean(), 2),
+           "sd": round(area.std(ddof=1), 2)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the mean burned area for 10000 resamples of the 517 Portuguese forest fires
+boots = boot_means(area)
+tail_plot(boots, area.mean(), "right", "Bootstrap sample means", bins=40)
+pd.Series({"Bootstrap SE": round(float(boots.std(ddof=1)), 3),
+           "CLT SE = s/sqrt(n)": round(se_mean(63.66, 517), 3)}).to_string()
+```
+
+```{python}
+#| echo: false
+t_ci(12.85, 63.66, 517, 0.90).to_string()
+```
+
+**Best estimate 12.85 hectares; ME $= 1.648 \cdot 2.80 \approx 4.61$;
+90% CI (8.24, 17.46).** We are 90% sure the mean area burned by all such
+forest fires in Portugal is between about 8.2 and 17.5 hectares. Despite the
+strong right skew, $n = 517$ is large enough for the t-tools — and the
+bootstrap above (SE $\approx 2.8$) agrees with the formula SE.
+
+## Exercise 6.100
+
+**How Many Hours on a Computer?** In `PASeniors`, $n = 447$ students
+answered the ComputerHours question: $\bar x = 16.740$ hours,
+$s = 17.688$. Find and interpret a 99% t-interval for the mean.
+
+*Data:* `data/ch01/PASeniors.csv`, from
+<https://www.lock5stat.com/datasets3e/PASeniors.csv>:
+
+```{python}
+#| echo: false
+pa = pd.read_csv("data/ch01/PASeniors.csv")
+ch = pa.ComputerHours.dropna().to_numpy(float)
+pd.Series({"n": len(ch), "mean": round(ch.mean(), 3),
+           "sd": round(ch.std(ddof=1), 3)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of mean weekly computer hours for 10000 resamples of the 447 Pennsylvania seniors
+boots = boot_means(ch)
+tail_plot(boots, ch.mean(), "right", "Bootstrap sample means", bins=40)
+pd.Series({"Bootstrap 99% CI": f"({np.percentile(boots, 0.5):.2f}, {np.percentile(boots, 99.5):.2f})"}).to_string()
+```
+
+```{python}
+#| echo: false
+t_ci(16.740, 17.688, 447, 0.99).to_string()
+```
+
+**Best estimate 16.74 hours; ME $= 2.587 \cdot 0.837 \approx 2.16$;
+99% CI (14.58, 18.90).** We are 99% sure that high school seniors in
+Pennsylvania average between about 14.6 and 18.9 hours per week on a
+computer. The bootstrap percentile interval (14.66, 18.96) matches; note
+how a large $s$ relative to $\bar x$ signals the right skew — with $n = 447$
+the t-interval is still reliable.
+
+## Exercise 6.101
+
+**How Many Birds Do Domestic Cats Kill?** KittyCams recorded $n = 55$
+outdoor-hunting cats: mean kills $2.4$ per week, $s = 1.51$. Find and
+interpret a 99% t-interval.
+
+```{python}
+#| echo: false
+t_ci(2.4, 1.51, 55, 0.99).to_string()
+```
+
+**Best estimate 2.4 kills/week; ME $= 2.670 \cdot 0.204 \approx 0.54$;
+99% CI (1.86, 2.94).** We are 99% sure that US house cats that hunt
+outdoors average between about 1.9 and 2.9 bird (and small-animal) kills per
+week.
+
+## Exercise 6.102
+
+**How Much TV Do College Students Watch?** In `StudentSurvey`, $n = 361$
+students recorded weekly TV hours: $\bar x = 6.504$, $s = 5.584$. Find a
+99% t-interval for $\mu$ and indicate the population.
+
+*Data:* `data/ch02/StudentSurvey.csv`, from
+<https://www.lock5stat.com/datasets3e/StudentSurvey.csv>:
+
+```{python}
+#| echo: false
+ss = pd.read_csv("data/ch02/StudentSurvey.csv")
+tv = ss.TV.dropna().to_numpy(float)
+pd.Series({"n": len(tv), "mean": round(tv.mean(), 3),
+           "sd": round(tv.std(ddof=1), 3)}).to_string()
+```
+
+```{python}
+#| echo: false
+t_ci(6.504, 5.584, 361, 0.99).to_string()
+```
+
+**Best estimate 6.50 hours; ME $\approx 0.76$; 99% CI (5.74, 7.27).**
+We are 99% sure that students at the college where this survey was taken
+(the population the random sample represents) watch an average of between
+about 5.7 and 7.3 hours of television per week.
+
+## Exercise 6.103
+
+**How Many Close Confidants Do People Have?** A random sample of $n = 2006$
+US adults: mean number of close confidants $2.2$ with $s = 1.4$.
+
+```{python}
+#| echo: false
+t_ci(2.2, 1.4, 2006, 0.99, digits=4).to_string()
+```
+
+- **(a)** Margin of error for 99% confidence:
+  $t^* \approx 2.578$, so ME $= 2.578 \cdot 1.4/\sqrt{2006} \approx
+  \textbf{0.08}$.
+- **(b)** 99% CI: $2.2 \pm 0.08 = \textbf{(2.12, 2.28)}$ — we are 99% sure
+  US adults average between about 2.1 and 2.3 close confidants (people with
+  whom they discussed important matters in the last six months).
+
+## Exercise 6.104
+
+**How Big Are Gribbles?** A sample of $n = 50$ gribbles: mean length
+$3.1$ mm, $s = 0.72$. Give the best estimate, a margin of error (95%), and
+a 95% CI; what must we assume?
+
+```{python}
+#| echo: false
+t_ci(3.1, 0.72, 50, 0.95).to_string()
+```
+
+**Best estimate 3.1 mm; ME $= 2.010 \cdot 0.1018 \approx 0.20$ mm;
+95% CI (2.90, 3.30).** We are 95% sure the mean length of all such gribbles
+is between about 2.9 and 3.3 mm. To trust the interval we assume the 50
+worms are a **random sample** and that the population of lengths is
+reasonably normal (or at least not badly skewed/outlier-ridden, since
+$n = 50$ is only moderately large).
+
+## Exercise 6.105
+
+**Is Your Stomach Controlling Your Personality?** For $n = 99$ healthy
+European individuals the mean number of unique gut-bacteria genes was
+564 million with $s = 122$ million. Find and interpret a 95% t-interval.
+
+```{python}
+#| echo: false
+t_ci(564, 122, 99, 0.95).to_string()
+```
+
+**Best estimate 564 million; ME $= 1.984 \cdot 12.26 \approx 24.3$ million;
+95% CI (539.7, 588.3).** We are 95% sure that Europeans average between
+about 540 and 588 million unique genes in their gut bacteria.
+
+## Exercise 6.106
+
+**Transgender Adults.** In a study of $n = 210$ transgender adults, the
+mean age at which they began transitioning was 32.6 with $s = 18.2$. Find a
+95% t-interval.
+
+```{python}
+#| echo: false
+t_ci(32.6, 18.2, 210, 0.95).to_string()
+```
+
+**Best estimate 32.6 years; ME $= 1.971 \cdot 1.256 \approx 2.48$;
+95% CI (30.1, 35.1).** We are 95% sure that transgender adults begin
+transitioning at an average age between about 30 and 35 years.
+
+## Exercise 6.107
+
+**Transgender Children.** In the same study ($n = 210$), the mean age of
+first memories of gender dysphoria was 6.6 years with $s = 3.5$. Find a
+90% t-interval.
+
+```{python}
+#| echo: false
+t_ci(6.6, 3.5, 210, 0.90).to_string()
+```
+
+**Best estimate 6.6 years; ME $= 1.652 \cdot 0.242 \approx 0.40$;
+90% CI (6.20, 7.00).** We are 90% sure the mean age of earliest feelings of
+gender dysphoria is between about 6.2 and 7.0 years.
+
+## Exercise 6.108
+
+**Dim Light at Night Makes Fat Mice.** For the $n = 10$ mice with a dim
+light at night, 8-week weight gain averaged $\bar x = 7.9$ g with $s = 3.0$
+(Figure 6.9: not heavily skewed, no extreme outliers). Find and interpret a
+90% t-interval for the mean weight gain; define the parameter.
+
+```{python}
+#| echo: false
+t_ci(7.9, 3.0, 10, 0.90).to_string()
+```
+
+Parameter: $\mu$, the mean 8-week body-mass gain of *all* mice kept with a
+dim light on at night (in conditions like this study). **Best estimate
+7.9 g; ME $= 1.833 \cdot 0.949 \approx 1.74$; 90% CI (6.16, 9.64).** We are
+90% sure that mice with a night light gain between about 6.2 and 9.6 grams
+on average over 8 weeks. (Figure 6.9 shows a single main hump, so the
+t-distribution is acceptable despite $n = 10$.)
+
+## Exercise 6.109
+
+**Bright Light at Night Makes Even Fatter Mice.** The $n = 9$ mice with a
+bright light on all the time gained $\bar x = 11.0$ g with $s = 2.6$;
+Figure 6.10 shows a cluster near 10 with a clear outlier near 18 g. Is a
+t-distribution appropriate? If not, how else might we build the interval?
+
+Discussion — no computation. **Not appropriate.** The sample is tiny
+($n = 9$) and the dotplot shows a distinct high outlier at about 18 g, so
+the population cannot be considered normal and the CLT offers no help at
+this size. The outlier also inflates $s$, making any formula interval
+misleading. Instead we should use **bootstrap methods** (Chapter 3):
+resample the 9 mice thousands of times and take percentiles of the bootstrap
+distribution of means as the confidence interval.
+
+## Exercise 6.110
+
+**United Flights in December.** Computer output for the difference in
+actual vs scheduled arrival time of $n = 1000$ United December flights:
+Mean $= 4.21$, StDev $= 45.34$, SE Mean $= 1.43$, Min $= -51$, Q1 $= -15$,
+Median $= -5$, Q3 $= 8$, Max $= 872$.
+
+*Data:* `data/ch04/DecemberFlights.csv`, from
+<https://www.lock5stat.com/datasets3e/DecemberFlights.csv> (United rows
+reproduce the output exactly):
+
+```{python}
+#| echo: false
+dec = pd.read_csv("data/ch04/DecemberFlights.csv")
+u = dec.loc[dec.Airline == "United", "Difference"].dropna().to_numpy(float)
+pd.Series({"n": len(u), "mean": round(u.mean(), 2),
+           "sd": round(u.std(ddof=1), 2),
+           "SE": round(u.std(ddof=1) / np.sqrt(len(u)), 2),
+           "min": u.min(), "Q1": np.percentile(u, 25),
+           "median": np.median(u), "Q3": np.percentile(u, 75),
+           "max": u.max()}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Boxplot of the difference between actual and scheduled arrival times for 1000 United flights in December
+fig, ax = plt.subplots(figsize=(6, 2.2))
+sns.boxplot(x=u, ax=ax, color="#4c72b0")
+ax.set_xlabel("Actual minus scheduled arrival time (minutes)")
+plt.tight_layout()
+plt.show()
+t_ci(4.21, 45.34, 1000, 0.95).to_string()
+```
+
+- **(a)** The sample mean difference is **4.21 minutes** (flights arrive
+  4.21 minutes late on average); the standard deviation of the differences
+  is **45.34 minutes**.
+- **(b) No.** The median ($-5$) is well below the mean (4.21) and the max
+  (872) dwarfs Q3 (8) — the output shows strong right skew with extreme
+  outliers, so this sample is not normally distributed.
+- **(c) Yes, we can proceed.** The t-tools require a *normal sampling
+  distribution of the mean*, not normal data: with $n = 1000$ the CLT
+  applies, and even the 872-minute outlier has little influence on a mean
+  of 1000 values.
+- **(d)** $4.21 \pm 1.962 \cdot 1.43 = 4.21 \pm 2.81 = \textbf{(1.40,
+  7.02)}$ minutes.
+- **(e)** We are 95% sure that United flights in December arrive, on
+  average, between about 1.4 and 7.0 minutes later than scheduled.
+
+## Exercise 6.111
+
+**SE from a formula and a bootstrap distribution.** Mean penalty minutes
+for NHL players, `OttawaSenators2019`: $n = 26$, $\bar x = 24.46$,
+$s = 24.92$.
+
+*Data:* `data/ch03/OttawaSenators2019.csv`, from
+<https://www.lock5stat.com/datasets3e/OttawaSenators2019.csv>:
+
+```{python}
+#| echo: false
+sen = pd.read_csv("data/ch03/OttawaSenators2019.csv")
+pm = sen.PenMins.dropna().to_numpy(float)
+boots = boot_means(pm)
+tail_plot(boots, pm.mean(), "right", "Bootstrap sample means (penalty minutes)", bins=30)
+pd.Series({"n": len(pm), "mean": round(pm.mean(), 2), "sd": round(pm.std(ddof=1), 2),
+           "CLT SE = s/sqrt(n)": round(se_mean(24.92, 26), 3),
+           "Bootstrap SE": round(float(boots.std(ddof=1)), 3)}).to_string()
+```
+
+Formula SE $= 24.92/\sqrt{26} \approx \textbf{4.89}$; the bootstrap
+distribution above gives SE $\approx \textbf{4.73}$ — close, despite the
+right-skewed penalty data, so the formula and the simulation agree well.
+
+## Exercise 6.112
+
+**SE from a formula and a bootstrap distribution.** Mean commute time in
+Atlanta, `CommuteAtlanta`: $n = 500$, $\bar x = 29.11$, $s = 20.72$.
+
+*Data:* `data/ch03/CommuteAtlanta.csv`, from
+<https://www.lock5stat.com/datasets3e/CommuteAtlanta.csv>:
+
+```{python}
+#| echo: false
+ca = pd.read_csv("data/ch03/CommuteAtlanta.csv")
+tm = ca.Time.dropna().to_numpy(float)
+boots = boot_means(tm)
+tail_plot(boots, tm.mean(), "right", "Bootstrap sample means (commute minutes)", bins=30)
+pd.Series({"n": len(tm), "mean": round(tm.mean(), 2), "sd": round(tm.std(ddof=1), 2),
+           "CLT SE = s/sqrt(n)": round(se_mean(20.72, 500), 3),
+           "Bootstrap SE": round(float(boots.std(ddof=1)), 3)}).to_string()
+```
+
+Formula SE $= 20.72/\sqrt{500} \approx \textbf{0.927}$; bootstrap SE
+$\approx \textbf{0.93}$ — an excellent match for this large, right-skewed
+sample.
+
+## Exercise 6.113
+
+**SE from a formula and a bootstrap distribution.** Mean price of used
+Mustangs online (in $1000s), `MustangPrice`: $n = 25$, $\bar x = 15.98$,
+$s = 11.11$.
+
+*Data:* `data/ch03/MustangPrice.csv`, from
+<https://www.lock5stat.com/datasets3e/MustangPrice.csv>:
+
+```{python}
+#| echo: false
+mp = pd.read_csv("data/ch03/MustangPrice.csv")
+pr = mp.Price.dropna().to_numpy(float)
+boots = boot_means(pr)
+tail_plot(boots, pr.mean(), "right", "Bootstrap sample means (price, $1000s)", bins=30)
+pd.Series({"n": len(pr), "mean": round(pr.mean(), 2), "sd": round(pr.std(ddof=1), 2),
+           "max price": pr.max(),
+           "CLT SE = s/sqrt(n)": round(se_mean(11.11, 25), 3),
+           "Bootstrap SE": round(float(boots.std(ddof=1)), 3)}).to_string()
+```
+
+Formula SE $= 11.11/\sqrt{25} \approx \textbf{2.22}$; bootstrap SE
+$\approx \textbf{2.20}$ — a surprisingly good match even though the data
+are strongly right-skewed (the $45,000 outlier inflates both $s$ and the
+bootstrap spread together).
+
+## Exercise 6.114
+
+**SE from a formula and a bootstrap distribution.** Mean body temperature
+(°F), `BodyTemp50`: $n = 50$, $\bar x = 98.26$, $s = 0.765$.
+
+*Data:* `data/ch06/BodyTemp50.csv`, from
+<https://www.lock5stat.com/datasets3e/BodyTemp50.csv>:
+
+```{python}
+#| echo: false
+bt = pd.read_csv("data/ch06/BodyTemp50.csv")
+btv = bt.BodyTemp.dropna().to_numpy(float)
+boots = boot_means(btv)
+tail_plot(boots, btv.mean(), "right", "Bootstrap sample means (body temperature, F)", bins=30)
+pd.Series({"n": len(btv), "mean": round(btv.mean(), 2), "sd": round(btv.std(ddof=1), 3),
+           "CLT SE = s/sqrt(n)": round(se_mean(0.765, 50), 4),
+           "Bootstrap SE": round(float(boots.std(ddof=1)), 4)}).to_string()
+```
+
+Formula SE $= 0.765/\sqrt{50} \approx \textbf{0.108}$; bootstrap SE
+$\approx \textbf{0.108}$ — for these nearly symmetric data the two methods
+agree to three decimals.
+
+## Exercise 6.115
+
+**Comparing normal and bootstrap confidence intervals.** Mean commute
+*distance* for Atlanta workers, `CommuteAtlanta`: $\bar x = 18.156$ miles,
+$s = 13.798$, $n = 500$. Find a 95% CI by bootstrap percentiles and by the
+t-formula; compare.
+
+*Data:* `data/ch03/CommuteAtlanta.csv` (Distance variable):
+
+```{python}
+#| echo: false
+di = ca.Distance.dropna().to_numpy(float)
+boots = boot_means(di)
+lo, hi = np.percentile(boots, [2.5, 97.5])
+tail_plot(boots, di.mean(), "right", "Bootstrap sample means (commute miles)", bins=30)
+plt.gca().axvline(lo, color="#c44e52", ls="--", lw=1.5)
+plt.gca().axvline(hi, color="#c44e52", ls="--", lw=1.5)
+pd.Series({"Bootstrap 95% CI": f"({lo:.2f}, {hi:.2f})"}).to_string()
+```
+
+```{python}
+#| echo: false
+t_ci(18.156, 13.798, 500, 0.95).to_string()
+```
+
+- **Bootstrap percentile 95% CI ≈ (16.97, 19.40)** (dashed lines above).
+- **t-interval:** $18.156 \pm 1.965 \cdot 0.617 = \textbf{(16.94, 19.37)}$.
+- **Comparison:** the two intervals agree almost exactly — with $n = 500$
+  the bootstrap distribution of means is essentially normal, so the
+  symmetric t-interval and the percentile interval coincide.
+
+## Exercise 6.116
+
+**Comparing normal and bootstrap confidence intervals.** Mean used-Mustang
+price, `MustangPrice`: $\bar x = 15.98$, $s = 11.11$, $n = 25$. Two ways,
+then compare.
+
+*Data:* `data/ch03/MustangPrice.csv`:
+
+```{python}
+#| echo: false
+boots = boot_means(pr)
+lo, hi = np.percentile(boots, [2.5, 97.5])
+tail_plot(boots, pr.mean(), "right", "Bootstrap sample means (price, $1000s)", bins=30)
+plt.gca().axvline(lo, color="#c44e52", ls="--", lw=1.5)
+plt.gca().axvline(hi, color="#c44e52", ls="--", lw=1.5)
+pd.Series({"Bootstrap 95% CI": f"({lo:.2f}, {hi:.2f})"}).to_string()
+```
+
+```{python}
+#| echo: false
+t_ci(15.98, 11.11, 25, 0.95).to_string()
+```
+
+- **Bootstrap percentile 95% CI ≈ (11.93, 20.52)**.
+- **t-interval:** $15.98 \pm 2.064 \cdot 2.222 = \textbf{(11.39, 20.57)}$.
+- **Comparison:** similar overall width, but the bootstrap interval is
+  shifted *right* of the t-interval at the lower end (11.93 vs 11.39):
+  with $n = 25$ and a big right-skew/outlier, resamples rarely mean below
+  about 12, while the symmetric t-interval reaches further left. The
+  bootstrap adapts to the skew; the t-interval assumes symmetry — a good
+  illustration of why bootstrap intervals remain valuable for small skewed
+  samples.
+
+## Exercise 6.117
+
+**How Much Fat Do US Adults Consume?** From `NutritionStudy`, $n = 315$ US
+adults: mean fat $\bar x = 77.03$ g/day, $s = 33.83$.
+
+*Data:* `data/ch02/NutritionStudy.csv`, from
+<https://www.lock5stat.com/datasets3e/NutritionStudy.csv> (Fat variable:
+$n = 315$, mean 77.03, SD 33.83):
+
+```{python}
+#| echo: false
+nsd = pd.read_csv("data/ch02/NutritionStudy.csv")
+fat = nsd.Fat.dropna().to_numpy(float)
+pd.Series({"n": len(fat), "mean": round(fat.mean(), 2),
+           "sd": round(fat.std(ddof=1), 2)}).to_string()
+```
+
+```{python}
+#| echo: false
+t_ci(77.03, 33.83, 315, 0.95).to_string()
+```
+
+- **(a)** 95% CI: $77.03 \pm 3.75 = \textbf{(73.28, 80.78)}$ — we are 95%
+  sure US adults in this population average between about 73 and 81 grams
+  of fat per day.
+- **(b)** Margin of error: $t^* = 1.968$, ME $= 1.968 \cdot 1.906 \approx
+  \textbf{3.75}$ grams.
+- **(c)** For ME $= \pm 1$: $n = (1.96 \cdot 33.83/1)^2 = 4396 \Rightarrow
+  \textbf{4397}$ adults.
+
+## Exercise 6.118
+
+**Estimating Number of Close Confidants More Accurately.** Using the
+confidant data ($s = 1.4$, Exercise 6.103): what $n$ gives ME within
+$\pm 0.05$ with 99% confidence?
+
+```{python}
+#| echo: false
+sample_n(0.05, 0.99, 1.4)
+```
+
+$$n=\left(\frac{2.576\cdot 1.4}{0.05}\right)^2 \approx 5202$$ — cutting the
+margin of error from 0.08 to 0.05, and raising the confidence level from
+95% to 99%, would require a sample of over 5000 adults.
+
+## Exercise 6.119
+
+**Plastic Microfiber Pollution from Clothes.** Washing fleece discharged a
+mean of 290 polyester fibers per liter of wastewater, $s = 87.6$, $n = 120$.
+
+```{python}
+#| echo: false
+t_ci(290, 87.6, 120, 0.99).to_string()
+```
+
+- **(a)** 99% CI: $290 \pm 20.93 = \textbf{(269.1, 310.9)}$ — we are 99%
+  sure that washing fleece releases between about 269 and 311 microfibers
+  per liter of wastewater on average.
+- **(b)** Margin of error: $t^* = 2.618 \cdot 87.6/\sqrt{120} \approx
+  \textbf{20.9}$ fibers/liter.
+- **(c)** For ME $= \pm 5$ with 99% confidence: $n = (2.576 \cdot
+  87.6/5)^2 \approx \textbf{2037}$ samples.
+
+## Exercise 6.120
+
+**Plastic Microfiber Pollution on Shorelines.** 90 beach sediment samples
+(250 mL each): mean 18.3 particles, $s = 8.2$.
+
+```{python}
+#| echo: false
+t_ci(18.3, 8.2, 90, 0.99).to_string()
+```
+
+- **(a)** 99% CI: $18.3 \pm 2.27 = \textbf{(16.0, 20.6)}$ — we are 99% sure
+  beach sediment averages between about 16 and 21 microparticles per 250 mL.
+- **(b)** Margin of error: $t^* = 2.632 \cdot 8.2/\sqrt{90} \approx
+  \textbf{2.27}$ particles.
+- **(c)** For ME $= \pm 1$ with 99% confidence: $n = (2.576 \cdot
+  8.2/1)^2 \approx \textbf{447}$ samples.
+
+## Exercise 6.121
+
+**What influences the sample size needed?** Sample size for ME within
+$\pm 10$, $\pm 5$, $\pm 1$ (95% confidence, $\tilde\sigma = 30$).
+
+```{python}
+#| echo: false
+pd.Series({"ME = 10": sample_n(10, 0.95, 30),
+           "ME = 5": sample_n(5, 0.95, 30),
+           "ME = 1": sample_n(1, 0.95, 30)}).to_string()
+```
+
+The required sizes are **35, 139, and 3458**. Since $n = (z^*\tilde\sigma/ME)^2$,
+halving the margin of error **quadruples** the sample size (35 → 139 → 554
+→ ...): accuracy is expensive, and each extra digit of precision costs
+disproportionately more.
+
+## Exercise 6.122
+
+**What influences the sample size needed?** Sample size for ME within
+$\pm 3$ with 99%, 95%, and 90% confidence ($\tilde\sigma = 30$).
+
+```{python}
+#| echo: false
+pd.Series({"99% confidence": sample_n(3, 0.99, 30),
+           "95% confidence": sample_n(3, 0.95, 30),
+           "90% confidence": sample_n(3, 0.90, 30)}).to_string()
+```
+
+The required sizes are **664, 385, and 271**. Higher confidence demands a
+wider net and hence a **larger** sample to keep the same margin of error —
+from 90% to 99% confidence roughly raises $n$ by a factor of 2.5.
+
+## Exercise 6.123
+
+**What influences the sample size needed?** Sample size for ME within
+$\pm 3$ (95% confidence) with $\tilde\sigma = 100, 50, 10$.
+
+```{python}
+#| echo: false
+pd.Series({"sigma-tilde = 100": sample_n(3, 0.95, 100),
+           "sigma-tilde = 50": sample_n(3, 0.95, 50),
+           "sigma-tilde = 10": sample_n(3, 0.95, 10)}).to_string()
+```
+
+The required sizes are **4269, 1068, and 43**. Since $n$ grows like
+$\tilde\sigma^2$, each halving of the population variability quarters the
+sample size needed — knowing the population is homogeneous is worth more
+than any amount of extra data collection.
+
+## Exercise 6.124
+
+**How Big Is the Tip Percentage at a Restaurant?** 95% t-interval for the
+mean tip percentage (PctTip) using the `RestaurantTips` dataset.
+
+*Data:* `data/ch02/RestaurantTips.csv`, from
+<https://www.lock5stat.com/datasets3e/RestaurantTips.csv>:
+
+```{python}
+#| echo: false
+rt = pd.read_csv("data/ch02/RestaurantTips.csv")
+pt = rt.PctTip.dropna().to_numpy(float)
+boots = boot_means(pt)
+tail_plot(boots, pt.mean(), "right", "Bootstrap sample means (tip percent)", bins=30)
+pd.Series({"n": len(pt), "mean": round(pt.mean(), 3),
+           "sd": round(pt.std(ddof=1), 3),
+           "Bootstrap 95% CI": f"({np.percentile(boots, 2.5):.2f}, {np.percentile(boots, 97.5):.2f})"}).to_string()
+```
+
+```{python}
+#| echo: false
+t_ci(pt.mean(), pt.std(ddof=1), len(pt), 0.95).to_string()
+```
+
+For the $n = 157$ restaurant bills the mean tip is 16.62% with $s = 4.39$,
+so the 95% t-interval is **(15.93, 17.31)** ($t^* = 1.975$, SE $= 0.35$,
+ME $\approx 0.69$). We are 95% sure that the mean tip percentage at this
+restaurant is between about 15.9% and 17.3%; the bootstrap interval
+(15.97, 17.36) confirms it.
+
+## Exercise 6.125
+
+**How Many Grams of Fiber Do People Get in a Day?** 95% t-interval for mean
+daily Fiber in `NutritionStudy`.
+
+*Data:* `data/ch02/NutritionStudy.csv` (Fiber variable):
+
+```{python}
+#| echo: false
+fb = nsd.Fiber.dropna().to_numpy(float)
+t_ci(fb.mean(), fb.std(ddof=1), len(fb), 0.95).to_string()
+```
+
+For the $n = 315$ participants the mean fiber intake is 12.79 g/day with
+$s = 5.33$, giving a 95% CI of **(12.20, 13.38)** ($t^* = 1.968$,
+SE $= 0.300$, ME $\approx 0.59$). We are 95% sure that US adults in this
+study population average between about 12.2 and 13.4 grams of fiber per
+day — well below the recommended 25–30 g.
+
+## Exercise 6.126
+
+*(Skill Builder 1)* Test $H_0\colon \mu = 15$ vs $H_a\colon \mu > 15$ using
+$\bar x = 17.2$, $s = 6.4$, $n = 40$ (5% level).
+
+```{python}
+#| echo: false
+#| fig-cap: t-distribution with 39 df and the right tail beyond t = 2.17 shaded
+t_curve(t_test(17.2, 6.4, 40, 15, "right")["t-statistic"], 39, "right")
+t_test(17.2, 6.4, 40, 15, "right").to_string()
+```
+
+$t = (17.2 - 15)/1.012 = 2.17$, df $= 39$, **p-value $\approx 0.018$**.
+Since $0.018 < 0.05$ we **reject $H_0$**: the data provide convincing
+evidence that the population mean is greater than 15.
+
+## Exercise 6.127
+
+*(Skill Builder 1)* Test $H_0\colon \mu = 100$ vs $H_a\colon \mu < 100$
+using $\bar x = 91.7$, $s = 12.5$, $n = 30$.
+
+```{python}
+#| echo: false
+t_curve(t_test(91.7, 12.5, 30, 100, "left")["t-statistic"], 29, "left")
+t_test(91.7, 12.5, 30, 100, "left").to_string()
+```
+
+$t = -3.64$, df $= 29$, **p-value $\approx 0.0005$** — reject $H_0$;
+strong evidence that the mean is below 100.
+
+## Exercise 6.128
+
+*(Skill Builder 1)* Test $H_0\colon \mu = 120$ vs $H_a\colon \mu < 120$
+using $\bar x = 112.3$, $s = 18.4$, $n = 100$.
+
+```{python}
+#| echo: false
+t_curve(t_test(112.3, 18.4, 100, 120, "left")["t-statistic"], 99, "left")
+t_test(112.3, 18.4, 100, 120, "left", digits=6).to_string()
+```
+
+$t = -4.19$, df $= 99$, **p-value $\approx 0.00003$** — reject $H_0$;
+very strong evidence that the mean is below 120.
+
+## Exercise 6.129
+
+*(Skill Builder 1)* Test $H_0\colon \mu = 10$ vs $H_a\colon \mu > 10$ using
+$\bar x = 13.2$, $s = 8.7$, $n = 12$.
+
+```{python}
+#| echo: false
+t_curve(t_test(13.2, 8.7, 12, 10, "right")["t-statistic"], 11, "right")
+t_test(13.2, 8.7, 12, 10, "right").to_string()
+```
+
+$t = 1.27$, df $= 11$, **p-value $\approx 0.114$** — since $0.114 > 0.05$
+we **fail to reject $H_0$**: a sample mean 3.2 above the null with only 12
+observations and $s = 8.7$ is not unusual, so there is no convincing
+evidence that $\mu > 10$.
+
+## Exercise 6.130
+
+*(Skill Builder 1)* Test $H_0\colon \mu = 4$ vs $H_a\colon \mu \ne 4$ using
+$\bar x = 4.8$, $s = 2.3$, $n = 15$.
+
+```{python}
+#| echo: false
+t_curve(t_test(4.8, 2.3, 15, 4, "two")["t-statistic"], 14, "two")
+t_test(4.8, 2.3, 15, 4, "two").to_string()
+```
+
+$t = 1.35$, df $= 14$, **p-value $\approx 0.199$** (two-tailed) — fail to
+reject $H_0$; no evidence that the mean differs from 4.
+
+## Exercise 6.131
+
+*(Skill Builder 1)* Test $H_0\colon \mu = 500$ vs $H_a\colon \mu \ne 500$
+using $\bar x = 432$, $s = 118$, $n = 75$.
+
+```{python}
+#| echo: false
+t_curve(t_test(432, 118, 75, 500, "two")["t-statistic"], 74, "two")
+t_test(432, 118, 75, 500, "two", digits=6).to_string()
+```
+
+$t = -4.99$, df $= 74$, **p-value $\approx 0.000004$** — reject $H_0$;
+very strong evidence that the mean is below 500 (and different from it).
+
+## Exercise 6.132
+
+**How Many Social Ties Do You Have?** Social analysts estimate a US adult
+averages 634 social ties. For $n = 1700$ randomly selected cell-phone
+users, $\bar x = 664$ with $s = 778$. Does the sample show that cell-phone
+users differ from 634?
+
+```{python}
+#| echo: false
+#| fig-cap: t-distribution with 1699 df and both tails beyond t = 1.59 shaded
+t_curve(t_test(664, 778, 1700, 634, "two")["t-statistic"], 1699, "two")
+t_test(664, 778, 1700, 634, "two").to_string()
+```
+
+Parameter: $\mu$, the mean number of social ties for all US adult cell-phone
+users. Hypotheses: $H_0\colon \mu = 634$ vs $H_a\colon \mu \ne 634$.
+$t = (664 - 634)/18.87 = 1.59$, df $= 1699$, **p-value $\approx 0.112$**
+(two-tailed). Since $0.112 > 0.05$ we **fail to reject $H_0$**: a 30-tie
+gap in a sample of 1700 with $s = 778$ is well within random-chance range,
+so the data provide no evidence that cell-phone users differ from the
+national average of 634 ties.
+
+## Exercise 6.133
+
+**The Autistic Brain.** Autopsies of $n = 7$ autistic male children found a
+mean of 1.94 billion neurons in the prefrontal cortex with $s = 0.50$
+billion; non-autistic children average about 1.15 billion. Test whether
+autistic children have more neurons (data not heavily skewed).
+
+```{python}
+#| echo: false
+#| fig-cap: t-distribution with 6 df and the right tail beyond t = 4.18 shaded
+t_curve(t_test(1.94, 0.50, 7, 1.15, "right")["t-statistic"], 6, "right")
+t_test(1.94, 0.50, 7, 1.15, "right").to_string()
+```
+
+$H_0\colon \mu = 1.15$ vs $H_a\colon \mu > 1.15$ ($\mu$ = mean prefrontal
+neuron count for autistic male children). $t = (1.94 - 1.15)/0.189 = 4.18$,
+df $= 6$, **p-value $\approx 0.0029$**. Since $0.0029 < 0.05$ we **reject
+$H_0$**: even with only 7 subjects, a mean 79% above the typical 1.15
+billion is too extreme for chance, providing strong evidence that autistic
+male children have more neurons on average in the prefrontal cortex —
+suggesting the causes of autism may act before birth.
+
+## Exercise 6.134
+
+**Be Nice to Pigeons, as They Remember Your Face.** After training with a
+hostile and a neutral person, $n = 32$ measurements of (pigeons at neutral
+site minus hostile site) give $\bar x = 3.9$ with $s = 6.8$. Test whether
+the mean difference is greater than zero.
+
+```{python}
+#| echo: false
+#| fig-cap: t-distribution with 31 df and the right tail beyond t = 3.24 shaded
+t_curve(t_test(3.9, 6.8, 32, 0, "right")["t-statistic"], 31, "right")
+t_test(3.9, 6.8, 32, 0, "right").to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the mean difference when the null mean is 0, observed 3.9 shaded in the right tail
+r = np.random.default_rng(2026)
+shifted = np.repeat([3.9], 32) - 3.9 + 0.0  # data shifted so the mean is the null value 0
+sims = np.array([r.choice(shifted, 32, replace=True).mean() for _ in range(10000)])
+tail_plot(sims, 3.9, "right", "Randomization sample means", bins=30)
+p_row("Mean difference", 3.9, sims, "right").to_string()
+```
+
+$H_0\colon \mu = 0$ vs $H_a\colon \mu > 0$. $t = 3.9/1.202 = 3.24$,
+df $= 31$, **p-value $\approx 0.0014$**; the randomization simulation above
+(shift and resample) agrees at about 0.001. Either way we **reject
+$H_0$**: the data provide convincing evidence that more pigeons gather at
+the neutral person's site — the birds recognize the hostile human's face
+and remember the grudge.
+
+## Exercise 6.135
+
+**Getting Enough Sleep?** One of the authors asked $n = 12$ Harvard
+students how much they slept the previous night: $\bar x = 6.2$ hours,
+$s = 1.70$ (Figure 6.13: boxplot from 4 to 10, roughly symmetric). Is there
+evidence that, on average, students are not getting enough sleep (less
+than 8 hours)?
+
+```{python}
+#| echo: false
+#| fig-cap: t-distribution with 11 df and the left tail beyond t = -3.67 shaded
+t_curve(t_test(6.2, 1.70, 12, 8, "left")["t-statistic"], 11, "left")
+t_test(6.2, 1.70, 12, 8, "left").to_string()
+```
+
+$H_0\colon \mu = 8$ vs $H_a\colon \mu < 8$ ($\mu$ = mean hours of sleep for
+all this author's students). $t = (6.2 - 8)/0.491 = -3.67$, df $= 11$,
+**p-value $\approx 0.0019$**. Since $0.0019 < 0.05$ we **reject $H_0$**:
+the sample provides convincing evidence that, on average, these students
+sleep significantly *less* than the recommended 8 hours per night.
+
+## Exercise 6.136
+
+**Football Air Pressure (Deflategate).** At the 2014 AFC championship,
+officials measured 11 Patriots game footballs: $\bar x = 11.1$ psi,
+$s = 0.40$ psi.
+
+```{python}
+#| echo: false
+#| fig-cap: t-distribution with 10 df and the left tail beyond t = -11.6 shaded
+t_curve(t_test(11.1, 0.40, 11, 12.5, "left")["t-statistic"], 10, "left")
+t_test(11.1, 0.40, 11, 12.5, "left", digits=6).to_string()
+```
+
+- **(a)** $H_0\colon \mu = 12.5$ vs $H_a\colon \mu < 12.5$ ($\mu$ = mean
+  air pressure of the Patriots' footballs). $t = (11.1 - 12.5)/0.1206 =
+  -11.6$, df $= 10$, **p-value $\approx 0.0000025$ — essentially zero**. We
+  overwhelmingly reject $H_0$: the average pressure is significantly less
+  than the allowable 12.5 psi limit.
+- **(b) No, not really.** These 11 balls were the game balls checked at
+  halftime of *one* game (under game-day weather), not a random sample of
+  all footballs used by the Patriots during the 2014 season. Extending the
+  conclusion to the whole season is a stretch — the sample is representative
+  of that game, at best.
+
+## Exercise 6.137
+
+**Homes for Sale.** Table 6.2 gives mean and SD of prices ($1000s) for
+$n = 30$ homes in each of NY, NJ, and PA. Using the typical US price of
+278 (thousand $) and a 5% level, is each state's average significantly
+greater than 278? Which state shows the most evidence?
+
+```{python}
+#| echo: false
+homes = pd.DataFrame({"State": ["New York", "New Jersey", "Pennsylvania"],
+                      "n": [30, 30, 30],
+                      "Mean": [365.3, 328.5, 265.6],
+                      "Std. Dev.": [317.8, 158.0, 137.1]})
+homes.to_string(index=False)
+```
+
+```{python}
+#| echo: false
+rows = [t_test(365.3, 317.8, 30, 278, "right"),
+        t_test(328.5, 158.0, 30, 278, "right"),
+        t_test(265.6, 137.1, 30, 278, "right")]
+pd.DataFrame({"State": ["New York", "New Jersey", "Pennsylvania"],
+              "t-statistic": [r["t-statistic"] for r in rows],
+              "df": [r["df"] for r in rows],
+              "p-value (H_a: mu > 278)": [r["p-value"] for r in rows]}).to_string(index=False)
+```
+
+- **(a) New York:** $t = (365.3 - 278)/58.0 = 1.51$, df $= 29$, p-value
+  $\approx 0.072 > 0.05$ — **not significant**, despite the highest mean,
+  because $s = 317.8$ makes the SE huge.
+- **(b) New Jersey:** $t = 50.5/28.8 = 1.75$, df $= 29$, p-value
+  $\approx 0.045 < 0.05$ — **significant** (barely).
+- **(c) Pennsylvania:** $t = -12.4/25.0 = -0.50$, df $= 29$, p-value
+  $\approx 0.688$ — **no evidence** (the sample mean is actually *below*
+  278).
+- **(d) New Jersey** shows the most evidence that its state average exceeds
+  the national typical price: it pairs an above-average mean with moderate
+  variability, while New York's enormous spread swamps its higher mean.
+
+## Exercise 6.138
+
+**Homes for Sale, Canton.** Table 6.3 gives the prices ($1000s) of $n = 10$
+homes for sale in Canton, NY. Test whether the average Canton price differs
+from the national figure of 278 thousand dollars.
+
+```{python}
+#| echo: false
+#| fig-cap: Dotplot of the ten Canton NY house prices in Table 6.3
+canton = np.array([187, 103, 139, 95, 120, 125, 345, 115, 105, 80], float)
+dotplot(canton, "Price ($1000s)")
+pd.Series({"n": len(canton), "mean": round(canton.mean(), 1),
+           "sd": round(canton.std(ddof=1), 1)}).to_string()
+```
+
+*Data:* `data/ch06/HomesForSaleCanton.csv`, from
+<https://www.lock5stat.com/datasets3e/HomesForSaleCanton.csv> (its first ten
+rows match Table 6.3):
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the mean Canton price when the null mean is 278, observed 141.4 shaded in both tails
+r = np.random.default_rng(2026)
+shifted = canton - canton.mean() + 278
+sims = np.array([r.choice(shifted, 10, replace=True).mean() for _ in range(10000)])
+tail_plot(sims, canton.mean(), "two", "Randomization sample means", null=278, bins=30)
+p_row("Mean price", canton.mean(), sims, "two", null=278).to_string()
+```
+
+```{python}
+#| echo: false
+t_test(canton.mean(), canton.std(ddof=1), 10, 278, "two", digits=5).to_string()
+```
+
+$H_0\colon \mu = 278$ vs $H_a\colon \mu \ne 278$. The ten prices average
+141.4 with $s = 77.2$ (the $345$ outlier is visible in the dotplot), so
+$t = (141.4 - 278)/24.42 = -5.59$, df $= 9$, **p-value $\approx 0.0003$**;
+the randomization simulation above gives a matching p-value $\approx 0$.
+We **reject $H_0$**: the average Canton house price is significantly
+different from — in fact far below — the national figure of 278 thousand
+dollars.
+
+## Exercise 6.139
+
+**Team Batting Average in Baseball.** From `BaseballHits2019` (all 30 MLB
+teams in 2019, treated as a sample of all teams in all years): $N = 30$,
+Mean $= 0.25217$, SE Mean $= 0.00198$, StDev $= 0.01084$. Test whether the
+average team batting average differs from 0.260, and compare to the Minitab
+output.
+
+*Data:* `data/ch02/BaseballHits2019.csv`, from
+<https://www.lock5stat.com/datasets3e/BaseballHits2019.csv>:
+
+```{python}
+#| echo: false
+bb = pd.read_csv("data/ch02/BaseballHits2019.csv")
+ba = bb.BattingAvg.dropna().to_numpy(float)
+pd.Series({"N": len(ba), "Mean": round(ba.mean(), 5),
+           "StDev": round(ba.std(ddof=1), 5),
+           "SE Mean": round(ba.std(ddof=1) / np.sqrt(len(ba)), 5)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: t-distribution with 29 df and both tails beyond t = -3.96 shaded
+t_curve(t_test(0.25217, 0.01084, 30, 0.26, "two")["t-statistic"], 29, "two")
+pd.concat([t_test(0.25217, 0.01084, 30, 0.26, "two"),
+           t_ci(0.25217, 0.01084, 30, 0.95, digits=5)]).to_string()
+```
+
+- **(a)** $N = 30$ teams; mean batting average $0.25217$; standard
+  deviation $0.01084$ (so SE Mean $= 0.01084/\sqrt{30} = 0.00198$, matching
+  the output).
+- **(b)** $H_0\colon \mu = 0.26$ vs $H_a\colon \mu \ne 0.26$: $t =
+  (0.25217 - 0.26)/0.00198 = -3.96$, df $= 29$, **p-value $\approx
+  0.0005$** — reject $H_0$ at any reasonable level: the average team
+  batting average is significantly below 0.260. The matching 95% CI is
+  (0.248, 0.256), which misses 0.26.
+- **(c) Comparison:** Minitab reports $T = -3.96$, $P = 0.00045$, and 95% CI
+  (0.24812, 0.25622) — identical to our hand-computed values (up to
+  rounding of the fourth decimal), confirming the t-test procedure.
+
+## Exercise 6.140
+
+**Are Florida Lakes Acidic or Alkaline?** From `FloridaLakes`, the pH
+output: $N = 53$, Mean $= 6.591$, SE Mean $= 0.177$, StDev $= 1.288$. Test
+whether the average pH differs from the neutral value of 7 (5% level).
+
+*Data:* `data/ch03/FloridaLakes.csv`, from
+<https://www.lock5stat.com/datasets3e/FloridaLakes.csv>:
+
+```{python}
+#| echo: false
+fl = pd.read_csv("data/ch03/FloridaLakes.csv")
+ph = fl.pH.dropna().to_numpy(float)
+pd.Series({"N": len(ph), "Mean": round(ph.mean(), 3),
+           "StDev": round(ph.std(ddof=1), 3),
+           "SE Mean": round(ph.std(ddof=1) / np.sqrt(len(ph)), 3)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: t-distribution with 52 df and both tails beyond t = -2.31 shaded
+t_curve(t_test(6.591, 1.288, 53, 7, "two")["t-statistic"], 52, "two")
+pd.concat([t_test(6.591, 1.288, 53, 7, "two"),
+           t_ci(6.591, 1.288, 53, 0.95, digits=4)]).to_string()
+```
+
+- **(a)** $N = 53$ lakes; mean pH $6.591$; standard deviation $1.288$ (SE
+  $= 1.288/\sqrt{53} = 0.177$).
+- **(b)** $H_0\colon \mu = 7$ vs $H_a\colon \mu \ne 7$: $t = (6.591 -
+  7)/0.177 = -2.31$, df $= 52$, **p-value $\approx 0.025 < 0.05$** — reject
+  $H_0$. Since the mean (6.591) and the entire 95% CI (6.235, 6.946) lie
+  *below* 7, Florida lakes appear, on average, slightly **more acidic**
+  than neutral.
+- **(c) Comparison:** Minitab reports $T = -2.31$, $P = 0.025$, 95% CI
+  (6.235, 6.946) — exactly our values, confirming the test.
+
+## Exercise 6.141
+
+**Mercury Content in Fish.** Using AvgMercury in `FloridaLakes`, test
+whether the mean mercury level of fish in Florida lakes is (a) less than
+1.0 ppm (the US FDA limit) and (b) less than 0.5 ppm (the Canadian limit).
+
+```{python}
+#| echo: false
+hg = fl.AvgMercury.dropna().to_numpy(float)
+pd.Series({"n": len(hg), "mean": round(hg.mean(), 3),
+           "sd": round(hg.std(ddof=1), 3)}).to_string()
+```
+
+```{python}
+#| echo: false
+pd.concat([t_test(hg.mean(), hg.std(ddof=1), len(hg), 1.0, "left").rename("(a) H0: mu = 1.0 vs Ha: mu < 1.0"),
+           t_test(hg.mean(), hg.std(ddof=1), len(hg), 0.5, "left").rename("(b) H0: mu = 0.5 vs Ha: mu < 0.5")], axis=1).to_string()
+```
+
+The 53 lakes average $\bar x = 0.527$ ppm with $s = 0.341$.
+
+- **(a)** $t = (0.527 - 1.0)/0.0468 = -10.09$, df $= 52$,
+  **p-value $\approx 0$** — overwhelming evidence that the mean mercury
+  level is **less than 1.0 ppm**: Florida lake fish are safely below the US
+  limit on average.
+- **(b)** $t = (0.527 - 0.5)/0.0468 = 0.58$, **p-value $\approx 0.72$** —
+  no evidence that the mean is below 0.5 ppm. In fact the sample mean sits
+  slightly *above* the Canadian limit, so there is no basis for claiming
+  the lakes meet the stricter Canadian standard on average.
+
+## Exercise 6.142
+
+**Number of Fouls in a Season by NBA Players.** The `NBAPlayers2019` data
+(listing players who played at least 24 minutes per game, as a sample of all
+regular players in all seasons) give season fouls. Test whether the mean
+number of fouls is less than 160 (roughly 2 per game).
+
+*Data:* `data/ch02/NBAPlayers2019.csv`, from
+<https://www.lock5stat.com/datasets3e/NBAPlayers2019.csv>:
+
+```{python}
+#| echo: false
+nb = pd.read_csv("data/ch02/NBAPlayers2019.csv")
+fo = nb.Fouls.dropna().to_numpy(float)
+pd.Series({"n": len(fo), "mean": round(fo.mean(), 2),
+           "sd": round(fo.std(ddof=1), 2)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the mean number of fouls when the null mean is 160, observed 151.9 shaded in the left tail
+r = np.random.default_rng(2026)
+shifted = fo - fo.mean() + 160
+sims = np.array([r.choice(shifted, len(fo), replace=True).mean() for _ in range(10000)])
+tail_plot(sims, fo.mean(), "left", "Randomization sample means", bins=30)
+p_row("Mean fouls", fo.mean(), sims, "left").to_string()
+```
+
+```{python}
+#| echo: false
+t_curve(t_test(fo.mean(), fo.std(ddof=1), len(fo), 160, "left")["t-statistic"], len(fo) - 1, "left")
+t_test(fo.mean(), fo.std(ddof=1), len(fo), 160, "left").to_string()
+```
+
+$H_0\colon \mu = 160$ vs $H_a\colon \mu < 160$ ($\mu$ = mean season fouls
+for all regularly playing NBA players). For the $n = 193$ players,
+$\bar x = 151.87$ with $s = 54.68$: $t = (151.87 - 160)/3.936 = -2.07$,
+df $= 192$, **p-value $\approx 0.020$** — the randomization test above
+agrees (p $\approx 0.02$). Since $0.020 < 0.05$ we **reject $H_0$**: there
+is evidence that regular NBA players average fewer than 160 fouls per
+season (about 1.9 per game, not quite 2).
+
+:::
