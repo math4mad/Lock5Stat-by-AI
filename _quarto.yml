@@ -131,6 +131,10 @@ website:
             text: "Ch. 10 · Section 10.2"
           - href: chapters/ch10/s10-3.qmd
             text: "Ch. 10 · Section 10.3"
+          - href: chapters/synthesis/unit-d-1.qmd
+            text: "Unit D · Synthesis (D.1–D.27)"
+          - href: chapters/synthesis/unit-d-2.qmd
+            text: "Unit D · Synthesis (D.28–D.53)"
 
 format:
   html:

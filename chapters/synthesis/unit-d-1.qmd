@@ -1,0 +1,665 @@
+---
+execute-dir: project
+title: "Unit D · Essential Synthesis (D.1–D.27)"
+subtitle: "Chi-square, ANOVA, and regression — one dataset tours them all"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+The Unit D Essential Synthesis exercises (Lock⁵, 3rd ed., pp. 705–710) are the
+"which tool when?" final exam for inference with multiple parameters: **one
+categorical variable** → chi-square goodness-of-fit; **two categorical
+variables** → chi-square test for association; **one categorical + one
+quantitative** → analysis of variance; **two quantitative** → test for
+correlation, test for slope, or the ANOVA for regression (multiple predictors
+add the regression ANOVA and tests for individual coefficients). Exercises
+D.1–D.10 run the entire toolbox over one dataset — tipping at the First Crush
+bistro (`RestaurantTips`, 157 bills with `Bill`, `Tip`, `PctTip`, `Guests`,
+`Credit`, `Day`, `Server`); D.11–D.18 practice reading p-values off theoretical
+distributions; D.19–D.27 ask only *which* method fits. Every randomization
+below uses 10,000 replicates with seed 2026, so all p-values are reproducible
+and agree with the book's $\chi^2$ and $F$ tables up to Monte Carlo wobble.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+from scipy import stats
+sns.set_theme(style="whitegrid")
+
+tips = pd.read_csv("data/ch09/RestaurantTips.csv")
+
+def gof_perm(counts, reps=10000, seed=2026):
+    """Chi-square GOF randomization: equal-probability multinomials vs observed counts."""
+    rng = np.random.default_rng(seed)
+    n, k = int(np.sum(counts)), len(counts)
+    E = np.full(k, n / k)
+    obs = float(((counts - E) ** 2 / E).sum())
+    sims = rng.multinomial(n, [1 / k] * k, size=reps)
+    return obs, ((sims - E) ** 2 / E).sum(axis=1)
+
+def assoc_perm(x, y, reps=10000, seed=2026):
+    """Chi-square association randomization: shuffle one variable, rebuild the table."""
+    rng = np.random.default_rng(seed)
+    obs = stats.chi2_contingency(pd.crosstab(x, y), correction=False)[0]
+    sims = np.array([stats.chi2_contingency(pd.crosstab(rng.permutation(x), y),
+                                            correction=False)[0]
+                     for _ in range(reps)])
+    return obs, sims
+
+def f_perm(values, groups, reps=10000, seed=2026):
+    """ANOVA randomization: shuffle the response over the fixed group labels."""
+    rng = np.random.default_rng(seed)
+    levels = pd.unique(groups)
+    obs = stats.f_oneway(*[values[groups == g] for g in levels])[0]
+    sims = np.empty(reps)
+    for i in range(reps):
+        p = rng.permutation(values)
+        sims[i] = stats.f_oneway(*[p[groups == g] for g in levels])[0]
+    return obs, sims
+
+def r_perm(x, y, reps=10000, seed=2026):
+    """Regression randomization: shuffle the response, recompute the F (= t^2)."""
+    rng = np.random.default_rng(seed)
+    n = len(x)
+    r = np.corrcoef(x, y)[0, 1]
+    obs = r ** 2 / (1 - r ** 2) * (n - 2)
+    sims = np.empty(reps)
+    for i in range(reps):
+        rr = np.corrcoef(x, rng.permutation(y))[0, 1]
+        sims[i] = rr ** 2 / (1 - rr ** 2) * (n - 2)
+    return obs, sims
+
+def dist_plot(sims, xlabel, obs=None, tail="right", bins=30, figsize=(6, 3)):
+    """Histogram of simulated statistics, optionally marking the observed statistic."""
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.histplot(x=sims, bins=bins, ax=ax, color="#4c72b0")
+    if obs is not None:
+        lines = {"right": (obs,), "left": (obs,), "two": (-abs(obs), abs(obs))}[tail]
+        for v in lines:
+            ax.axvline(v, color="#c44e52", ls="--", lw=1)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Simulated statistics")
+    plt.tight_layout()
+    plt.show()
+```
+
+::: {.panel-tabset}
+
+## Exercise D.1
+
+**Do the Servers Serve Equal Numbers of Tables?** A chi-square
+**goodness-of-fit** test on one categorical variable (`Server`), Table D.5:
+A 60, B 65, C 32 of 157 bills.
+
+- $H_0: p_A = p_B = p_C = 1/3$ vs $H_a$: at least one server's share differs.
+  Expected count per server: $157/3 = 52.33$ (all $\ge 5$).
+- $\chi^2 = \sum (O-E)^2/E = \textbf{12.09}$ on $3 - 1 = 2$ df:
+  **p = 0.0024** (randomization: 0.0019) → **reject $H_0$**.
+- The servers do **not** serve equal numbers of tables — A and B each carry
+  more than their expected share, C carries far fewer.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the chi-square statistic when the three servers are equally likely
+counts = tips.Server.value_counts().sort_index().to_numpy(float)
+obs, sims = gof_perm(counts)
+dist_plot(sims, "Randomization chi-square statistics (equal servers)", obs=obs, bins=24)
+pd.Series({"Counts (A, B, C)": tips.Server.value_counts().sort_index().to_dict(),
+           "Expected under H0": round(counts.mean(), 2),
+           "Chi-square": round(obs, 2),
+           "df": 2,
+           "p-value (chi-square)": round(stats.chi2.sf(obs, 2), 4),
+           "p-value (randomization)": round(float((sims >= obs).mean()), 4)}).to_string()
+```
+
+## Exercise D.2
+
+**Are Bills Evenly Distributed between the Days of the Week?** Goodness-of-fit
+again, now on `Day` (Table D.6): Mon 20, Tues 13, Wed 62, Thurs 36, Fri 26.
+
+- $H_0$: all five weekdays equally likely ($p = 0.2$ each) vs $H_a$: some days
+  are more popular. Expected per day: $157/5 = 31.4$.
+- $\chi^2 = \textbf{46.34}$ on $5 - 1 = 4$ df: **p ≈ 2 × 10⁻⁹** (randomization:
+  0 of 10,000 shuffles reach it) → **reject $H_0$** emphatically.
+- Some days genuinely draw more bills: **Wednesday (62 of 157, ≈ 40%)** is by
+  far the busiest; Tuesday (13) the slowest.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the chi-square statistic when all five weekdays are equally popular
+order = ["m", "t", "w", "th", "f"]
+counts = tips.Day.value_counts().reindex(order).to_numpy(float)
+obs, sims = gof_perm(counts)
+dist_plot(sims, "Randomization chi-square statistics (equal days)", obs=obs, bins=24)
+pd.Series({"Counts (Mon–Fri)": dict(zip(["Mon", "Tues", "Wed", "Thurs", "Fri"], counts.astype(int))),
+           "Expected under H0": round(counts.mean(), 1),
+           "Chi-square": round(obs, 2),
+           "df": 4,
+           "p-value (chi-square)": f"{stats.chi2.sf(obs, 4):.2e}",
+           "p-value (randomization)": round(float((sims >= obs).mean()), 4)}).to_string()
+```
+
+## Exercise D.3
+
+**Are Credit Cards Used Equally Often among the Three Servers?** Two
+categorical variables (`Server` × `Credit`) → chi-square **test for
+association**, Table D.7:
+
+|       | A  | B  | C  | Total |
+|-------|---:|---:|---:|------:|
+| Cash  | 39 | 50 | 17 | 106   |
+| Card  | 21 | 15 | 15 | 51    |
+
+- $H_0$: no association between server and payment method vs $H_a$: there is
+  an association. All expected counts $\ge 5$ (smallest 10.4 for C–Card).
+- $\chi^2 = \textbf{5.82}$ on $(2-1)(3-1) = 2$ df: **p = 0.054**
+  (randomization: 0.051).
+- **Not significant at the 5% level** — though only barely. The card rates
+  differ noticeably in the sample (A 35%, B 23%, C 47%): server C leans on
+  cards and B on cash, but the gap does not clear the 5% bar with $n = 157$;
+  a larger sample would likely confirm a real association.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the chi-square statistic when payment method is unrelated to server
+tab = pd.crosstab(tips.Credit, tips.Server).reindex(index=["n", "y"], columns=["A", "B", "C"])
+obs, sims = assoc_perm(tips.Credit.to_numpy(), tips.Server.to_numpy())
+dist_plot(sims, "Randomization chi-square statistics (no association)", obs=obs, bins=24)
+pd.Series({"Card % by server (A, B, C)": (tab.loc["y"] / tab.sum(axis=0) * 100).round(1).to_dict(),
+           "Chi-square": round(obs, 2),
+           "df": 2,
+           "p-value (chi-square)": round(stats.chi2.sf(obs, 2), 4),
+           "p-value (randomization)": round(float((sims >= obs).mean()), 4)}).to_string()
+```
+
+## Exercise D.4
+
+**Are Credit Cards Used Equally Often between the Days of the Week?** Chi-square
+test for association, `Day` × `Credit`, Table D.8:
+
+|       | Mon | Tues | Wed | Thurs | Fri | Total |
+|-------|----:|-----:|----:|------:|----:|------:|
+| Cash  | 14  | 5    | 41  | 24    | 22  | 106   |
+| Card  | 6   | 8    | 21  | 12    | 4   | 51    |
+
+- $\chi^2 = \textbf{8.59}$ on $(2-1)(5-1) = 4$ df; the $\chi^2$ p-value is
+  **0.072**.
+- **Conditions are not met**: the expected count for Tuesday–Card is
+  $13 \cdot 51/157 = \textbf{4.2} < 5$, so the $\chi^2$ distribution is not a
+  reliable yardstick. The appropriate test is a **randomization test**:
+  shuffle the 157 payment methods over the fixed day counts and recompute
+  $\chi^2$ — **p ≈ 0.074**, in close agreement.
+- **Not significant at the 5% level** either way. Tuesday again stands out
+  (8 of 13 bills, 62%, paid by card — the highest of any day) against Friday's
+  15%, but with only 13 Tuesday bills the evidence is not convincing.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the chi-square statistic when payment method is unrelated to day
+tab = pd.crosstab(tips.Credit, tips.Day).reindex(index=["n", "y"], columns=order)
+exp = stats.chi2_contingency(tab, correction=False)[3]
+obs, sims = assoc_perm(tips.Credit.to_numpy(), tips.Day.to_numpy())
+dist_plot(sims, "Randomization chi-square statistics (no association)", obs=obs, bins=24)
+pd.Series({"Card % by day (Mon–Fri)": (tab.loc["y"] / tab.sum(axis=0) * 100).round(1).to_dict(),
+           "Chi-square": round(obs, 2),
+           "df": 4,
+           "p-value (chi-square)": round(stats.chi2.sf(obs, 4), 4),
+           "Smallest expected count": round(float(exp.min()), 2),
+           "p-value (randomization)": round(float((sims >= obs).mean()), 4)}).to_string()
+```
+
+## Exercise D.5
+
+**Does Average Tip Percentage Vary by Server?** One categorical (`Server`) +
+one quantitative (`PctTip`) → **ANOVA for difference in means**. The data
+reproduce Table D.9 exactly (A 17.543 ± 5.504, B 16.017 ± 3.485,
+C 16.109 ± 3.376).
+
+- $H_0: \mu_A = \mu_B = \mu_C$ vs $H_a$: at least one mean differs.
+- Conditions: independent tables; sample sizes 60/65/32 are comfortably large;
+  standard deviations are similar (largest/smallest ratio ≈ 1.6). One wrinkle:
+  server A has an **outlier** — a single **42.2%** tip — which makes the
+  $F$-distribution questionable; the randomization $F$ (no normality needed)
+  settles it.
+- $F = \textbf{2.19}$ on $(2, 154)$ df: **p = 0.115** (randomization: 0.113).
+- **Do not reject $H_0$**: no convincing difference in mean tip percentage
+  across servers. The raw gap between A (17.5%) and B/C (≈ 16%) is well within
+  what chance variation produces.
+
+```{python}
+#| echo: false
+#| fig-cap: Tip percentages by server and the randomization distribution of the ANOVA F-statistic
+pct = tips.PctTip.to_numpy(float)
+sv = tips.Server.to_numpy()
+obs, sims = f_perm(pct, sv)
+F, p = stats.f_oneway(pct[sv == "A"], pct[sv == "B"], pct[sv == "C"])
+fig, axes = plt.subplots(1, 2, figsize=(7, 3))
+sns.boxplot(x=tips.Server, y=tips.PctTip, ax=axes[0], color="#4c72b0")
+axes[0].set_xlabel("Server")
+axes[0].set_ylabel("Percent tip")
+sns.histplot(x=sims, bins=24, ax=axes[1], color="#55a868")
+axes[1].axvline(obs, color="#c44e52", ls="--", lw=1)
+axes[1].set_xlabel("Randomization F-statistics")
+plt.tight_layout()
+plt.show()
+pd.Series({"Means (A, B, C)": {s: round(pct[sv == s].mean(), 2) for s in "ABC"},
+           "F-statistic": round(F, 2),
+           "df": "(2, 154)",
+           "p-value (F-distribution)": round(p, 4),
+           "p-value (randomization)": round(float((sims >= obs).mean()), 4)}).to_string()
+```
+
+## Exercise D.6
+
+**Does Size of the Bill Vary by Server?** ANOVA again, now with `Bill` as the
+response; the data match Table D.10 (A 22.76 ± 12.71, B 21.14 ± 10.19,
+C 25.92 ± 14.35).
+
+- $H_0: \mu_A = \mu_B = \mu_C$ vs $H_a$: at least one mean bill differs.
+- Conditions: bill distributions are **right-skewed** (values to \$70.51) with
+  large spreads, but the three SDs are similar and the group sizes
+  (60/65/32) large enough for $F$; the randomization $F$ provides the
+  assumption-free check.
+- $F = \textbf{1.67}$ on $(2, 154)$ df: **p = 0.191** (randomization: 0.194).
+- **Do not reject $H_0$**: no convincing evidence that some servers get the
+  big spenders. Server C's average bill (\$25.92 vs \$21–23) is easily a
+  chance artifact here.
+
+```{python}
+#| echo: false
+#| fig-cap: Bill sizes by server and the randomization distribution of the ANOVA F-statistic
+bill = tips.Bill.to_numpy(float)
+obs, sims = f_perm(bill, sv)
+F, p = stats.f_oneway(bill[sv == "A"], bill[sv == "B"], bill[sv == "C"])
+fig, axes = plt.subplots(1, 2, figsize=(7, 3))
+sns.boxplot(x=tips.Server, y=tips.Bill, ax=axes[0], color="#4c72b0")
+axes[0].set_xlabel("Server")
+axes[0].set_ylabel("Bill ($)")
+sns.histplot(x=sims, bins=24, ax=axes[1], color="#55a868")
+axes[1].axvline(obs, color="#c44e52", ls="--", lw=1)
+axes[1].set_xlabel("Randomization F-statistics")
+plt.tight_layout()
+plt.show()
+pd.Series({"Means (A, B, C)": {s: round(bill[sv == s].mean(), 2) for s in "ABC"},
+           "F-statistic": round(F, 2),
+           "df": "(2, 154)",
+           "p-value (F-distribution)": round(p, 4),
+           "p-value (randomization)": round(float((sims >= obs).mean()), 4)}).to_string()
+```
+
+## Exercise D.7
+
+**Tip by Number of Guests: Correlation.** Two quantitative variables (`Guests`,
+`Tip`) → **test for correlation**; Figure D.3's scatterplot is reproduced below.
+
+- **(a) Yes — positive**: tips climb as parties grow (most points at 1–2
+  guests sit low, the 4–7 guest points sit high). One **outlier**: a single
+  diner (1 guest) leaving a \$15 tip on a \$60.72 bill.
+- **(b)** With $r = 0.504$ and $n = 157$:
+  $t = r\sqrt{(n-2)/(1-r^2)} = \textbf{7.26}$ on $155$ df,
+  one-tailed **p ≈ 9 × 10⁻¹²**; shuffling `Tip` 10,000 times never produces
+  $r \ge 0.504$. **Highly significant positive correlation** — larger parties
+  do leave larger tips.
+- **(c) No** — correlation never implies causation, and these are observational
+  data. The obvious confounder: **the size of the bill** — bigger parties order
+  more, bigger bills mechanically mean bigger tips (about 18% of the bill),
+  regardless of any effect of guest count itself.
+
+```{python}
+#| echo: false
+#| fig-cap: Tip vs number of guests and the randomization distribution of the correlation F-statistic
+gst = tips.Guests.to_numpy(float)
+tp = tips.Tip.to_numpy(float)
+n = len(tips)
+r = float(np.corrcoef(gst, tp)[0, 1])
+t = r * np.sqrt((n - 2) / (1 - r ** 2))
+obs, sims = r_perm(gst, tp)
+fig, axes = plt.subplots(1, 2, figsize=(7, 3))
+sns.scatterplot(x=gst, y=tp, ax=axes[0], color="#4c72b0", alpha=0.6)
+axes[0].set_xlabel("Guests")
+axes[0].set_ylabel("Tip ($)")
+sns.histplot(x=sims, bins=24, ax=axes[1], color="#55a868")
+axes[1].axvline(obs, color="#c44e52", ls="--", lw=1)
+axes[1].set_xlabel("Randomization F-statistics")
+plt.tight_layout()
+plt.show()
+pd.Series({"r": round(r, 3),
+           "t = r*sqrt((n-2)/(1-r^2))": round(t, 2),
+           "df": n - 2,
+           "One-tail p-value (t)": f"{stats.t.sf(t, n - 2):.1e}",
+           "One-tail p-value (randomization)": float((sims >= obs).mean())}).to_string()
+```
+
+## Exercise D.8
+
+**Tip by Number of Guests: Regression.** Fitting `Tip` on `Guests` reproduces
+the printed output exactly (intercept 1.1068, slope 1.3087, $t = 7.264$,
+p = 1.72e-11).
+
+- **(a)** The slope of **1.309** means: each additional guest at the table
+  adds, on average, about **\$1.31 to the tip**.
+- **(b)** For three guests: $1.1068 + 3(1.3087) = \textbf{\$5.03}$.
+- **(c)** The 95% CI for the **mean** tip at three guests, (4.57, 5.49), says:
+  across *all* tables of three guests, the average tip is between \$4.57 and
+  \$5.49 (95% confident). The 95% **prediction** interval, (0.86, 9.20), says:
+  any *single* three-guest table should usually tip somewhere between \$0.86
+  and \$9.20 — far wider, because individual tips scatter a lot (residual
+  SD ≈ \$2.10) around the line. She should **expect about \$5** from a
+  three-top, with realistic tips anywhere from under a dollar to nine dollars.
+
+```{python}
+#| echo: false
+#| fig-cap: Least-squares line predicting tip from number of guests
+lr = stats.linregress(gst, tp)
+xs = np.linspace(1, 7, 50)
+fig, ax = plt.subplots(figsize=(6, 3))
+sns.scatterplot(x=gst, y=tp, ax=ax, color="#4c72b0", alpha=0.6)
+ax.plot(xs, lr.intercept + lr.slope * xs, color="#c44e52", lw=1.5)
+ax.set_xlabel("Guests")
+ax.set_ylabel("Tip ($)")
+plt.tight_layout()
+plt.show()
+pd.Series({"Intercept": round(lr.intercept, 4),
+           "Slope (per guest)": round(lr.slope, 4),
+           "SE of slope": round(lr.stderr, 4),
+           "t": round(lr.slope / lr.stderr, 3),
+           "p-value (two-tail)": f"{lr.pvalue:.2e}",
+           "Predicted tip, 3 guests": round(lr.intercept + 3 * lr.slope, 2)}).to_string()
+```
+
+## Exercise D.9
+
+**ANOVA for Regression to Predict Tip from Bill.** Regressing `Tip` on `Bill`
+reproduces the output: $\widehat{Tip} = -0.292 + 0.182\,Bill$,
+$R^2 = 83.7\%$, $F = 797.87$.
+
+- **(a)** $R^2 = \textbf{0.837}$: **83.7% of the variation in tip amounts is
+  explained by the size of the bill** — bill size alone accounts for nearly
+  all of it, leaving only 16.3% to group size, day, server, and luck.
+- **(b)** The regression ANOVA tests $H_0: \beta = 0$ (bill is useless) vs
+  $H_a: \beta \ne 0$: $F = \textbf{797.87}$ on $(1, 155)$ df (equal to
+  $t^2 = 28.25^2$), **p < 0.0001** → **reject $H_0$**: bill size is a highly
+  effective predictor of tip. Shuffling `Tip` 10,000 times never comes close
+  to $F = 797.87$.
+
+```{python}
+#| echo: false
+#| fig-cap: Least-squares line predicting tip from bill size and the randomization distribution of the regression F-statistic
+bl = tips.Bill.to_numpy(float)
+lr = stats.linregress(bl, tp)
+r2 = lr.rvalue ** 2
+F = r2 / (1 - r2) * (n - 2)
+obs, sims = r_perm(bl, tp)
+fig, axes = plt.subplots(1, 2, figsize=(7, 3))
+sns.scatterplot(x=bl, y=tp, ax=axes[0], color="#4c72b0", alpha=0.6)
+xs = np.linspace(0, 75, 50)
+axes[0].plot(xs, lr.intercept + lr.slope * xs, color="#c44e52", lw=1.5)
+axes[0].set_xlabel("Bill ($)")
+axes[0].set_ylabel("Tip ($)")
+sns.histplot(x=sims, bins=24, ax=axes[1], color="#55a868")
+axes[1].set_xlim(0, 30)
+axes[1].set_xlabel("Randomization F-statistics (axis clipped)")
+plt.tight_layout()
+plt.show()
+pd.Series({"Slope (per $ of bill)": round(lr.slope, 4),
+           "R-squared": round(r2, 4),
+           "F-statistic": round(F, 2),
+           "df": "(1, 155)",
+           "p-value": f"{lr.pvalue:.1e}",
+           "p-value (randomization)": float((sims >= obs).mean())}).to_string()
+```
+
+## Exercise D.10
+
+**Predicting Tip from Bill and Number of Guests.** Multiple regression of
+`Tip` on `Bill` and `Guests` reproduces the printed Minitab output exactly
+(coefficients −0.2524, 0.183751, −0.0357; $F = 396.74$).
+
+- **(a)** $\widehat{Tip} = -0.252 + 0.184\,Bill - 0.036\,Guests$. For three
+  guests with a \$30 bill:
+  $-0.252 + 0.184(30) - 0.036(3) = \textbf{\$5.15}$ (\$5.16 with the printed
+  rounded coefficients).
+- **(b)** The `Bill` coefficient (0.184): each additional **dollar of bill**
+  adds \$0.184 to the predicted tip, *holding the number of guests constant*.
+  The `Guests` coefficient (−0.036): each additional guest changes the
+  predicted tip by **−\$0.036, holding bill size constant** — essentially
+  nothing, because a bigger party's tip already comes through its bigger bill.
+- **(c)** `Bill`: **p < 0.0001 — highly significant**. `Guests`: **p = 0.727 —
+  not significant**: once the bill is in the model, guest count adds no
+  predictive value.
+- **(d)** $R^2 = \textbf{0.837}$: the two predictors together explain 83.7% of
+  the variation in tips — **no improvement** over `Bill` alone (83.7% in
+  Exercise D.9), confirming guests is redundant.
+- **(e)** The regression ANOVA tests $H_0: \beta_{Bill} = \beta_{Guests} = 0$
+  (neither predictor is useful) vs $H_a$: at least one $\beta \ne 0$:
+  $F = \textbf{396.74}$ on $(2, 154)$ df, **p < 0.0001** → **reject $H_0$** —
+  the model is effective, driven entirely by the bill.
+
+```{python}
+#| echo: false
+X = np.column_stack([np.ones(n), bl, gst])
+beta = np.linalg.lstsq(X, tp, rcond=None)[0]
+resid = tp - X @ beta
+mse = (resid ** 2).sum() / (n - 3)
+se = np.sqrt(np.diag(mse * np.linalg.inv(X.T @ X)))
+tv = beta / se
+pv = 2 * stats.t.sf(np.abs(tv), n - 3)
+r2 = 1 - (resid ** 2).sum() / ((tp - tp.mean()) ** 2).sum()
+F = (((tp - tp.mean()) ** 2).sum() - (resid ** 2).sum()) / 2 / mse
+pd.Series({"Coefficients (int, Bill, Guests)": [round(b, 4) for b in beta],
+           "SEs": [round(s, 4) for s in se],
+           "t-values": [round(t, 2) for t in tv],
+           "p-values": [f"{p:.3f}" if p > 1e-4 else "<0.0001" for p in pv],
+           "R-squared": round(r2, 4),
+           "F-statistic": round(F, 2),
+           "df": "(2, 154)",
+           "p-value (ANOVA)": f"{stats.f.sf(F, 2, n - 3):.1e}",
+           "Predicted tip: $30 bill, 3 guests": round(beta[0] + 30 * beta[1] + 3 * beta[2], 2)}).to_string()
+```
+
+## Exercise D.11
+
+**Upper-tail test for correlation**, $t = 1.36$, df = 15.
+
+```{python}
+#| echo: false
+pd.Series({"p-value P(t >= 1.36), df = 15": round(stats.t.sf(1.36, 15), 4),
+           "Significant at 5%?": bool(stats.t.sf(1.36, 15) < 0.05)}).to_string()
+```
+
+**p = 0.0970 — not significant** at the 5% level.
+
+## Exercise D.12
+
+**ANOVA test**, $F = 7.42$, df (3, 56).
+
+```{python}
+#| echo: false
+pd.Series({"p-value P(F >= 7.42), df (3, 56)": round(stats.f.sf(7.42, 3, 56), 5),
+           "Significant at 5%?": bool(stats.f.sf(7.42, 3, 56) < 0.05)}).to_string()
+```
+
+**p = 0.0003 — significant**: strong evidence that the group means differ.
+
+## Exercise D.13
+
+**Chi-square goodness-of-fit**, $\chi^2 = 4.18$, 5 groups → df = $5 - 1 = 4$.
+
+```{python}
+#| echo: false
+pd.Series({"p-value P(chi2 >= 4.18), df = 4": round(stats.chi2.sf(4.18, 4), 4),
+           "Significant at 5%?": bool(stats.chi2.sf(4.18, 4) < 0.05)}).to_string()
+```
+
+**p = 0.382 — not significant**: the observed counts are entirely consistent
+with the null proportions.
+
+## Exercise D.14
+
+**Two-tailed test for slope**, $t = 2.89$, $n = 30$ → df = $n - 2 = 28$.
+
+```{python}
+#| echo: false
+pd.Series({"p-value, two-tail, df = 28": round(2 * stats.t.sf(2.89, 28), 4),
+           "Significant at 5%?": bool(2 * stats.t.sf(2.89, 28) < 0.05)}).to_string()
+```
+
+**p = 0.0074 — significant**: the slope differs from 0.
+
+## Exercise D.15
+
+**ANOVA for difference in means**, 100 people in six groups →
+df (5, $100 - 6$) = (5, 94), $F = 2.51$.
+
+```{python}
+#| echo: false
+pd.Series({"p-value P(F >= 2.51), df (5, 94)": round(stats.f.sf(2.51, 5, 94), 4),
+           "Significant at 5%?": bool(stats.f.sf(2.51, 5, 94) < 0.05)}).to_string()
+```
+
+**p = 0.0353 — significant** (just): the six group means are not all equal.
+
+## Exercise D.16
+
+**Chi-square test for a 2 × 4 table**, $\chi^2 = 6.83$ →
+df = $(2-1)(4-1) = 3$.
+
+```{python}
+#| echo: false
+pd.Series({"p-value P(chi2 >= 6.83), df = 3": round(stats.chi2.sf(6.83, 3), 4),
+           "Significant at 5%?": bool(stats.chi2.sf(6.83, 3) < 0.05)}).to_string()
+```
+
+**p = 0.0775 — not significant** at the 5% level.
+
+## Exercise D.17
+
+**Two-tailed test for a coefficient in a three-predictor regression**,
+$t = 1.83$, $n = 26$ → df = $n - 3 - 1 = 22$.
+
+```{python}
+#| echo: false
+pd.Series({"p-value, two-tail, df = 22": round(2 * stats.t.sf(1.83, 22), 4),
+           "Significant at 5%?": bool(2 * stats.t.sf(1.83, 22) < 0.05)}).to_string()
+```
+
+**p = 0.0808 — not significant** at the 5% level.
+
+## Exercise D.18
+
+**Lower-tail test for correlation**, $t = -4.51$, $n = 81$ → df = 79.
+
+```{python}
+#| echo: false
+pd.Series({"p-value P(t <= -4.51), df = 79": f"{stats.t.cdf(-4.51, 79):.2e}",
+           "Significant at 5%?": bool(stats.t.cdf(-4.51, 79) < 0.05)}).to_string()
+```
+
+**p ≈ 1.1 × 10⁻⁵ — highly significant**: clear evidence of a negative
+correlation.
+
+## Exercise D.19
+
+**Three drugs for leukemia, response = white blood cell count.**
+
+- **ANOVA for difference in means.** One categorical explanatory variable
+  (drug, 3 groups) and one quantitative response (cell count).
+- $H_0: \mu_1 = \mu_2 = \mu_3$ vs $H_a$: at least one drug's mean cell count
+  differs. ANOVA compares the variation *between* drug groups to the variation
+  *within* them via an $F$-statistic.
+
+## Exercise D.20
+
+**Three drugs for HIV-positive patients, response = develops AIDS (yes/no).**
+
+- **Chi-square test for association** (equivalently, a test for a difference
+  in proportions — with a $3 \times 2$ table both descriptions coincide).
+- $H_0$: no association between drug and AIDS development
+  ($p_1 = p_2 = p_3$) vs $H_a$: the drugs differ in AIDS rates. The response
+  is *categorical*, so ANOVA on means does not apply.
+
+## Exercise D.21
+
+**50 towns: wood-burning houses vs asthma cases.**
+
+- **Test for correlation** — and equivalently the **test for the slope** of
+  the simple regression or the **ANOVA for regression** (all three are
+  appropriate and give the same conclusion for one predictor, since
+  $F = t^2$).
+- $H_0: \rho = 0$ (no linear relationship) vs $H_a: \rho \ne 0$. Two
+  quantitative variables on towns: this is regression territory, not
+  chi-square or ANOVA.
+
+## Exercise D.22
+
+**Admissions model: predict college GPA from honors courses, AP courses, 11th-grade
+English grade, 9th-grade math grade.**
+
+- **ANOVA for regression** — four quantitative predictors of a quantitative
+  response; "test the effectiveness of the model" means the overall
+  $F$-test $H_0: \beta_1 = \beta_2 = \beta_3 = \beta_4 = 0$ vs $H_a$: at
+  least one $\beta \ne 0$.
+- Additionally, a **test for a slope/coefficient** applies to each individual
+  predictor ($H_0: \beta_i = 0$) to see which transcript variables matter.
+
+## Exercise D.23
+
+**Polling agency: check the sample's racial distribution against census proportions.**
+
+- **Chi-square goodness-of-fit test.** One categorical variable (race) whose
+  null proportions are *known in advance* from the census.
+- $H_0$: the sample's racial mix matches the city's known proportions vs
+  $H_a$: at least one group is over- or under-represented. A known reference
+  distribution is the signature of goodness-of-fit.
+
+## Exercise D.24
+
+**Cereal sales model with display height, price, aisle width, advertising.**
+
+- **Test for a slope/coefficient in a (multiple) regression model.** The
+  question targets *one* predictor — display height — within a
+  multiple-regression model, so the relevant test is
+  $H_0: \beta_{height} = 0$ vs $H_a: \beta_{height} \ne 0$, assessed with a
+  $t$-statistic (with the other predictors held in the model).
+- (The overall **ANOVA for regression** would instead address the whole
+  four-predictor model, which is not what's being asked.)
+
+## Exercise D.25
+
+**Hockey model: predict winning percentage from power-play %, penalty-kill %,
+checks/game, face-off %, penalties/game.**
+
+- **ANOVA for regression.** Five predictors, one quantitative response, and
+  the question is how effective the *model* is overall.
+- $H_0: \beta_1 = \beta_2 = \beta_3 = \beta_4 = \beta_5 = 0$ (no predictor
+  helps) vs $H_a$: at least one $\beta \ne 0$, judged by the model
+  $F$-statistic on $(5, n - 6)$ df.
+
+## Exercise D.26
+
+**Does average time to trial differ across seven counties? (25 cases each.)**
+
+- **ANOVA for difference in means.** One categorical variable (county,
+  7 groups), one quantitative response (time to trial).
+- $H_0: \mu_1 = \cdots = \mu_7$ vs $H_a$: at least one county's mean differs.
+
+## Exercise D.27
+
+**Does the proportion of cases settled out of court differ across seven
+counties? (60 cases each.)**
+
+- **Chi-square test for association.** Two categorical variables: settlement
+  (settled / not) × county (7 groups).
+- $H_0$: no association — settlement rates are the same in all seven counties
+  ($p_1 = \cdots = p_7$) vs $H_a$: at least one county differs. Because the
+  response is a *proportion*, not a mean, ANOVA does not apply.
+
+:::
