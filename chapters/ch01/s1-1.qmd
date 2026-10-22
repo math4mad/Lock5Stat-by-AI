@@ -4,24 +4,462 @@ title: "Chapter 1 · Section 1.1"
 subtitle: "Exercises — one tab per exercise"
 author: "Lock5Stat-by-AI"
 date: today
+jupyter: python3
 ---
 
-Exercises for *Statistics: Unlocking the Power of Data* (Lock⁵, 3rd ed.),
-Section 1.1. Each tab holds one exercise: question → data → analysis →
-decision, following the same template as the Phase 1/2 notes.
+Section 1.1 of Lock⁵ introduces the anatomy of a dataset: **cases** are the units
+we observe (one row per case), and **variables** are characteristics recorded on
+every case (one column per variable). A variable is **quantitative** when its
+values are numbers for which arithmetic makes sense (heights, salaries, counts)
+and **categorical** when it places each case into a group (yes/no answers,
+brands, regions). When one variable helps explain or predict another, the first
+is the **explanatory variable** and the second is the **response variable**.
+The exercises below are from *Statistics: Unlocking the Power of Data*
+(Lock⁵, 3rd ed., pp. 13–16). Skill Builders 1.1–1.10 drill the definitions; the
+rest apply them to real studies, and tabs based on Lock5 data files include a
+small executable EDA.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+sns.set_theme(style="whitegrid")
+```
 
 ::: {.panel-tabset}
 
 ## Exercise 1.1
 
-*Placeholder — filled in during Phase 3.*
+**People in a city are asked if they support a new recycling law.**
+*(Skill Builder 1: (a) the cases, (b) the variable and its type.)*
+
+- **(a) Cases:** the people in the city who were asked (the residents surveyed).
+- **(b) Variable:** whether the person supports the new recycling law
+  (support / do not support) — **categorical**, since it records group
+  membership rather than a number on which arithmetic makes sense.
 
 ## Exercise 1.2
 
-*Placeholder — filled in during Phase 3.*
+**Record the percentage change in the price of a stock for 100 stocks publicly
+traded on Wall Street.**
+
+- **(a) Cases:** the 100 stocks.
+- **(b) Variable:** percentage change in the stock's price — **quantitative**,
+  a numerical value where differences and averages are meaningful.
 
 ## Exercise 1.3
 
-*Placeholder — filled in during Phase 3.*
+**Collect data from a sample of teenagers with the question
+“Do you eat at least five servings a day of fruits and vegetables?”**
+
+- **(a) Cases:** the teenagers in the sample.
+- **(b) Variable:** the answer to the five-servings question (yes / no) —
+  **categorical**.
+
+## Exercise 1.4
+
+**Measure the shelf life of bunches of bananas (the number of days until the
+bananas go bad) for a large sample.**
+
+- **(a) Cases:** the bunches of bananas.
+- **(b) Variable:** shelf life, measured as the number of days until the
+  bananas go bad — **quantitative**.
+
+## Exercise 1.5
+
+**Estimate the bending strength of beams by bending 10 beams until they break
+and recording the force at which the beams broke.**
+
+- **(a) Cases:** the 10 beams.
+- **(b) Variable:** the force at which a beam broke (its bending strength) —
+  **quantitative**.
+
+## Exercise 1.6
+
+**Record whether or not the literacy rate is over 75% for each country in the
+world.**
+
+- **(a) Cases:** the countries of the world.
+- **(b) Variable:** whether the country's literacy rate is over 75% (yes / no) —
+  **categorical**. The underlying literacy rate is quantitative, but once it is
+  converted to an over/under-75% indicator the recorded variable is categorical.
+
+## Exercise 1.7
+
+**Lung capacity and number of years smoking cigarettes.**
+
+- **Explanatory variable:** number of years smoking cigarettes.
+- **Response variable:** lung capacity.
+
+Smoking history plausibly helps explain lung capacity, not the other way around.
+
+## Exercise 1.8
+
+**Amount of fertilizer used and the yield of a crop.**
+
+- **Explanatory variable:** amount of fertilizer used.
+- **Response variable:** yield of the crop.
+
+## Exercise 1.9
+
+**Blood alcohol content (BAC) and number of alcoholic drinks consumed.**
+
+- **Explanatory variable:** number of alcoholic drinks consumed.
+- **Response variable:** blood alcohol content (BAC).
+
+## Exercise 1.10
+
+**Year and the world record time in a marathon.**
+
+- **Explanatory variable:** year.
+- **Response variable:** world record time in the marathon.
+
+## Exercise 1.11
+
+**Student Survey Variables (Data 1.1).** Example 1.2 already classified seven
+of the variables in `StudentSurvey`; the remaining variables are `Year`,
+`Height`, `Weight`, `Siblings`, `VerbalSAT`, `MathSAT`, `SAT`, and
+`HigherSAT`.
+
+**(a) Quantitative or categorical?**
+
+| Variable | Description | Type |
+|---|---|---|
+| Year | FirstYear / Sophomore / Junior / Senior | categorical |
+| Height | height in inches | quantitative |
+| Weight | weight in pounds | quantitative |
+| Siblings | number of siblings | quantitative |
+| VerbalSAT | Verbal SAT score | quantitative |
+| MathSAT | Math SAT score | quantitative |
+| SAT | Verbal + Math SAT combined | quantitative |
+| HigherSAT | which SAT section is higher | categorical |
+
+**(b) Questions about an individual variable**, e.g. “What is the average
+height of students in the survey?” or “How many students are seniors?” — any
+question about the distribution or a summary of one variable.
+
+**(c) Questions about relationships**, e.g. “Do taller students tend to weigh
+more?” or “Do students with a higher VerbalSAT score also tend to have a
+higher MathSAT score?”
+
+*Data:* `data/ch01/StudentSurvey.csv` (Data 1.1, n = 362), downloaded from
+<https://www.lock5stat.com/datasets3e/StudentSurvey.csv>.
+
+```{python}
+#| echo: false
+ss = pd.read_csv("data/ch01/StudentSurvey.csv")
+cols8 = ["Year", "Height", "Weight", "Siblings",
+         "VerbalSAT", "MathSAT", "SAT", "HigherSAT"]
+ss[cols8].head()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: "Which SAT section is higher — Math or Verbal — among the 362 surveyed students"
+fig, ax = plt.subplots(figsize=(5, 3))
+ss["HigherSAT"].value_counts().plot.bar(ax=ax, color="#4c72b0")
+ax.set_xlabel("HigherSAT")
+ax.set_ylabel("Students")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 1.12
+
+**Countries of the World (Data 1.2).** The full `AllCountries` dataset has 217
+cases (countries) and 26 variables.
+
+**(a) Quantitative or categorical?** Categorical: `Country`, `Code`, and
+`Developed` (a 1/2/3 code labeling a development group). Quantitative: the
+remaining 23 variables — `LandArea`, `Population`, `Density`, `GDP`, `Rural`,
+`CO2`, `PumpPrice`, `Military`, `Health`, `ArmedForces`, `Internet`, `Cell`,
+`HIV`, `Hunger`, `Diabetes`, `BirthRate`, `DeathRate`, `ElderlyPop`,
+`LifeExpectancy`, `FemaleLabor`, `Unemployment`, `Energy`, `Electricity`.
+
+**(b) Questions about an individual variable**, e.g. “What is the average life
+expectancy across countries?” or “Which country has the largest population?”
+
+**(c) Questions about relationships**, e.g. “Do countries with higher internet
+use have higher GDP per capita?” or “Is the birth rate associated with life
+expectancy?”
+
+*Data:* `data/ch01/AllCountries.csv` (Data 1.2, n = 217), downloaded from
+<https://www.lock5stat.com/datasets3e/AllCountries.csv>.
+
+```{python}
+#| echo: false
+ac = pd.read_csv("data/ch01/AllCountries.csv")
+ac[["Country", "Population", "GDP", "LifeExpectancy", "Developed"]].head()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: "Distribution of life expectancy across the 217 countries"
+fig, ax = plt.subplots(figsize=(5, 3))
+ac["LifeExpectancy"].hist(bins=15, ax=ax, color="#4c72b0", edgecolor="white")
+ax.set_xlabel("Life expectancy (years)")
+ax.set_ylabel("Countries")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 1.13
+
+**Goldilocks Effect: Read to Your Kids!** 27 four-year-olds heard stories in
+three formats (audio, illustrated, animated) while an MRI machine measured
+each child's brain connectivity. Illustrated was “just right.”
+
+- **(a) Explanatory variable:** story format (audio / illustrated / animated) —
+  **categorical**.
+- **(b) Response variable:** brain connectivity as measured by the MRI —
+  **quantitative**.
+- **(c) Cases:** 27 (the four-year-old children).
+
+## Exercise 1.14
+
+**Female Gamers Face Sexual Harassment.** A research firm questioned 1151
+female gamers in Great Britain.
+
+- **(a) Cases:** the 1151 female gamers who were questioned.
+- **(b) Variables:** whether the gamer had received obscene messages while
+  playing online (**categorical**); how many hours a week she plays
+  (**quantitative**); whether she feels there are enough strong female
+  characters in games (**categorical**).
+- **(c) Dataset size:** 1151 rows (cases) and 3 columns (variables).
+
+## Exercise 1.15
+
+**Active Learning vs Passive Learning: Which is Best?** Students in a college
+physics course were randomly assigned to an active-learning or a
+passive-learning class period; afterwards they rated how much they thought
+they had learned (1–5 Likert scale) and took a 20-question multiple-choice exam.
+
+- **(a) Cases:** the students who took part in the study.
+- **(b) Variables:** teaching format, active vs passive (**categorical**);
+  perceived learning, the 1–5 Likert rating (**quantitative**, though ordinal);
+  actual learning, the score on the 20-question exam (**quantitative**).
+- **(c) Explanatory variable:** teaching format. **Response variables:**
+  perceived learning and exam score (two responses measured on each student).
+- **(d) Dataset size:** 154 + 142 = **296 rows** and **3 columns**.
+
+The interesting finding: students *thought* they learned more passively but
+*actually* learned more in the active class — a gap between perceived and real
+learning.
+
+## Exercise 1.16
+
+**Spider Sex Play.** Some maturing spiders were allowed to take part in
+near-matings (mock sex); others were isolated. When fully mature, pairs with
+mock-sex experience reached real mating significantly faster.
+
+- **Cases:** the pairs of spiders observed at real matings.
+- **Variables:** whether either partner had prior near-mating experience
+  (yes / no) — **categorical**, the explanatory variable; time to reach real
+  mating — **quantitative**, the response variable.
+
+## Exercise 1.17
+
+**Hormones and Fish Fertility.** Water samples were taken from various lakes;
+as estrogen concentration rises, fish fertility falls.
+
+- **Cases:** the lakes (the water samples taken from lakes).
+- **Variables:** estrogen concentration in the lake water, in parts per
+  trillion — **quantitative**, the explanatory variable; fertility of the fish,
+  recorded as the percent of eggs fertilized — **quantitative**, the response
+  variable.
+
+## Exercise 1.18
+
+**Fast-Twitch Muscles and Race.** A study of the *ACTN3* gene variant reported
+it in about 20% of a sample of Caucasians, 25% of a sample of Asians, and 1%
+of a sample of Africans.
+
+- **Cases:** the people in the three samples.
+- **Variables:** ethnic group (Caucasian / Asian / African) — **categorical**;
+  presence of the *ACTN3* gene variant (has it / does not) — **categorical**.
+
+Both variables are categorical; the 20%/25%/1% figures are summaries computed
+within each ethnic group.
+
+## Exercise 1.19
+
+**Largest Cities in the World.** Seven of the ten largest cities (including
+the largest, Tokyo, Japan) are in the Eastern Hemisphere and three are in the
+Western Hemisphere. Table 1.3 gives populations in millions:
+Eastern — 37, 26, 23, 22, 21, 21, 21; Western — 21, 20, 19.
+
+- **(a)** There are **10 cases** (the ten largest cities) and **two
+  variables**: Hemisphere (Eastern / Western) — **categorical** — and
+  Population, in millions — **quantitative**.
+- **(b)** The dataset with cases as rows and variables as columns:
+
+*The printed table gives only populations grouped by hemisphere (city names
+are not recorded), so rows are identified by rank.*
+
+```{python}
+#| echo: false
+cities = pd.DataFrame({
+    "Hemisphere": ["Eastern"] * 7 + ["Western"] * 3,
+    "Population": [37, 26, 23, 22, 21, 21, 21, 21, 20, 19],
+})
+cities
+```
+
+```{python}
+#| echo: false
+#| fig-cap: "Populations of the ten largest cities, colored by hemisphere"
+fig, ax = plt.subplots(figsize=(6, 3.2))
+for hemi, color in [("Eastern", "#4c72b0"), ("Western", "#c44e52")]:
+    sub = cities[cities["Hemisphere"] == hemi]
+    ax.bar(sub.index + 1, sub["Population"], color=color, label=hemi)
+ax.set_xlabel("City (ranked by population)")
+ax.set_ylabel("Population (millions)")
+ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 1.20
+
+**How Fast Do Homing Pigeons Go?** In the 2019 Midwest Classic (Topeka,
+Kansas) the fastest bird went 1676 YPM (yards per minute), about 56 mph. The
+top seven finishers included three Hens (females) and four Cocks (males).
+Table 1.4 gives speeds in YPM: Hens — 1676, 1452, 1449; Cocks — 1458, 1435,
+1418, 1413.
+
+- **(a)** There are **7 cases** (the top seven finishers) and **two
+  variables**: Sex (Hen / Cock) — **categorical** — and Speed, in YPM —
+  **quantitative**.
+- **(b)** The dataset with cases as rows and variables as columns:
+
+```{python}
+#| echo: false
+pigeons = pd.DataFrame({
+    "Sex": ["Hen"] * 3 + ["Cock"] * 4,
+    "Speed": [1676, 1452, 1449, 1458, 1435, 1418, 1413],
+})
+pigeons
+```
+
+```{python}
+#| echo: false
+#| fig-cap: "Race speeds of the top seven homing pigeons, by sex"
+fig, ax = plt.subplots(figsize=(4.5, 3))
+for sex, color in [("Hen", "#c44e52"), ("Cock", "#4c72b0")]:
+    sub = pigeons[pigeons["Sex"] == sex]
+    ax.scatter(sub["Sex"], sub["Speed"], s=70, color=color, label=sex)
+ax.set_ylabel("Speed (YPM)")
+ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 1.21
+
+**Pigeon Racing.** In the 2019 Midwest Classic, 1412 pigeons finished the
+race, and each bird's home loft, sex, distance, and speed were recorded.
+
+- **(a) Cases:** 1412 (the pigeons that finished the race).
+- **(b) Variables:** 4 in total — home loft (**categorical**), sex
+  (**categorical**), distance (**quantitative**), speed (**quantitative**).
+  So 2 categorical and 2 quantitative.
+- **(c) Dataset size:** 1412 rows and 4 columns. A loft may have several
+  different pigeons finish, so the loft is a variable, not a case identifier.
+
+## Exercise 1.22
+
+**Trans-Generational Effects of Diet.** Male rats were fed a high-fat diet or
+a normal diet; their daughters (who never ate a high-fat diet) were far more
+likely to develop metabolic syndrome if the father ate high-fat food.
+
+- **Variables:** the father's diet (high-fat vs normal) — **categorical**,
+  the explanatory variable; whether the daughter develops metabolic syndrome
+  (yes / no) — **categorical**, the response variable.
+
+Both main variables are categorical.
+
+## Exercise 1.23
+
+**Trans-Generational Effects of Environment.** Young female mice were assigned
+to an enriched environment or not; their adult offspring learned to navigate
+mazes faster even though they had never been exposed to the enrichment.
+
+- **Variables:** the mother's environment (enriched vs not enriched) —
+  **categorical**, the explanatory variable; intelligence of the offspring,
+  measured by how fast they learn to navigate mazes — **quantitative**, the
+  response variable (it could be reduced to a smarter / not-smarter label, but
+  as measured it is quantitative).
+
+## Exercise 1.24
+
+**Pennsylvania High School Seniors.** The data in `PASeniors` show results for
+a sample of 457 high-school seniors in Pennsylvania, selected at random from
+students in the Census at Schools project between 2010 and 2019. For each
+question, decide whether the answer gives a value for a **quantitative
+variable**, a **categorical variable**, or is **not a value for a variable**
+in this dataset.
+
+- **(a)** What mode of transportation do you use to get to school?
+  → **Categorical** — the answer (Car / Bus / Walk) is a value of the variable
+  `GetToSchool`.
+- **(b)** Do you have any allergies? → **Categorical** (Yes / No), the variable
+  `Allergies`.
+- **(c)** What proportion of students in this sample are vegetarians?
+  → **Not a value for a variable**: it is a summary statistic computed across
+  all 457 cases. The case-level variable `Vegetarian` (Yes / No) is
+  categorical.
+- **(d)** How many hours did you spend last week working at a paid job?
+  → **Quantitative**, the variable `WorkHours`.
+- **(e)** What is the difference between typical hours of sleep you get on
+  school nights and non-school nights? → **Not a value for a variable in this
+  dataset** as recorded: the file stores two separate quantitative variables
+  (`Sleep1`, `Sleep2`), and their per-student difference, while quantitative
+  in nature, is a derived quantity rather than one of the recorded variables.
+- **(f)** What is the maximum time (in minutes) that a student in this sample
+  needs to get to school? → **Not a value for a variable**: the maximum is a
+  summary statistic over all cases. The case-level variable `TravelTime` is
+  quantitative.
+- **(g)** If you could have a super power — invisibility, telepathy, super
+  strength, ability to fly, or ability to freeze time? → **Categorical**, the
+  variable `Superpower`.
+
+*Data:* `data/ch01/PASeniors.csv` (n = 457, 36 variables), downloaded from
+<https://www.lock5stat.com/datasets3e/PASeniors.csv>.
+
+```{python}
+#| echo: false
+pas = pd.read_csv("data/ch01/PASeniors.csv")
+pas[["GetToSchool", "Allergies", "Vegetarian", "WorkHours",
+     "Sleep1", "Sleep2", "TravelTime", "Superpower"]].head()
+```
+
+The summary quantities in (c) and (f) live at the sample level, not the case
+level:
+
+```{python}
+#| echo: false
+pd.DataFrame({
+    "Summary quantity": ["Proportion vegetarian", "Max travel time (min)"],
+    "Value": [(pas["Vegetarian"] == "Yes").mean().round(3),
+              pas["TravelTime"].max()],
+})
+```
+
+```{python}
+#| echo: false
+#| fig-cap: "How the 457 Pennsylvania seniors get to school"
+fig, ax = plt.subplots(figsize=(5, 3))
+pas["GetToSchool"].value_counts().plot.bar(ax=ax, color="#4c72b0")
+ax.set_xlabel("GetToSchool")
+ax.set_ylabel("Students")
+plt.tight_layout()
+plt.show()
+```
 
 :::
