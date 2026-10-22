@@ -1,0 +1,964 @@
+---
+execute-dir: project
+title: "Chapter 3 · Section 3.4"
+subtitle: "Bootstrap Confidence Intervals Using Percentiles — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 3.4 of Lock⁵ shows how to turn a bootstrap distribution into a
+confidence interval. The **percentile method** keeps the middle slice of the
+bootstrap statistics, chopping equal amounts from each tail: 2.5% per tail for
+95% confidence, 5% for 90%, 1% for 98%, and 0.5% for 99%. The **standard error
+method** exploits the fact that bootstrap distributions are usually roughly
+symmetric and bell-shaped and centered at the original sample statistic: a 95%
+confidence interval is then simply *statistic ± 2·SE*, where the **standard
+error (SE)** is the standard deviation of the bootstrap statistics. When the
+bootstrap distribution is roughly normal the two methods agree closely; when it
+is skewed, irregular, or multi-modal (small samples, outliers), the SE shortcut
+fails and even the percentiles deserve caution. For a **difference in means or
+proportions**, the two groups are resampled independently and the bootstrap
+statistics are the differences.
+
+The exercises below (3.112–3.149, from *Statistics: Unlocking the Power of
+Data*, Lock⁵ 3rd ed., pp. 271–277) are worked with runnable bootstraps — 5000
+resamples from a fixed seed (2026) unless an exercise specifies the
+distribution. Simulated endpoints can wiggle a few hundredths away from
+StatKey's printed values, and the book's printed percentile tables are quoted
+wherever an exercise supplies them.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+sns.set_theme(style="whitegrid")
+
+def prop_boot(x, n, seed=2026, reps=5000):
+    """Bootstrap a proportion: resample n values from a sample with x successes."""
+    rng = np.random.default_rng(seed)
+    return rng.binomial(n, x / n, reps) / n
+
+def boot_mean(data, seed=2026, reps=5000):
+    """Bootstrap distribution of the sample mean."""
+    rng = np.random.default_rng(seed)
+    data = np.asarray(data, dtype=float)
+    return data[rng.integers(0, len(data), (reps, len(data)))].mean(axis=1)
+
+def boot_diff(a, b, seed=2026, reps=5000):
+    """Bootstrap distribution of mean(a) - mean(b), resampling each group separately."""
+    rng = np.random.default_rng(seed)
+    a = np.asarray(a, dtype=float)
+    b = np.asarray(b, dtype=float)
+    ma = a[rng.integers(0, len(a), (reps, len(a)))].mean(axis=1)
+    mb = b[rng.integers(0, len(b), (reps, len(b)))].mean(axis=1)
+    return ma - mb
+
+def boot_sd(data, seed=2026, reps=5000):
+    """Bootstrap distribution of the sample standard deviation."""
+    rng = np.random.default_rng(seed)
+    data = np.asarray(data, dtype=float)
+    return data[rng.integers(0, len(data), (reps, len(data)))].std(axis=1, ddof=1)
+
+def pct_ci(s, level, nd=3):
+    """Percentile confidence interval: keep the middle `level` percent."""
+    edge = (100 - level) / 2
+    lo, hi = np.percentile(s, [edge, 100 - edge])
+    if nd == 0:
+        return int(round(lo)), int(round(hi))
+    return round(float(lo), nd), round(float(hi), nd)
+```
+
+::: {.panel-tabset}
+
+## Exercise 3.112
+
+*(Skill Builder 1: how much is chopped from each tail?)* To create a
+confidence interval from a bootstrap distribution using percentiles, indicate
+what percent of values must be chopped off from each tail:
+
+- **(a) 95%: chop 2.5% from each tail** (keep the middle 95%).
+- **(b) 90%: chop 5% from each tail.**
+- **(c) 98%: chop 1% from each tail.**
+- **(d) 99%: chop 0.5% from each tail.**
+
+## Exercise 3.113
+
+*(Skill Builder 2: same question in counts.)* If the bootstrap distribution
+contains values for 1000 bootstrap samples, how many are chopped off at each
+end?
+
+- **(a) 95%: 2.5% of 1000 = 25 values.**
+- **(b) 90%: 50 values.**
+- **(c) 98%: 10 values.**
+- **(d) 99%: 5 values.**
+
+```{python}
+#| echo: false
+chop = pd.Series({"95%": 1000 * 0.05 / 2, "90%": 1000 * 0.10 / 2,
+                  "98%": 1000 * 0.02 / 2, "99%": 1000 * 0.01 / 2}, name="Chopped at each end")
+chop.to_string()
+```
+
+## Exercise 3.114
+
+*(Skill Builders 3.114–3.119 use one process: $n = 30$, 5000 bootstrap samples,
+95% CI of 67 to 73; options A. 66 to 74, B. 67 to 73, C. 67.5 to 72.5.)* Using
+the data to find a **99%** confidence interval:
+
+- **A (66 to 74).** Higher confidence requires keeping more of the bootstrap
+  distribution, so the interval gets wider.
+
+## Exercise 3.115
+
+Using the data to find a **90%** confidence interval:
+
+- **C (67.5 to 72.5).** Lower confidence chops more from each tail, so the
+  interval gets narrower.
+
+## Exercise 3.116
+
+Using an original sample of size $n = 45$:
+
+- **C (67.5 to 72.5).** A larger sample makes the statistic less variable, so
+  the bootstrap distribution is tighter (smaller SE) and the interval narrows
+  around the same center.
+
+## Exercise 3.117
+
+Using an original sample of size $n = 16$:
+
+- **A (66 to 74).** A smaller sample makes the statistic more variable (bigger
+  SE), so the interval widens.
+
+## Exercise 3.118
+
+Using 10,000 bootstrap samples for the distribution:
+
+- **B (67 to 73).** Adding bootstrap samples only smooths the distribution;
+  the SE and the percentile endpoints stay essentially the same.
+
+## Exercise 3.119
+
+Using 1000 bootstrap samples for the distribution:
+
+- **B (67 to 73).** Same idea in reverse: 1000 samples still describe the
+  distribution well, so the interval is essentially unchanged (endpoints may
+  wobble a hair).
+
+## Exercise 3.120
+
+*(Skill Builder 4: bootstrap CI for a single proportion.)* 95% confidence
+interval if **35 agree in a random sample of 100 people**:
+
+- **$\hat{p} = 0.35$, bootstrap SE ≈ 0.048.**
+- **95% CI ≈ 0.26 to 0.45** (percentile); the SE method gives 0.35 ± 2(0.048) ≈
+  0.25 to 0.45 — the two agree closely.
+- We are 95% confident that between about 26% and 45% of the population agree.
+
+```{python}
+#| echo: false
+s = prop_boot(35, 100)
+se = s.std(ddof=1)
+pd.Series({"Sample proportion": 0.35, "Bootstrap SE": round(se, 4),
+           "SE interval (95%)": f"({0.35 - 2*se:.3f}, {0.35 + 2*se:.3f})",
+           "95% percentile CI": str(pct_ci(s, 95))}).to_string()
+```
+
+## Exercise 3.121
+
+95% confidence interval if **180 agree in a random sample of 250 people**:
+
+- **$\hat{p} = 0.72$, bootstrap SE ≈ 0.029; 95% CI ≈ 0.664 to 0.776.** With
+  $n = 250$ the interval is noticeably tighter than in Exercise 3.120.
+
+```{python}
+#| echo: false
+s = prop_boot(180, 250)
+se = s.std(ddof=1)
+pd.Series({"Sample proportion": 0.72, "Bootstrap SE": round(se, 4),
+           "SE interval (95%)": f"({0.72 - 2*se:.3f}, {0.72 + 2*se:.3f})",
+           "95% percentile CI": str(pct_ci(s, 95))}).to_string()
+```
+
+## Exercise 3.122
+
+90% confidence interval if **112 agree and 288 disagree in a random sample of
+400 people**:
+
+- **$\hat{p} = 0.28$, bootstrap SE ≈ 0.023; 90% CI ≈ 0.242 to 0.32** (middle
+  90% — 5% chopped from each tail).
+
+```{python}
+#| echo: false
+s = prop_boot(112, 400)
+pd.Series({"Sample proportion": 0.28, "Bootstrap SE": round(s.std(ddof=1), 4),
+           "90% percentile CI": str(pct_ci(s, 90))}).to_string()
+```
+
+## Exercise 3.123
+
+99% confidence interval if, in a random sample of **1000 people, 382 agree,
+578 disagree, and 40 can't decide**:
+
+- Only the agree/disagree split matters for the proportion who agree:
+  $\hat{p} = 382/1000 = 0.382$.
+- **Bootstrap SE ≈ 0.015; 99% CI ≈ 0.344 to 0.421** (0.5% chopped from each
+  tail).
+
+```{python}
+#| echo: false
+s = prop_boot(382, 1000)
+pd.Series({"Sample proportion": 0.382, "Bootstrap SE": round(s.std(ddof=1), 4),
+           "99% percentile CI": str(pct_ci(s, 99))}).to_string()
+```
+
+## Exercise 3.124
+
+**IQ Scores.** Figure 3.32 shows the bootstrap distribution of sample means for
+an original sample of 10 IQ scores (1000 bootstrap statistics, center 100.104,
+SE 4.798).
+
+- **(a) The original sample mean is about 100** (bootstrap distributions are
+  centered at the statistic: the center reads 100.104).
+- **(b) 99% CI ≈ 88 to 112.** For 99% confidence we chop 0.5% from each tail —
+  about 5 of the 1000 bootstrap values on each side — leaving the middle 99%.
+  Since the distribution looks roughly normal, this is about
+  $100.1 \pm 2.6(4.8)$, i.e. **about 87.7 to 112.5**.
+
+```{python}
+#| echo: false
+m, se, z = 100.104, 4.798, 2.576
+pd.Series({"Bootstrap center": m, "Bootstrap SE": se,
+           "99% interval": f"({m - z*se:.1f}, {m + z*se:.1f})"}).to_string()
+```
+
+## Exercise 3.125
+
+**Average Penalty Minutes in the NHL.** Table 3.14 gives percentiles from a
+bootstrap distribution of 5000 sample means for penalty minutes of Ottawa
+Senators players.
+
+- The middle 98% runs from the 1.0% percentile to the 99.0% percentile.
+- **98% CI: 14.3 to 36.7 penalty minutes.** We are 98% confident that the mean
+  penalty minutes for all NHL players (treating this team as a reasonable
+  sample) is between about 14.3 and 36.7 minutes per season.
+
+*Data:* `data/ch03/OttawaSenators2019.csv` (already on hand from Section 3.3) —
+re-running the 5000-sample bootstrap on the 26 players' penalty minutes
+(`PenMins`) lands within a hair of the printed table:
+
+```{python}
+#| echo: false
+pen = pd.read_csv("data/ch03/OttawaSenators2019.csv")["PenMins"].dropna()
+s = boot_mean(pen)
+pd.Series({"n": len(pen), "Mean penalty minutes": round(pen.mean(), 2),
+           "Bootstrap SE": round(s.std(ddof=1), 1),
+           "98% percentile CI (1%, 99%)": str(pct_ci(s, 98, 1))}).to_string()
+```
+
+## Exercise 3.126
+
+**How Important Is Regular Exercise?** In a poll of 1000 American adults, 753
+said exercise is an important part of daily life.
+
+- **$\hat{p} = 0.753$, bootstrap SE ≈ 0.014; 90% CI ≈ 0.730 to 0.776.**
+- We are 90% confident that between about 73% and 78% of American adults think
+  exercise is an important part of daily life.
+
+```{python}
+#| echo: false
+s = prop_boot(753, 1000)
+pd.Series({"Sample proportion": 0.753, "Bootstrap SE": round(s.std(ddof=1), 4),
+           "90% percentile CI": str(pct_ci(s, 90))}).to_string()
+```
+
+## Exercise 3.127
+
+**How Do Your Instructors Feel about Student Off-Task Technology Use?** Of 36
+instructors surveyed, 25 said they are bothered by student cell phone use
+during class.
+
+- **$\hat{p} = 25/36 = 0.694$, bootstrap SE ≈ 0.076; 90% CI ≈ 0.556 to 0.806.**
+- We are 90% confident that between about 56% and 81% of all college
+  instructors are bothered by student phone use in class — a wide interval,
+  since only 36 instructors were surveyed.
+
+```{python}
+#| echo: false
+s = prop_boot(25, 36)
+pd.Series({"Sample proportion": round(25/36, 3), "Bootstrap SE": round(s.std(ddof=1), 3),
+           "90% percentile CI": str(pct_ci(s, 90))}).to_string()
+```
+
+## Exercise 3.128
+
+**What Proportion of Americans Say They Are Poor?** In October 2019, 182 of
+1000 US adults described themselves as poor.
+
+- **$\hat{p} = 0.182$, bootstrap SE ≈ 0.012; 90% CI ≈ 0.162 to 0.203.**
+- We are 90% confident that between about 16% and 20% of all US adults would
+  describe themselves as poor.
+
+```{python}
+#| echo: false
+s = prop_boot(182, 1000)
+pd.Series({"Sample proportion": 0.182, "Bootstrap SE": round(s.std(ddof=1), 4),
+           "90% percentile CI": str(pct_ci(s, 90))}).to_string()
+```
+
+## Exercise 3.129
+
+**Many Europeans Don't Recognize Signs of Stroke or Heart Attack.** Of 10,228
+people surveyed across nine European countries, 4910 linked arm or shoulder
+pain to heart attacks.
+
+- **$\hat{p} = 4910/10228 = 0.480$, bootstrap SE ≈ 0.005; 99% CI ≈ 0.467 to
+  0.492.**
+- We are 99% confident that between about 46.7% and 49.2% of Europeans (from
+  these nine countries) can identify arm or shoulder pain as a symptom of a
+  heart attack.
+- **Yes — the entire interval lies below 0.5**, so we can be 99% confident the
+  proportion is less than half.
+
+```{python}
+#| echo: false
+s = prop_boot(4910, 10228)
+pd.Series({"Sample proportion": round(4910/10228, 3), "Bootstrap SE": round(s.std(ddof=1), 4),
+           "99% percentile CI": str(pct_ci(s, 99))}).to_string()
+```
+
+## Exercise 3.130
+
+**Eating Organic and 3-PBA Levels.** From the Organic Effect study, Figure 3.34
+shows a bootstrap distribution (1000 samples) of the mean 3-PBA concentration
+before the switch minus the mean after switching to organic.
+
+- **(a) Parameter:** $\mu_{Non} - \mu_{Org}$, the difference in mean 3-PBA
+  concentration (μg/g creatinine) while eating non-organic versus eating
+  organic.
+- **(b) Statistic:** $\bar{x}_{Non} - \bar{x}_{Org}$ — the bootstrap
+  distribution is centered at the statistic, about **24.5 μg/g creatinine**
+  (Figure 3.34 reads mean = 24.518).
+- **(c) 99% CI ≈ 15.5 to 35.5 μg/g creatinine** (chop 0.5% from each tail of
+  the distribution, which spans roughly 15 to 35).
+- **(d) Interpretation:** we are 99% confident that the mean 3-PBA
+  concentration is between about 15.5 and 35.5 μg/g creatinine *higher* while
+  eating non-organic than while eating organic.
+- **(e) Yes.** The entire interval is well above 0, so these data provide
+  strong evidence that 3-PBA concentrations are lower while eating organic.
+- **(f) No.** The family was not randomly assigned to a diet (no control
+  group, a single family, measurements before/after a voluntary switch), so we
+  cannot conclude that eating organic *causes* the lower concentrations.
+
+*Data:* `data/ch03/OrganicEffect.csv`, downloaded from
+<https://www.lock5stat.com/datasets3e/OrganicEffect.csv> — resampling the
+before and after measurements independently (ignoring the pairing) reproduces
+the book's distribution:
+
+```{python}
+#| echo: false
+oe = pd.read_csv("data/ch03/OrganicEffect.csv")
+p3 = oe[oe["Pesticide"] == "3-PBA"]
+non = p3["NonOrganic"].to_numpy(float)
+org = p3["Organic"].to_numpy(float)
+s = boot_diff(non, org)
+pd.Series({"n per group": len(non), "Mean non-organic": round(non.mean(), 2),
+           "Mean organic": round(org.mean(), 2),
+           "Statistic (non minus organic)": round(non.mean() - org.mean(), 2),
+           "Bootstrap SE": round(s.std(ddof=1), 2),
+           "99% percentile CI": str(pct_ci(s, 99, 2))}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the difference in mean 3-PBA concentration, non-organic minus organic
+fig, ax = plt.subplots(figsize=(6, 3))
+sns.histplot(s, bins=40, ax=ax, color="#4c72b0")
+lo, hi = pct_ci(s, 99, 2)
+for x in (lo, hi):
+    ax.axvline(x, color="#c44e52", ls="--", lw=1)
+ax.set_xlabel("Bootstrap difference in means (mcg/g creatinine)")
+ax.set_ylabel("Frequency")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 3.131
+
+**Using the Paired Nature of the Data.** The same study analyzed as a single
+sample of *differences* (before minus after for each measurement). Table 3.15
+gives percentiles of the bootstrap distribution of the mean difference.
+
+- **(a) 99% CI: 15.8 to 32.4 μg/g creatinine** — the 0.5% percentile is 15.8
+  and the 99.5% percentile is 32.4. (Our paired bootstrap of the 20 differences
+  gives a very similar 15.5 to 34.2.)
+- **(b) Interpretation:** we are 99% confident that the mean difference in 3-PBA
+  concentration (before minus after) is between 15.8 and 32.4 μg/g creatinine;
+  since the interval is entirely positive, concentrations are lower while
+  eating organic.
+- Note the interval is **narrower** than the one in Exercise 3.130 — using the
+  paired structure removes person-to-person variability.
+
+```{python}
+#| echo: false
+d = p3["Diff"].to_numpy(float)
+s = boot_mean(d, seed=2027)
+pd.Series({"n": len(d), "Mean difference": round(d.mean(), 2),
+           "Bootstrap SE": round(s.std(ddof=1), 2),
+           "99% percentile CI": str(pct_ci(s, 99, 2))}).to_string()
+```
+
+## Exercise 3.132
+
+**Investigating the Width of a Confidence Interval.** Compared to Exercise
+3.130 (unpaired), the paired interval in Exercise 3.131 was narrower. For each
+change, does the width likely **increase, decrease, or remain the same**?
+
+- **(a) Increase the sample size: decrease.** More data means a less variable
+  statistic, so the bootstrap distribution tightens.
+- **(b) Simulate more bootstrap samples: remain the same.** The width reflects
+  the sample, not how many times we resample it; extra samples just smooth the
+  picture.
+- **(c) Decrease the confidence level from 99% to 95%: decrease.** Less
+  confidence chops more from each tail.
+
+## Exercise 3.133
+
+**What Proportion Have Pesticides Detected?** Before going organic, 111 of 240
+measurements detected pesticides; while eating organic, only 24 of 240 did.
+
+- **(a)** $\hat{p}_{Non} - \hat{p}_{Org} = 111/240 - 24/240 = 0.4625 - 0.1000 =
+  \mathbf{0.3625}$.
+- **(b) 98% CI ≈ 0.275 to 0.45** (middle 98% of the bootstrap difference in
+  proportions, Figure 3.35).
+- **(c) Interpretation:** we are 98% confident that the proportion of
+  measurements with detected pesticides is between about 27.5 and 45
+  percentage points *higher* while eating non-organic than while eating
+  organic.
+
+```{python}
+#| echo: false
+rng = np.random.default_rng(2026)
+s = rng.binomial(240, 111/240, 5000) / 240 - rng.binomial(240, 24/240, 5000) / 240
+pd.Series({"Difference in proportions": 0.3625, "Bootstrap SE": round(s.std(ddof=1), 3),
+           "98% percentile CI": str(pct_ci(s, 98))}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the difference in proportions of detected pesticides
+fig, ax = plt.subplots(figsize=(6, 3))
+sns.histplot(s, bins=40, ax=ax, color="#4c72b0")
+lo, hi = pct_ci(s, 98)
+for x in (lo, hi):
+    ax.axvline(x, color="#c44e52", ls="--", lw=1)
+ax.set_xlabel("Bootstrap difference in proportions")
+ax.set_ylabel("Frequency")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 3.134
+
+**Donating Blood to Grandma?** Old mice were randomly assigned transfusions of
+blood from young or old mice; treadmill runtime (minutes) is in `YoungBlood`.
+
+- Best estimate: $\bar{x}_{Young} - \bar{x}_{Old} = 56.76 - 34.69 = \mathbf{22.1}$
+  minutes.
+- **90% CI ≈ 11.2 to 33.0 minutes.**
+- **Interpretation:** we are 90% confident that old mice getting young blood
+  run between about 11 and 33 minutes longer on the treadmill, on average, than
+  old mice getting old blood.
+
+*Data:* `data/ch02/YoungBlood.csv` (already on hand from Section 2.3):
+
+```{python}
+#| echo: false
+yb = pd.read_csv("data/ch02/YoungBlood.csv")
+yng = yb.loc[yb["Plasma"] == "Young", "Runtime"].to_numpy(float)
+old = yb.loc[yb["Plasma"] == "Old", "Runtime"].to_numpy(float)
+s = boot_diff(yng, old)
+pd.Series({"n (Young, Old)": f"{len(yng)}, {len(old)}",
+           "Mean young": round(yng.mean(), 2), "Mean old": round(old.mean(), 2),
+           "Statistic (young minus old)": round(yng.mean() - old.mean(), 2),
+           "Bootstrap SE": round(s.std(ddof=1), 2),
+           "90% percentile CI": str(pct_ci(s, 90, 1))}).to_string()
+```
+
+## Exercise 3.135
+
+**Does a Common Ingredient in Soap Increase Staph Infections?** Of 90 people
+swabbed, Table 3.16 cross-classifies triclosan detection and staph bacteria
+(24 of 37 with triclosan had staph; 15 of 53 without).
+
+- **(a) Parameter:** $p_{T} - p_{N}$, the difference in the proportion of
+  people carrying staph bacteria (those with triclosan minus those without).
+- **(b) Best estimate:** $\hat{p}_T - \hat{p}_N = 24/37 - 15/53 = 0.649 -
+  0.283 = \mathbf{0.366}$.
+- **(c) 99% CI ≈ 0.101 to 0.606.**
+- **(d)** The entire interval is above 0, so people with triclosan in their
+  systems do appear **more likely** to have staph infections. But this is an
+  observational study — people were not randomly assigned triclosan — so we
+  **cannot conclude that triclosan causes** the increase.
+
+```{python}
+#| echo: false
+rng = np.random.default_rng(2026)
+s = rng.binomial(37, 24/37, 5000) / 37 - rng.binomial(53, 15/53, 5000) / 53
+pd.Series({"Difference in proportions": round(24/37 - 15/53, 3),
+           "Bootstrap SE": round(s.std(ddof=1), 3),
+           "99% percentile CI": str(pct_ci(s, 99))}).to_string()
+```
+
+## Exercise 3.136
+
+**Heads or Tails? Purple or Orange?** Adults tend to write the first option
+they are given. Sample statistic and 90% confidence interval for $p$, the
+proportion of times the first option is written:
+
+- **(a) Heads first:** $\hat{p} = 118/140 = 0.843$; **90% CI ≈ 0.793 to 0.893**.
+- **(b) Tails first:** $\hat{p} = 57/85 = 0.671$; **90% CI ≈ 0.588 to 0.753**.
+- **(c) Purple first:** $\hat{p} = 89/99 = 0.899$; **90% CI ≈ 0.848 to 0.949**.
+- **(d) Orange first:** $\hat{p} = 79/98 = 0.806$; **90% CI ≈ 0.735 to 0.867**.
+
+All four intervals lie far above 0.5 — a strong first-option advantage in
+every case.
+
+```{python}
+#| echo: false
+rows = []
+for lab, x, n in [("a Heads first", 118, 140), ("b Tails first", 57, 85),
+                  ("c Purple first", 89, 99), ("d Orange first", 79, 98)]:
+    s = prop_boot(x, n)
+    rows.append({"Case": lab, "Sample proportion": round(x/n, 3),
+                 "90% percentile CI": str(pct_ci(s, 90))})
+pd.DataFrame(rows).set_index("Case").to_string()
+```
+
+## Exercise 3.137
+
+**Teen Vaping Surges.** In the 2019 National Youth Tobacco Survey, 435 of 1582
+teens reported using an e-cigarette in the last 30 days.
+
+- **(a) Parameter:** $p$ = the proportion of **all US teens** who used an
+  e-cigarette or vape product in the last 30 days.
+- **(b) 99% CI ≈ 0.247 to 0.303** ($\hat{p} = 435/1582 = 0.275$, bootstrap SE
+  ≈ 0.011).
+- **(c) Yes.** One third (0.333) lies above the entire interval, so we can be
+  99% confident that less than 1/3 of all US teens used e-cigarettes in the
+  last 30 days.
+
+```{python}
+#| echo: false
+s = prop_boot(435, 1582)
+pd.Series({"Sample proportion": round(435/1582, 3), "Bootstrap SE": round(s.std(ddof=1), 4),
+           "99% percentile CI": str(pct_ci(s, 99))}).to_string()
+```
+
+## Exercise 3.138
+
+**Average Tip for a Waitress.** The `RestaurantTips` data (157 bills at the
+First Crush bistro) give a 95% confidence interval for the average tip two
+ways:
+
+- Mean tip $\bar{x} = \$3.85$; bootstrap SE ≈ 0.19.
+- **SE method:** $3.85 \pm 2(0.19)$ → **3.46 to 4.23 dollars.**
+- **Percentile method:** middle 95% of the bootstrap means → **3.485 to 4.235
+  dollars.**
+- The two intervals agree to within a few cents because the bootstrap
+  distribution is roughly symmetric and bell-shaped — exactly the condition
+  under which the SE shortcut works.
+
+*Data:* `data/ch02/RestaurantTips.csv` (already on hand from Chapter 2):
+
+```{python}
+#| echo: false
+tip = pd.read_csv("data/ch02/RestaurantTips.csv")["Tip"].dropna()
+s = boot_mean(tip)
+se = s.std(ddof=1)
+pd.Series({"n": len(tip), "Mean tip": round(tip.mean(), 3),
+           "Bootstrap SE": round(se, 3),
+           "SE method (95%)": f"({tip.mean() - 2*se:.2f}, {tip.mean() + 2*se:.2f})",
+           "Percentile method (95%)": str(pct_ci(s, 95, 3))}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the mean tip with the SE interval (dashed) and percentile interval (dotted)
+fig, ax = plt.subplots(figsize=(6, 3))
+sns.histplot(s, bins=40, ax=ax, color="#4c72b0")
+for x in (tip.mean() - 2*se, tip.mean() + 2*se):
+    ax.axvline(x, color="#c44e52", ls="--", lw=1.2)
+lo, hi = pct_ci(s, 95, 3)
+for x in (lo, hi):
+    ax.axvline(x, color="#55a868", ls=":", lw=1.6)
+ax.set_xlabel("Bootstrap mean tip (dollars)")
+ax.set_ylabel("Frequency")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 3.139
+
+**Daily Tip Revenue for a Waitress.** Two intervals for the average tip: A
+(3.55 to 4.15) and B (3.35 to 4.35).
+
+- **(a) Interval A is the 90% interval** (width 0.60) **and Interval B is the
+  99% interval** (width 1.00): higher confidence always means a wider
+  interval.
+- **(b)** A waitress who waits on 20 tables per shift has expected daily tip
+  revenue of 20 times the mean tip:
+  - 90% confidence: $20 \times 3.55$ to $20 \times 4.15$ → **$71 to $83 per
+    day.**
+  - 99% confidence: $20 \times 3.35$ to $20 \times 4.35$ → **$67 to $87 per
+    day.**
+- Interpretation: if her tables are typical of this restaurant, we are 90%
+  confident her long-run average daily tip revenue is between $71 and $83
+  (99% confident it is between $67 and $87) — a range of about $20 per shift.
+
+## Exercise 3.140
+
+**Who Smokes More: Male Students or Female Students?** From the
+`StudentSurvey` data (362 students): 27 of 193 males smoke; 16 of 169 females
+smoke.
+
+- **(a)** Best estimate: $27/193 - 16/169 = 0.140 - 0.095 = \mathbf{0.045}$ —
+  **males** smoke more in this sample.
+- **(b) 99% CI ≈ −0.037 to 0.135.** The interval contains 0, so even though
+  the sample proportion is higher for males, we cannot conclude (at 99%
+  confidence) that a higher proportion of all male college students smoke.
+
+*Data:* `data/ch01/StudentSurvey.csv` (already on hand from Chapter 1):
+
+```{python}
+#| echo: false
+ss = pd.read_csv("data/ch01/StudentSurvey.csv")
+male = ss.loc[ss["Sex"] == "M", "Smoke"]
+fem = ss.loc[ss["Sex"] == "F", "Smoke"]
+xm, nm = int((male == "Yes").sum()), int(male.notna().sum())
+xf, nf = int((fem == "Yes").sum()), int(fem.notna().sum())
+rng = np.random.default_rng(2026)
+s = rng.binomial(nm, xm/nm, 5000) / nm - rng.binomial(nf, xf/nf, 5000) / nf
+pd.Series({"Males smoking": f"{xm} of {nm}", "Females smoking": f"{xf} of {nf}",
+           "Difference in proportions": round(xm/nm - xf/nf, 3),
+           "99% percentile CI": str(pct_ci(s, 99))}).to_string()
+```
+
+## Exercise 3.141
+
+**Home Field Advantage.** In a sample of 120 FA Premier League matches
+(excluding ties), the home team won 70.
+
+- **(a)** Population: all FA Premier League matches (excluding ties);
+  parameter: $p$ = the proportion of such matches won by the home team.
+- **(b)** $\hat{p} = 70/120 = \mathbf{0.583}$.
+- **(c) 90% CI ≈ 0.508 to 0.658.** We are 90% confident that between about 51%
+  and 66% of Premier League matches are won by the home team.
+- **(d) 99% CI ≈ 0.475 to 0.692.**
+- **(e)** At 90% confidence, **yes** — the whole interval is above 0.5, so a
+  home field advantage is plausible-to-likely. At 99% confidence, **no** — the
+  interval includes 0.5, so we cannot rule out an even split at that level.
+
+```{python}
+#| echo: false
+s = prop_boot(70, 120)
+pd.Series({"Sample proportion": round(70/120, 3), "Bootstrap SE": round(s.std(ddof=1), 4),
+           "90% percentile CI": str(pct_ci(s, 90)), "99% percentile CI": str(pct_ci(s, 99))}).to_string()
+```
+
+## Exercise 3.142
+
+**Using Percentiles to Estimate Tea vs Coffee Immune Response.** From the
+`ImmuneTea` data (Table 3.12), difference in mean immune response (tea minus
+coffee):
+
+- **(a) Best estimate:** $\bar{x}_T - \bar{x}_C = 34.82 - 17.70 = \mathbf{17.1}$.
+- **(b) Parameter:** $\mu_T - \mu_C$, the difference in mean immune response
+  between tea drinkers and coffee drinkers.
+- **(c) 90% CI ≈ 3.7 to 29.7.** We are 90% confident that tea drinkers' mean
+  immune response is between about 4 and 30 units higher than coffee
+  drinkers'.
+- **(d) 99% CI ≈ −3.9 to 35.5.**
+- **(e)** At 90% confidence, **yes** — the entire interval is above 0. At 99%
+  confidence, **no** — the interval contains 0, so a zero difference is still
+  plausible at that level.
+
+*Data:* `data/ch03/ImmuneTea.csv` (already on hand):
+
+```{python}
+#| echo: false
+it = pd.read_csv("data/ch03/ImmuneTea.csv")
+tea = it.loc[it["Drink"] == "Tea", "InterferonGamma"].to_numpy(float)
+cof = it.loc[it["Drink"] == "Coffee", "InterferonGamma"].to_numpy(float)
+s = boot_diff(tea, cof)
+pd.Series({"n (Tea, Coffee)": f"{len(tea)}, {len(cof)}",
+           "Mean tea": round(tea.mean(), 2), "Mean coffee": round(cof.mean(), 2),
+           "Statistic (tea minus coffee)": round(tea.mean() - cof.mean(), 2),
+           "90% percentile CI": str(pct_ci(s, 90, 1)),
+           "99% percentile CI": str(pct_ci(s, 99, 1))}).to_string()
+```
+
+## Exercise 3.143
+
+**Effect of Splitting the Bill.** In the `SplitBill` experiment, 24 subjects
+paid individually and 24 split the bill equally; 95% CI for the difference in
+mean cost (Individual minus Split):
+
+- $\bar{x}_{Ind} - \bar{x}_{Split} = 37.29 - 50.92 = \mathbf{-13.6}$ Israeli
+  shekels; bootstrap SE ≈ 3.8.
+- **95% CI ≈ −21.2 to −6.0 shekels.**
+- We are 95% confident that people ordering while paying individually spend
+  between about 6 and 21 shekels *less* per person — splitting the bill
+  nudges groups toward more expensive orders.
+
+*Data:* `data/ch01/SplitBill.csv` (already on hand from Chapter 1):
+
+```{python}
+#| echo: false
+sb = pd.read_csv("data/ch01/SplitBill.csv")
+ind = sb.loc[sb["Payment"] == "Individual", "Cost"].to_numpy(float)
+spl = sb.loc[sb["Payment"] == "Split", "Cost"].to_numpy(float)
+s = boot_diff(ind, spl)
+pd.Series({"Mean individual": round(ind.mean(), 2), "Mean split": round(spl.mean(), 2),
+           "Statistic (individual minus split)": round(ind.mean() - spl.mean(), 2),
+           "Bootstrap SE": round(s.std(ddof=1), 2),
+           "95% percentile CI": str(pct_ci(s, 95, 1))}).to_string()
+```
+
+## Exercise 3.144
+
+**St. Louis vs Atlanta Commute Times.** `CommuteAtlanta` and `CommuteStLouis`
+each contain 500 workers' commute times (minutes).
+
+- **(a)** The comparative boxplots below show Atlanta's commute times sitting
+  higher at every measure — a larger median, more spread, and many long right
+  outliers up to about 185 minutes. **Atlanta appears to have the longer
+  average commute.**
+- **(b) Parameter:** $\mu_A - \mu_S$ (mean commute time, Atlanta minus St.
+  Louis); **best estimate:** $29.11 - 21.97 = \mathbf{7.1}$ minutes.
+- **(c)** One bootstrap statistic: resample 500 Atlanta times with replacement,
+  independently resample 500 St. Louis times with replacement, and record the
+  difference in the two sample means (Atlanta minus St. Louis).
+- **(d)** The bootstrap distribution has SE ≈ 1.15, so the 95% interval is
+  $7.14 \pm 2(1.15)$ → **4.85 to 9.43 minutes** (percentile method: 4.93 to
+  9.37 — the two agree). We are 95% confident that Atlantans commute about 5
+  to 9.4 minutes longer on average than St. Louis residents.
+
+*Data:* `data/ch03/CommuteAtlanta.csv` and `data/ch03/CommuteStLouis.csv`,
+downloaded from <https://www.lock5stat.com/datasets3e/>:
+
+```{python}
+#| echo: false
+#| fig-cap: Commute times for samples of 500 workers in Atlanta and St. Louis
+ca = pd.read_csv("data/ch03/CommuteAtlanta.csv")["Time"].to_numpy(float)
+cl = pd.read_csv("data/ch03/CommuteStLouis.csv")["Time"].to_numpy(float)
+fig, ax = plt.subplots(figsize=(6, 3))
+ax.boxplot([cl, ca], vert=False, widths=0.5)
+ax.set_yticklabels(["St. Louis", "Atlanta"])
+ax.set_xlabel("Commute time (minutes)")
+plt.tight_layout()
+plt.show()
+```
+
+```{python}
+#| echo: false
+s = boot_diff(ca, cl)
+se = s.std(ddof=1)
+pd.Series({"Mean Atlanta": round(ca.mean(), 2), "Mean St. Louis": round(cl.mean(), 2),
+           "Statistic (Atlanta minus St. Louis)": round(ca.mean() - cl.mean(), 2),
+           "Bootstrap SE": round(se, 2),
+           "SE method (95%)": f"({ca.mean() - cl.mean() - 2*se:.2f}, {ca.mean() - cl.mean() + 2*se:.2f})",
+           "Percentile method (95%)": str(pct_ci(s, 95, 2))}).to_string()
+```
+
+## Exercise 3.145
+
+**Cost of Two-Year Colleges.** `SampColleges2yr` holds a sample of 50 US
+two-year colleges drawn from the population in `CollegeScores2yr`.
+
+- **(a)** Sample mean cost $\bar{x} = \$15{,}365$; **90% CI ≈ $14,026 to
+  $16,722.** We are 90% confident that the average total cost at two-year
+  colleges in the US is between about $14,000 and $16,700.
+- **(b)** The mean cost for **all** 1099 two-year colleges in
+  `CollegeScores2yr` is **$16,790** — **not** inside the interval (it sits just
+  above the upper endpoint). That is the one-in-ten chance at work: roughly 10%
+  of 90% confidence intervals miss the population mean, and this particular
+  sample of 50 landed a bit cheap.
+
+*Data:* `data/ch03/SampColleges2yr.csv`, downloaded from
+<https://www.lock5stat.com/datasets3e/SampColleges2yr.csv>; population
+`data/ch02/CollegeScores2yr.csv` (already on hand):
+
+```{python}
+#| echo: false
+smp = pd.read_csv("data/ch03/SampColleges2yr.csv")["Cost"].dropna()
+pop = pd.read_csv("data/ch02/CollegeScores2yr.csv")["Cost"].dropna()
+sa = boot_mean(smp)
+lo, hi = pct_ci(sa, 90, 0)
+pd.Series({"n (sample)": len(smp), "Sample mean cost": round(smp.mean(), 1),
+           "90% percentile CI": (lo, hi), "n (population)": len(pop),
+           "Population mean cost": round(pop.mean(), 1),
+           "Population mean inside interval?": lo <= pop.mean() <= hi}).to_string()
+```
+
+## Exercise 3.146
+
+**Cost of Four-Year Colleges.** The same exercise for `SampColleges4yr`
+(sample of 50) and the population in `CollegeScores4yr`:
+
+- **90% CI ≈ $29,559 to $35,426** around the sample mean of $32,498.
+- The mean cost for all 1850 four-year schools is **$34,277** — **yes, this
+  time the interval contains the population mean** (near its upper end).
+
+*Data:* `data/ch03/SampColleges4yr.csv`, downloaded from
+<https://www.lock5stat.com/datasets3e/SampColleges4yr.csv>; population
+`data/ch02/CollegeScores4yr.csv` (already on hand):
+
+```{python}
+#| echo: false
+smp4 = pd.read_csv("data/ch03/SampColleges4yr.csv")["Cost"].dropna()
+pop4 = pd.read_csv("data/ch02/CollegeScores4yr.csv")["Cost"].dropna()
+sa4 = boot_mean(smp4)
+lo4, hi4 = pct_ci(sa4, 90, 0)
+pd.Series({"n (sample)": len(smp4), "Sample mean cost": round(smp4.mean(), 1),
+           "90% percentile CI": (lo4, hi4), "n (population)": len(pop4),
+           "Population mean cost": round(pop4.mean(), 1),
+           "Population mean inside interval?": lo4 <= pop4.mean() <= hi4}).to_string()
+```
+
+## Exercise 3.147
+
+**Effect of Overeating for One Month: Correlation between Short-Term and
+Long-Term Weight Gain.** For 18 participants, the correlation between
+one-month weight gain and weight gain 2.5 years later is $r = 0.21$.
+
+- **(a) Parameter:** $\rho$, the population correlation between weight gain
+  during the one-month intervention and weight gain 2.5 years later; **best
+  estimate $r = 0.21$.**
+- **(b)** To get one bootstrap sample, resample the 18 **ordered pairs** with
+  replacement — keeping each person's two values (one-month gain and 2.5-year
+  gain) together.
+- **(c)** The statistic recorded is the **correlation** of the bootstrap
+  sample.
+- **(d)** The standard error is the **standard deviation of the 1000 bootstrap
+  correlations**.
+- **(e)** $0.21 \pm 2(0.14)$ → **95% CI: −0.07 to 0.49.**
+- **(f)** The interval contains 0, so it is plausible there is **no correlation
+  at all** — we are not confident the correlation is positive (even though the
+  best estimate is positive).
+- **(g)** A 90% interval would most likely be **narrower** — lower confidence
+  chops more from each tail.
+
+```{python}
+#| echo: false
+r, se = 0.21, 0.14
+pd.Series({"Best estimate": r, "SE": se,
+           "95% SE interval": f"({r - 2*se:.2f}, {r + 2*se:.2f})"}).to_string()
+```
+
+## Exercise 3.148
+
+**Mustang Prices and Car Sales.** Figure 3.37 shows bootstrap distributions of
+the **standard deviation** for two datasets.
+
+- **(a) Used Mustang prices** (thousands of dollars, `MustangPrice`, $n = 25$):
+  the bootstrap distribution in Figure 3.37(a) is roughly symmetric and
+  bell-shaped, centered at 10.721 with SE 1.743, so the interval is
+  appropriate. **95% CI: $10.72 \pm 2(1.74)$ → about 7.2 to 14.2 thousand
+  dollars.** We are 95% confident that the standard deviation of used Mustang
+  prices is between about \$7,200 and \$14,200. (Our own 5000-resample
+  bootstrap reproduces the figure: center 10.71, SE 1.76, percentile interval
+  7.05 to 13.91.)
+- **(b) Monthly sales of new cars** (658, 456, 830, 696, 385, $n = 5$): the
+  sample SD is 181.9, but the bootstrap distribution in Figure 3.37(b) is
+  **not** roughly normal — it is skewed and spread from near 0 to about 245,
+  with its center (157.722) well below the statistic. **Not appropriate** to
+  construct a confidence interval. With only five months and an outlier (830),
+  each resample's SD depends heavily on how many times the outlier lands in
+  the resample.
+
+*Data:* `data/ch03/MustangPrice.csv`, downloaded from
+<https://www.lock5stat.com/datasets3e/MustangPrice.csv>:
+
+```{python}
+#| echo: false
+mp = pd.read_csv("data/ch03/MustangPrice.csv")
+s_a = boot_sd(mp["Price"])
+sales = np.array([658, 456, 830, 696, 385], dtype=float)
+s_b = boot_sd(sales)
+se_a, se_b = s_a.std(ddof=1), s_b.std(ddof=1)
+pd.Series({
+    "(a) Sample SD, Mustang price": round(mp["Price"].std(ddof=1), 2),
+    "(a) Bootstrap center": round(s_a.mean(), 2), "(a) Bootstrap SE": round(se_a, 2),
+    "(a) SE method (95%)": f"({s_a.mean() - 2*se_a:.1f}, {s_a.mean() + 2*se_a:.1f})",
+    "(a) Percentile method (95%)": str(pct_ci(s_a, 95, 2)),
+    "(b) Sample SD, sales": round(sales.std(ddof=1), 1),
+    "(b) Bootstrap center": round(s_b.mean(), 1), "(b) Bootstrap SE": round(se_b, 1),
+    "(b) Bootstrap skewness": round(pd.Series(s_b).skew(), 2),
+    "(b) Bootstrap range": f"({s_b.min():.1f}, {s_b.max():.1f})"}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distributions of the standard deviation for Mustang prices (a) and monthly new-car sales (b)
+fig, axes = plt.subplots(1, 2, figsize=(7, 3))
+sns.histplot(s_a, bins=40, ax=axes[0], color="#4c72b0")
+axes[0].set_title("(a) Mustang prices")
+axes[0].set_xlabel("Bootstrap SD")
+axes[0].set_ylabel("Frequency")
+sns.histplot(s_b, bins=40, ax=axes[1], color="#4c72b0")
+axes[1].set_title("(b) Monthly sales")
+axes[1].set_xlabel("Bootstrap SD")
+axes[1].set_ylabel("Frequency")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 3.149
+
+**Small Sample Size and Outliers.** Bootstrap distribution of the standard
+deviation for the data 8, 10, 7, 12, 13, 8, 10, 50 ($n = 8$, sample SD 14.39):
+
+- **Shape: a series of separate, gappy clusters — not at all symmetric and
+  bell-shaped.** About 34% of resamples omit the outlier 50 entirely (SD ≈ 2);
+  the rest form one cluster for each possible number of copies of the outlier
+  (one copy → SD ≈ 14.4, two copies → ≈ 18.7, three copies → ≈ 21, ...).
+- **Not appropriate** to construct a confidence interval from this
+  distribution.
+- **Why:** with a small sample and an outlier, each resample's standard
+  deviation depends almost entirely on how many times the outlier is drawn —
+  the statistic jumps between discrete levels instead of varying smoothly, so
+  neither the SE method nor the percentiles describe a sensible interval.
+
+```{python}
+#| echo: false
+d149 = np.array([8, 10, 7, 12, 13, 8, 10, 50], dtype=float)
+rng = np.random.default_rng(2026)
+idx = rng.integers(0, len(d149), (5000, len(d149)))
+s = d149[idx].std(axis=1, ddof=1)
+ncopies = (idx == 7).sum(axis=1)
+tab = pd.DataFrame({"Bootstrap samples": pd.Series(ncopies).value_counts().sort_index(),
+                    "Mean SD": pd.Series(s).groupby(ncopies).mean().round(2)})
+tab.index.name = "Copies of the outlier 50"
+tab.to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the standard deviation for a small sample with an outlier
+fig, ax = plt.subplots(figsize=(6, 3))
+sns.histplot(s, bins=60, ax=ax, color="#4c72b0")
+ax.set_xlabel("Bootstrap SD")
+ax.set_ylabel("Frequency")
+plt.tight_layout()
+plt.show()
+```
+
+:::

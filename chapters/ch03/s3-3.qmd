@@ -1,0 +1,1039 @@
+---
+execute-dir: project
+title: "Chapter 3 · Section 3.3"
+subtitle: "Constructing Bootstrap Confidence Intervals — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 3.3 of Lock⁵ turns the bootstrap idea into a working method for
+**confidence intervals**: take a bootstrap sample by resampling the original
+data *with replacement* (matching the original sample size and the structure
+of the statistic), compute the statistic for each bootstrap sample, and use
+the spread of the resulting **bootstrap distribution** to measure how much the
+statistic varies from sample to sample. The bootstrap distribution is
+centered at the value of the original sample statistic, and its standard
+deviation estimates the **standard error (SE)**. Section 3.3 builds a 95%
+interval as **statistic ± 2·SE**; in Section 3.4 the same interval is read
+directly from the percentiles of the bootstrap distribution, and we show both
+below — when the bootstrap distribution is reasonably symmetric and
+bell-shaped the two agree closely, while for skewed or lumpy distributions
+they can differ, a useful visual warning. A confidence interval also doubles
+as a two-sided test: a value *inside* the interval is plausible for the
+parameter, a value *outside* it is not.
+The exercises below are from *Statistics: Unlocking the Power of Data*
+(Lock⁵, 3rd ed., pp. 256–262). Skill Builders 3.80–3.85 recognize possible
+bootstrap samples and read centers, standard errors, and intervals off
+bootstrap distributions; 3.86–3.103 build intervals for proportions and
+differences in proportions; 3.100–3.111 apply the method to means, a
+correlation, and a standard deviation, using real Lock⁵ datasets loaded
+below. All executable bootstraps use 5000 replicates with seed 2026, so the
+intervals are reproducible; the book's printed intervals (from StatKey runs)
+agree to within Monte Carlo wobble.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+sns.set_theme(style="whitegrid")
+
+def boot_stats(groups, stat_fn, reps=5000, seed=2026):
+    """Bootstrap statistics: resample each group in `groups` with replacement,
+    apply `stat_fn` to the list of resampled arrays, repeat `reps` times."""
+    rng = np.random.default_rng(seed)
+    out = np.empty(reps)
+    for i in range(reps):
+        res = [g[rng.integers(0, len(g), len(g))] for g in groups]
+        out[i] = stat_fn(res)
+    return out
+
+def boot_plot(boots, xlabel, bins=30, figsize=(6, 3)):
+    """Histogram of a bootstrap distribution with the middle 95% percentile lines."""
+    lo, hi = np.percentile(boots, [2.5, 97.5])
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.histplot(x=boots, bins=bins, ax=ax, color="#4c72b0")
+    for v in (lo, hi):
+        ax.axvline(v, color="#c44e52", ls="--", lw=1)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Bootstrap statistics")
+    plt.tight_layout()
+    plt.show()
+
+def boot_row(label, stat, boots, digits=3):
+    """One-row summary: statistic, bootstrap SE, statistic ± 2·SE, percentile CI."""
+    se = boots.std(ddof=1)
+    lo, hi = np.percentile(boots, [2.5, 97.5])
+    return pd.Series({
+        label: round(float(stat), digits),
+        "Bootstrap SE": round(float(se), digits),
+        "Statistic ± 2·SE": f"({stat - 2 * se:.{digits}f}, {stat + 2 * se:.{digits}f})",
+        "95% percentile CI": f"({lo:.{digits}f}, {hi:.{digits}f})",
+    })
+
+def yes_no(n_yes, n_no):
+    """Binary array: 1 = yes/agree, 0 = no."""
+    return np.repeat([1.0, 0.0], [n_yes, n_no])
+```
+
+::: {.panel-tabset}
+
+## Exercise 3.80
+
+*(Skill Builder 1: possible bootstrap samples?)* Original sample: 17, 10, 15,
+21, 13, 18 ($n = 6$). A bootstrap sample must have exactly 6 values, each
+drawn *with replacement* from the original six — so every value must be one of
+10, 13, 15, 17, 18, 21, and repeats are allowed.
+
+- **(a) 10, 12, 17, 18, 20, 21 — No.** The values 12 and 20 are not in the
+  original sample.
+- **(b) 10, 15, 17 — No.** Only 3 values; a bootstrap sample must match the
+  original sample size of 6.
+- **(c) 10, 13, 15, 17, 18, 21 — Yes.** The original six values, each drawn
+  once (each is in the original sample, and drawing each exactly once is
+  allowed).
+- **(d) 18, 13, 21, 17, 15, 13, 10 — No.** Seven values — the wrong size.
+- **(e) 13, 10, 21, 10, 18, 17 — Yes.** Every value comes from the original
+  sample, the size is 6, and the repeated 10 is fine when resampling with
+  replacement.
+
+## Exercise 3.81
+
+*(Skill Builder 1)* Original sample: 85, 72, 79, 97, 88 ($n = 5$). Each
+bootstrap sample must have 5 values drawn with replacement from the original
+five.
+
+- **(a) 79, 79, 97, 85, 88 — Yes.** All values are in the original sample; the
+  repeated 79 is allowed.
+- **(b) 72, 79, 85, 88, 97 — Yes.** The original values in a different order.
+- **(c) 85, 88, 97, 72 — No.** Only 4 values — the wrong size.
+- **(d) 88, 97, 81, 78, 85 — No.** The values 81 and 78 are not in the
+  original sample.
+- **(e) 97, 85, 79, 85, 97 — Yes.** All values from the original sample,
+  repeats allowed, correct size.
+- **(f) 72, 72, 79, 72, 79 — Yes.** Same — only 72s and 79s, but only those
+  two values are needed and repeats are allowed.
+
+## Exercise 3.82
+
+*(Skill Builder 2: estimate the statistic, standard error, and 95% confidence
+interval from Figure 3.19(a), a bootstrap distribution for a sample
+proportion. Values read from the graph; answers may vary slightly.)*
+
+- **Statistic: $\hat p \approx 0.7$** — a bootstrap distribution is centered at
+  the original sample proportion, and the dotplot peaks at about 0.7.
+- **Standard error: $SE \approx 0.05$** — the bootstrap proportions spread
+  over roughly 0.5 to 0.9, a range of about 0.4, which is about 4 standard
+  errors on either side of the center... equivalently, most values lie within
+  about 0.1 of 0.7.
+- **95% confidence interval: $0.7 \pm 2(0.05)$, from about 0.6 to 0.8.**
+- **Parameter: $p$**, the population proportion that the sample proportion
+  estimates.
+
+## Exercise 3.83
+
+*(Skill Builder 2: Figure 3.19(b), a bootstrap distribution for a sample
+mean.)*
+
+- **Statistic: $\bar x \approx 25$** — the bootstrap means center at about 25.
+- **Standard error: $SE \approx 3$** — the bootstrap means spread over roughly
+  16 to 34 (range 18 ≈ 6 SEs).
+- **95% confidence interval: $25 \pm 2(3) = 19$ to $31$.**
+- **Parameter: $\mu$**, the population mean.
+
+## Exercise 3.84
+
+*(Skill Builder 2: Figure 3.19(c), a bootstrap distribution for a sample
+correlation. Values read from the graph; answers may vary slightly.)*
+
+- **Statistic: $r \approx 0.40$** — the bootstrap correlations center at about
+  0.40, midway between the axis labels 0.25 and 0.55.
+- **Standard error: $SE \approx 0.05$** — the correlations spread over
+  roughly 0.25 to 0.55.
+- **95% confidence interval: $0.40 \pm 2(0.05)$, from about 0.3 to 0.5.**
+- **Parameter: $\rho$**, the population correlation.
+
+## Exercise 3.85
+
+*(Skill Builder 2: Figure 3.19(d), a bootstrap distribution for a difference
+in sample means.)*
+
+- **Statistic: $\bar x_1 - \bar x_2 \approx 6$** — the bootstrap differences
+  center at about 6.
+- **Standard error: $SE \approx 4$** — the differences spread over roughly
+  −4 to 16 (range 20 ≈ 5 SEs).
+- **95% confidence interval: $6 \pm 2(4) = -2$ to $14$.**
+- **Parameter: $\mu_1 - \mu_2$**, the difference in population means.
+
+## Exercise 3.86
+
+*(Skill Builder 3: single proportion — in a random sample of 100 people, 35
+agree.)* The sample proportion is $\hat p = 35/100 = 0.35$. We bootstrap by
+resampling 100 values with replacement from the sample of 35 agreements and
+65 disagreements and computing the proportion in each bootstrap sample:
+
+- **Bootstrap SE ≈ 0.048.**
+- **95% confidence interval: $0.35 \pm 2(0.048)$, from about 0.25 to 0.45.**
+- Interpretation: we are 95% sure that the proportion of the population that
+  agrees is between about 0.25 and 0.45.
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the sample proportion, 35 agree in a sample of 100
+sample = yes_no(35, 65)
+boots = boot_stats([sample], lambda r: r[0].mean())
+boot_plot(boots, "Bootstrap sample proportions")
+```
+
+```{python}
+#| echo: false
+boot_row("Sample proportion", 0.35, boots).to_string()
+```
+
+## Exercise 3.87
+
+*(Skill Builder 3)* In a random sample of 250 people, 180 agree:
+$\hat p = 180/250 = 0.72$.
+
+- **Bootstrap SE ≈ 0.028.**
+- **95% confidence interval: $0.72 \pm 2(0.028) = 0.664$ to $0.776$.**
+- We are 95% sure that the proportion of the population that agrees is
+  between 0.664 and 0.776. Notice the interval is much narrower than in
+  Exercise 3.86 — the larger sample gives a smaller standard error.
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the sample proportion, 180 agree in a sample of 250
+sample = yes_no(180, 70)
+boots = boot_stats([sample], lambda r: r[0].mean())
+boot_plot(boots, "Bootstrap sample proportions")
+```
+
+```{python}
+#| echo: false
+boot_row("Sample proportion", 0.72, boots).to_string()
+```
+
+## Exercise 3.88
+
+*(Skill Builder 3)* In a random sample of 400 people, 112 agree and 288
+disagree: $\hat p = 112/400 = 0.28$.
+
+- **Bootstrap SE ≈ 0.022.**
+- **95% confidence interval: $0.28 \pm 2(0.022)$, from about 0.235 to 0.325.**
+- We are 95% sure that the proportion of the population that agrees is
+  between about 0.235 and 0.325.
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the sample proportion, 112 agree in a sample of 400
+sample = yes_no(112, 288)
+boots = boot_stats([sample], lambda r: r[0].mean())
+boot_plot(boots, "Bootstrap sample proportions")
+```
+
+```{python}
+#| echo: false
+boot_row("Sample proportion", 0.28, boots).to_string()
+```
+
+## Exercise 3.89
+
+*(Skill Builder 3)* In a random sample of 1000 people, 382 agree, 578
+disagree, and 40 are undecided. Using the sample of 1000 with
+$\hat p = 382/1000 = 0.382$ (undecided counts as not agreeing):
+
+- **Bootstrap SE ≈ 0.015.**
+- **95% confidence interval: $0.382 \pm 2(0.015) = 0.352$ to $0.412$.**
+- We are 95% sure that the proportion of the population that agrees is
+  between 0.352 and 0.412. (If the 40 undecided people are dropped instead,
+  $\hat p = 382/960 = 0.398$ — the choice should be made before looking at
+  the data.)
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the sample proportion, 382 agree in a sample of 1000
+sample = yes_no(382, 618)
+boots = boot_stats([sample], lambda r: r[0].mean())
+boot_plot(boots, "Bootstrap sample proportions")
+```
+
+```{python}
+#| echo: false
+boot_row("Sample proportion", 0.382, boots).to_string()
+```
+
+## Exercise 3.90
+
+**Hitchhiker Snails.** Biologist Shinichiro Wada fed 174 live snails to
+birds; 26 of the snails were excreted live out the other end.
+
+- **(a)** The best estimate for the proportion of all such snails to live
+  after being eaten by a bird is the sample proportion
+  $\hat p = 26/174 \approx 0.15$.
+- **(b)** The bootstrap distribution in Figure 3.20 (mean 0.15, st. dev.
+  0.028) gives **SE ≈ 0.028**.
+- **(c)** $0.15 \pm 2(0.028) = 0.094$ to $0.206$: we are 95% sure that the
+  proportion of all snails of this type that would survive being eaten by a
+  bird is between about 0.09 and 0.21. Our own 5000-replicate bootstrap
+  below gives an almost identical interval.
+- **(d) Yes.** Since 0.20 lies within the interval from part (c), it is
+  plausible that 20% of all snails of this type live after being eaten by a
+  bird.
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the proportion of snails that survive being eaten by a bird
+snails = yes_no(26, 174 - 26)
+boots = boot_stats([snails], lambda r: r[0].mean())
+boot_plot(boots, "Bootstrap sample proportions")
+```
+
+```{python}
+#| echo: false
+boot_row("Proportion surviving", 26 / 174, boots).to_string()
+```
+
+## Exercise 3.91
+
+**Are You Distracted by Off-Task Technology in Class?** The bootstrap
+distribution of the sample proportion of students often distracted by
+off-task technology use is shown in Figure 3.21.
+
+- **(a)** The best estimate of the proportion of all students who would
+  answer yes is the center of the bootstrap distribution, **about 0.49**.
+- **(b)** **SE ≈ 0.025.** The bootstrap proportions spread over roughly 0.40
+  to 0.58, so most fall within about 0.05 of the center and half of that
+  range, about 0.025, is a typical distance from 0.49.
+- **(c)** $0.49 \pm 2(0.025) = 0.44$ to $0.54$: we are 95% sure that the
+  proportion of all students who feel they are often distracted during class
+  by off-task use of technology is between 0.44 and 0.54.
+
+## Exercise 3.92
+
+**Can You Tell a Story about Your Parents?** Of 260 US young adults (around
+age 18) who were asked, 244 could recall a story a parent had told them
+about when the parent was young.
+
+- **(a)** $\hat p = 244/260 \approx 0.938$. Bootstrapping the 260 responses
+  gives **SE ≈ 0.015** and a 95% confidence interval of
+  $0.938 \pm 2(0.015) = 0.908$ to $0.968$: we are 95% sure that the
+  proportion of all US young adults who can recall such a family story is
+  between about 0.91 and 0.97.
+- **(b) Yes.** The entire confidence interval lies above 0.90, so a
+  proportion of 0.90 or less is not plausible for the population — the
+  claim that *more than* 90% can retell a family story is supported.
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the proportion of young adults who can recall a family story
+story = yes_no(244, 260 - 244)
+boots = boot_stats([story], lambda r: r[0].mean())
+boot_plot(boots, "Bootstrap sample proportions")
+```
+
+```{python}
+#| echo: false
+boot_row("Proportion recalling", 244 / 260, boots).to_string()
+```
+
+## Exercise 3.93
+
+**Survey on Biggest Problems for US Teens.** In a representative sample of
+920 US teens, 644 said anxiety/depression is a major problem among people
+their age: $\hat p = 644/920 = 0.70$.
+
+- **Bootstrap SE ≈ 0.015.**
+- **95% confidence interval: $0.70 \pm 2(0.015) = 0.67$ to $0.73$.**
+- We are 95% sure that the proportion of all US teens who believe anxiety
+  and depression are major problems for their peers is between 0.67 and
+  0.73.
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the proportion of US teens seeing anxiety and depression as a major problem
+teens = yes_no(644, 920 - 644)
+boots = boot_stats([teens], lambda r: r[0].mean())
+boot_plot(boots, "Bootstrap sample proportions")
+```
+
+```{python}
+#| echo: false
+boot_row("Sample proportion", 0.70, boots).to_string()
+```
+
+## Exercise 3.94
+
+**Do Teen Problems Differ Based on Income Level?** From Table 3.10, teens
+saying anxiety/depression is a major problem: below \$75,000 — 386 of 536;
+above \$75,000 — 258 of 384.
+
+- **(a)** Below \$75,000: $\hat p_L = 386/536 \approx 0.720$. Above \$75,000:
+  $\hat p_H = 258/384 \approx 0.672$.
+- **(b)** The sample statistic is $\hat p_L - \hat p_H = 0.720 - 0.672 =
+  0.048$, estimating the parameter $p_L - p_H$.
+- **(c)** Bootstrapping each group separately (536 and 384 values, with
+  replacement) gives **SE ≈ 0.031**.
+- **(d)** $0.048 \pm 2(0.031) = -0.013$ to $0.110$.
+- **(e) No.** Since 0 is within the interval, a difference of zero between
+  the two income groups is plausible — the data do not convince us that the
+  proportions differ.
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the difference in proportions, lower income minus higher income teens
+low = yes_no(386, 536 - 386)
+high = yes_no(258, 384 - 258)
+boots = boot_stats([low, high], lambda r: r[0].mean() - r[1].mean())
+boot_plot(boots, "Bootstrap difference in proportions (low - high)")
+```
+
+```{python}
+#| echo: false
+boot_row("Difference (low - high)", 386 / 536 - 258 / 384, boots).to_string()
+```
+
+## Exercise 3.95
+
+**Ants on a Sandwich.** A student in Australia counted the ants that climbed
+on a piece of peanut butter sandwich left on the ground, eight times
+(Table 3.11): 43, 59, 22, 25, 36, 47, 19, 21.
+
+- **(a)** Computed below: **$\bar x = 34.0$ ants, $s = 14.63$.**
+- **(b)** Write each of the eight values on a slip of paper, put the slips in
+  a bag, and mix well. Draw one slip, record the value, *return it*, and
+  repeat until 8 values are recorded — that is one bootstrap sample.
+  Average the 8 values to get one bootstrap statistic (a bootstrap sample
+  mean).
+- **(c)** The bootstrap distribution should be roughly **bell-shaped** (the
+  original sample is roughly symmetric) and **centered at 34**, the original
+  sample mean.
+- **(d)** The parameter is $\mu$, the **mean number of ants** that would
+  climb on a piece of peanut butter sandwich left near this ant hill; the
+  best estimate is $\bar x = 34$.
+- **(e)** With SE = 4.85: $34 \pm 2(4.85) = 24.3$ to $43.7$. We are 95% sure
+  that the mean number of ants on such a sandwich piece is between about 24
+  and 44. (Our 5000-replicate bootstrap below gives SE ≈ 4.9 and an almost
+  identical interval.)
+
+```{python}
+#| echo: false
+ants = np.array([43, 59, 22, 25, 36, 47, 19, 21], dtype=float)
+pd.Series({"Mean": round(ants.mean(), 1),
+           "StDev": round(ants.std(ddof=1), 2)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the mean number of ants on a peanut butter sandwich
+boots = boot_stats([ants], lambda r: r[0].mean())
+boot_plot(boots, "Bootstrap sample means")
+```
+
+```{python}
+#| echo: false
+boot_row("Sample mean", ants.mean(), boots, digits=1).to_string()
+```
+
+## Exercise 3.96
+
+**Brain Hippocampal Size.** We use the $n = 25$ participants in the control
+group of the football/hippocampus study (Exercise 2.165,
+`FootballBrain` data) to estimate average brain hippocampus volume for all
+non-football-playing people.
+
+- **(a) Dotplot I (values from about 6000 to 10000) shows the original
+  data; Dotplot II (values from about 7000 to 8200) shows the bootstrap
+  distribution.** Bootstrap statistics vary less than individual data values,
+  so the bootstrap dotplot is the tighter one.
+- **(b)** Both plots are centered near **7600**, so $\bar x \approx 7600\ \mu L$
+  (computed from the data: $\bar x = 7602.6$).
+- **(c)** The bootstrap means in Dotplot II spread over roughly 7000 to 8200,
+  so **SE ≈ 200 μL** (our bootstrap gives SE ≈ 206).
+- **(d) Larger.** The standard deviation of the original data ($s \approx
+  1074\ \mu L$) is much larger than the standard error — dividing by
+  $\sqrt{n} = \sqrt{25} = 5$ shrinks the spread of means far below the spread
+  of individuals.
+- **(e)** $7600 \pm 2(200) = 7200$ to $8000\ \mu L$: we are 95% sure that the
+  mean hippocampal volume for all non-football-playing people is between
+  about 7200 and 8000 μL.
+
+*Data:* `data/ch02/FootballBrain.csv`, from
+<https://www.lock5stat.com/datasets3e/FootballBrain.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the mean hippocampal volume for the control group
+hipp = pd.read_csv("data/ch02/FootballBrain.csv")
+ctrl = hipp.loc[hipp.Group == "Control", "Hipp"].dropna().to_numpy(float)
+boots = boot_stats([ctrl], lambda r: r[0].mean())
+boot_plot(boots, "Bootstrap sample means (μL)")
+```
+
+```{python}
+#| echo: false
+boot_row("Sample mean (μL)", ctrl.mean(), boots, digits=0).to_string()
+```
+
+## Exercise 3.97
+
+**Rats with Compassion.** In the study, 23 of the 30 rats freed a trapped
+rat, even with chocolate as a distraction. We estimate the proportion of all
+rats that would show empathy in this way.
+
+- **(a)** The parameter is $p$, the proportion of all rats that would free a
+  trapped rat; the best estimate is $\hat p = 23/30 \approx 0.767$.
+- **(b)** Write **yes** on 23 slips of paper and **no** on 7 slips, mix them,
+  draw one slip, record it, *return it*, and repeat 30 times. The proportion
+  of yes values among the 30 draws is one bootstrap statistic.
+- **(c)** The bootstrap distribution below (from the `CompassionateRats`
+  data) is roughly bell-shaped and centered at 0.767, with **SE ≈ 0.077**.
+- **(d)** $0.767 \pm 2(0.077) = 0.613$ to $0.921$: we are 95% sure that the
+  proportion of rats likely to show empathy is between about 0.61 and 0.92.
+  (The percentile interval from our run sits slightly lower — the bootstrap
+  distribution is a bit skewed left.)
+
+*Data:* `data/ch03/CompassionateRats.csv`, from
+<https://www.lock5stat.com/datasets3e/CompassionateRats.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the proportion of rats showing empathy
+rats = pd.read_csv("data/ch03/CompassionateRats.csv")
+empathy = (rats["Empathy"] == "yes").to_numpy(float)
+boots = boot_stats([empathy], lambda r: r[0].mean())
+boot_plot(boots, "Bootstrap sample proportions")
+```
+
+```{python}
+#| echo: false
+boot_row("Proportion helping", empathy.mean(), boots).to_string()
+```
+
+## Exercise 3.98
+
+**Are Female Rats More Compassionate Than Male Rats?** All 6 of the 6 female
+rats freed the trapped rat ($\hat p_F = 1.0$) while 17 of the 24 male rats
+did so ($\hat p_M = 17/24 \approx 0.708$).
+
+- **Best estimate:** $\hat p_F - \hat p_M = 1.0 - 0.708 = 0.292$, estimating
+  $p_F - p_M$.
+- **Bootstrap SE ≈ 0.093.** As the book's footnote cautions, every bootstrap
+  sample contains only the six female values, all yes, so $\hat p_F = 1$ for
+  every bootstrap sample — all of the standard error comes from resampling
+  the male rats.
+- **95% confidence interval:** $0.292 \pm 2(0.093) = 0.105$ to $0.479$ (our
+  percentile interval: 0.125 to 0.500).
+- Since 0 is not in the interval, it is **not plausible that male and female
+  rats are equally compassionate** — the data suggest female rats are more
+  likely to show compassion. Still, the interval is wide (few females, a
+  proportion pinned at 1), so the size of the difference is uncertain.
+
+*Data:* `data/ch03/CompassionateRats.csv`, from
+<https://www.lock5stat.com/datasets3e/CompassionateRats.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the difference in proportions of empathy, females minus males
+fem = (rats.loc[rats.Sex == "F", "Empathy"] == "yes").to_numpy(float)
+male = (rats.loc[rats.Sex == "M", "Empathy"] == "yes").to_numpy(float)
+boots = boot_stats([fem, male], lambda r: r[0].mean() - r[1].mean())
+boot_plot(boots, "Bootstrap difference in proportions (F - M)")
+```
+
+```{python}
+#| echo: false
+boot_row("Difference (F - M)", fem.mean() - male.mean(), boots).to_string()
+```
+
+## Exercise 3.99
+
+**Teens Are More Likely to Send Text Messages.** Teens: $n_t = 800$,
+$\hat p_t = 0.87$; adults: $n_a = 2252$, $\hat p_a = 0.72$. Figure 3.23 shows
+the bootstrap distribution of $\hat p_t - \hat p_a$ for 5000 bootstrap
+samples.
+
+- **(a) SE = 0.015.** The bootstrap differences span roughly 0.10 to 0.20 — a
+  range of 0.10, which is about 6–7 standard errors — and the standard error
+  must be small enough that $\pm 2\,SE$ stays inside the plot, ruling out
+  0.030 and larger. (0.015 also matches the formula
+  $\sqrt{\frac{0.87 \cdot 0.13}{800} + \frac{0.72 \cdot 0.28}{2252}}$.)
+- **(b)** $0.15 \pm 2(0.015) = 0.12$ to $0.18$: we are 95% sure that the
+  proportion of teen cell phone users who send/receive text messages is
+  between 0.12 and 0.18 **higher** than the proportion of adults who do so.
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the difference in proportions of texters, teens minus adults
+teen = yes_no(round(0.87 * 800), 800 - round(0.87 * 800))
+adult = yes_no(round(0.72 * 2252), 2252 - round(0.72 * 2252))
+boots = boot_stats([teen, adult], lambda r: r[0].mean() - r[1].mean())
+boot_plot(boots, "Bootstrap difference in proportions (teen - adult)")
+```
+
+```{python}
+#| echo: false
+boot_row("Difference (teen - adult)", teen.mean() - adult.mean(), boots).to_string()
+```
+
+## Exercise 3.100
+
+**Tea, Coffee, and Your Immune System.** In a randomized experiment, 11
+participants drank five or six cups of tea a day and 10 drank coffee; after
+two weeks, interferon gamma production was measured (Table 3.12,
+`ImmuneTea` data). We estimate the effect size, the increase in average
+interferon gamma production for tea compared to coffee.
+
+- **Best estimate:** $\bar x_T - \bar x_C = 34.8 - 17.7 = 17.1$ units.
+- **Bootstrap SE ≈ 7.9** (resampling the 11 tea values and the 10 coffee
+  values separately, with replacement).
+- **95% confidence interval:** $17.1 \pm 2(7.9) = 1.3$ to $32.9$.
+- Interpretation: we are 95% sure that the mean interferon gamma production
+  for tea drinkers is between about 1 and 33 units **higher** than for
+  coffee drinkers. The interval lies (just) above 0, so the data provide
+  some evidence that drinking tea enhances interferon gamma production —
+  and this was a randomized experiment, so a causal effect is plausible.
+
+*Data:* `data/ch03/ImmuneTea.csv`, from
+<https://www.lock5stat.com/datasets3e/ImmuneTea.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the difference in mean interferon gamma, tea minus coffee
+immune = pd.read_csv("data/ch03/ImmuneTea.csv")
+tea = immune.loc[immune.Drink == "Tea", "InterferonGamma"].to_numpy(float)
+coffee = immune.loc[immune.Drink == "Coffee", "InterferonGamma"].to_numpy(float)
+boots = boot_stats([tea, coffee], lambda r: r[0].mean() - r[1].mean())
+boot_plot(boots, "Bootstrap difference in means (tea - coffee)")
+```
+
+```{python}
+#| echo: false
+boot_row("Difference (tea - coffee)", tea.mean() - coffee.mean(), boots, digits=1).to_string()
+```
+
+## Exercise 3.101
+
+**Automobile Depreciation.** For a random sample of 20 automobile models we
+record the value of the model as a new car and its value after being driven
+10 miles; the difference is the depreciation from just driving the car off
+the lot.
+
+- **(a)** Computed below from `CarDepreciation`: **$\bar x = \$2356$,
+  $s = \$858$.**
+- **(b)** The bootstrap distribution of the sample mean (below) is roughly
+  **bell-shaped**, **centered near 2356**, with **SE ≈ 187** — the spread of
+  means is far smaller than the spread of the individual depreciations.
+- **(c)** $2356 \pm 2(187) = 1982$ to $2730$: we are 95% sure that the mean
+  amount a new car depreciates by being driven off the lot is between about
+  \$1980 and \$2730.
+
+*Data:* `data/ch03/CarDepreciation.csv`, from
+<https://www.lock5stat.com/datasets3e/CarDepreciation.csv>:
+
+```{python}
+#| echo: false
+depr = pd.read_csv("data/ch03/CarDepreciation.csv")["Depreciation"].dropna()
+pd.Series({"n": len(depr), "Mean": round(depr.mean(), 0),
+           "StDev": round(depr.std(ddof=1), 0)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the mean depreciation from driving a new car off the lot
+dep = depr.to_numpy(float)
+boots = boot_stats([dep], lambda r: r[0].mean())
+boot_plot(boots, "Bootstrap sample means ($)")
+```
+
+```{python}
+#| echo: false
+boot_row("Sample mean ($)", dep.mean(), boots, digits=0).to_string()
+```
+
+## Exercise 3.102
+
+**Correlation between Price and Depreciation in Automobiles.** The
+`CarDepreciation` data contain both the **New** price and the
+**Depreciation** for the 20 automobile models.
+
+- **(a)** The correlation for the original sample is **$r = 0.126$** — only a
+  weak positive association: pricier cars tend to depreciate slightly *more*
+  dollars, but the relationship is far from strong.
+- **(b)** Bootstrapping the 20 **ordered pairs** (resampling cars, keeping
+  each car's New and Depreciation values together) gives **SE ≈ 0.23**.
+- **(c)** $0.126 \pm 2(0.23) = -0.33$ to $0.59$: we are 95% sure that the
+  correlation between new price and depreciation for all automobile models
+  is between about −0.33 and 0.59. Since 0 is in the interval, **zero
+  correlation is plausible** — despite $r = 0.126$ in this sample, the data
+  do not convince us of a linear relationship. (The percentile interval
+  below is shifted further left; with $n = 20$ the bootstrap correlation
+  distribution is irregular, another reminder to always look at the plot.)
+
+*Data:* `data/ch03/CarDepreciation.csv`, from
+<https://www.lock5stat.com/datasets3e/CarDepreciation.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the correlation between new price and depreciation
+cars = pd.read_csv("data/ch03/CarDepreciation.csv")
+newp = cars["New"].dropna().to_numpy(float)
+depv = cars["Depreciation"].dropna().to_numpy(float)
+boots = boot_stats([newp, depv], lambda r: np.corrcoef(r[0], r[1])[0, 1])
+boot_plot(boots, "Bootstrap correlations")
+```
+
+```{python}
+#| echo: false
+boot_row("Sample correlation", np.corrcoef(newp, depv)[0, 1], boots).to_string()
+```
+
+## Exercise 3.103
+
+**Headaches and Handedness.** Of 273 participants with cluster headaches,
+24 were left-handed; of 477 participants with migraine headaches, 42 were
+left-handed.
+
+- **(a)** $\hat p_C = 24/273 \approx 0.088$.
+- **(b)** Bootstrapping the 273 cluster cases gives **SE ≈ 0.017** and a 95%
+  confidence interval of $0.088 \pm 2(0.017) = 0.054$ to $0.122$: we are 95%
+  sure that the proportion of cluster headache sufferers who are
+  left-handed is between about 0.05 and 0.12.
+- **(c)** $\hat p_M = 42/477 \approx 0.088$.
+- **(d)** Bootstrapping the 477 migraine cases gives **SE ≈ 0.013** and an
+  interval of about $0.064$ to $0.114$.
+- **(e) The migraine interval is narrower.** The two sample proportions are
+  identical (0.088), but the migraine sample is larger ($n = 477$ vs
+  $n = 273$), so its bootstrap proportions vary less — a larger sample gives
+  a smaller standard error and a narrower interval.
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distributions of the proportion left-handed, cluster headaches and migraines
+cluster_b = boot_stats([yes_no(24, 273 - 24)], lambda r: r[0].mean())
+migraine_b = boot_stats([yes_no(42, 477 - 42)], lambda r: r[0].mean())
+fig, axes = plt.subplots(1, 2, figsize=(7, 3))
+for ax, b, name in [(axes[0], cluster_b, "Cluster (n = 273)"),
+                    (axes[1], migraine_b, "Migraine (n = 477)")]:
+    sns.histplot(x=b, bins=24, ax=ax, color="#4c72b0")
+    lo, hi = np.percentile(b, [2.5, 97.5])
+    for v in (lo, hi):
+        ax.axvline(v, color="#c44e52", ls="--", lw=1)
+    ax.set_title(name, fontsize=10)
+    ax.set_xlabel("Bootstrap proportions")
+plt.tight_layout()
+plt.show()
+```
+
+```{python}
+#| echo: false
+pd.concat([boot_row("Cluster (24 of 273)", 24 / 273, cluster_b),
+           boot_row("Migraine (42 of 477)", 42 / 477, migraine_b)],
+          axis=1).to_string()
+```
+
+## Exercise 3.104
+
+**How Close Do You Feel to Others?** Synchronized movement study, 264 high
+school students in Brazil. We use the closeness ratings given *before* the
+activity (**CloseBefore**, 1 = least close to 7 = most close, recorded for
+260 of the 264 participants) to estimate the mean closeness rating one
+person would assign to others in a group.
+
+- **(a)** The parameter is $\mu$, the mean closeness rating that would be
+  assigned to other group members (before the activity) by all people like
+  these students; the sample mean $\bar x$ estimates it.
+- **(b)** $\bar x = 4.87$ on the 1-to-7 scale.
+- **(c)** **SE ≈ 0.11** from the bootstrap distribution below.
+- **(d)** $4.87 \pm 2(0.11) = 4.65$ to $5.10$.
+- **(e)** We are 95% sure that the mean closeness rating assigned to others
+  before the activity is between about 4.6 and 5.1 — on average, students
+  felt moderately close to their group members even before the activity.
+
+*Data:* `data/ch03/SynchronizedMovement.csv`, from
+<https://www.lock5stat.com/datasets3e/SynchronizedMovement.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the mean closeness rating before the activity
+sync = pd.read_csv("data/ch03/SynchronizedMovement.csv")
+close_b = sync["CloseBefore"].dropna().to_numpy(float)
+boots = boot_stats([close_b], lambda r: r[0].mean())
+boot_plot(boots, "Bootstrap sample means")
+```
+
+```{python}
+#| echo: false
+boot_row("Sample mean (CloseBefore)", close_b.mean(), boots).to_string()
+```
+
+## Exercise 3.105
+
+**Does Synchronization Increase Feelings of Closeness?** We use the
+closeness ratings given *after* the activity (**CloseAfter**) to estimate
+the difference in mean rating between those who just did a synchronized
+activity and those who did a non-synchronized one.
+
+- **(a)** The parameter is $\mu_S - \mu_N$, the difference in mean closeness
+  rating between all people who do a synchronized activity and all who do a
+  non-synchronized one.
+- **(b)** $\bar x_S - \bar x_N = 5.275 - 4.810 = 0.466$ (synchronization is
+  associated with closeness about half a scale-point higher).
+- **(c)** **SE ≈ 0.23** from the bootstrap distribution below (resampling
+  the 138 synchronized and 126 non-synchronized ratings separately).
+- **(d)** $0.466 \pm 2(0.228) = 0.009$ to $0.921$.
+- **(e)** We are 95% sure that synchronized activity increases the mean
+  closeness rating by between about 0.01 and 0.92 points. Since 0 is (just)
+  outside the interval, the data provide modest evidence that
+  synchronization really does increase feelings of closeness — and this was
+  a randomized experiment.
+
+*Data:* `data/ch03/SynchronizedMovement.csv`, from
+<https://www.lock5stat.com/datasets3e/SynchronizedMovement.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the difference in mean closeness, synchronized minus not
+close_y = sync.loc[sync.Synch == "yes", "CloseAfter"].dropna().to_numpy(float)
+close_n = sync.loc[sync.Synch == "no", "CloseAfter"].dropna().to_numpy(float)
+boots = boot_stats([close_y, close_n], lambda r: r[0].mean() - r[1].mean())
+boot_plot(boots, "Bootstrap difference in means (yes - no)")
+```
+
+```{python}
+#| echo: false
+boot_row("Difference (yes - no)", close_y.mean() - close_n.mean(), boots).to_string()
+```
+
+## Exercise 3.106
+
+**Does Synchronization Boost Pain Tolerance?** We use the pain tolerance
+ratings after the activity (**PainTolerance**, up to 300 mmHg) to estimate
+the difference in mean pain tolerance between synchronized and
+non-synchronized groups (ignoring exertion level).
+
+- **(a)** The parameter is $\mu_S - \mu_N$, the difference in mean pain
+  tolerance between all people who complete a synchronized activity and all
+  who complete a non-synchronized one.
+- **(b)** $\bar x_S - \bar x_N = 224.4 - 211.1 = 13.3$ mmHg.
+- **(c)** **SE ≈ 9.2** from the bootstrap distribution below.
+- **(d)** $13.3 \pm 2(9.2) = -5.1$ to $31.8$.
+- **(e)** We are 95% sure that the difference in mean pain tolerance between
+  synchronized and non-synchronized groups is between about −5 and 32 mmHg.
+  Since 0 is *within* the interval, a zero effect is plausible — on its own,
+  synchronization does not (yet) convince us it boosts pain tolerance.
+
+*Data:* `data/ch03/SynchronizedMovement.csv`, from
+<https://www.lock5stat.com/datasets3e/SynchronizedMovement.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the difference in mean pain tolerance, synchronized minus not
+pt_y = sync.loc[sync.Synch == "yes", "PainTolerance"].dropna().to_numpy(float)
+pt_n = sync.loc[sync.Synch == "no", "PainTolerance"].dropna().to_numpy(float)
+boots = boot_stats([pt_y, pt_n], lambda r: r[0].mean() - r[1].mean())
+boot_plot(boots, "Bootstrap difference in means (yes - no)")
+```
+
+```{python}
+#| echo: false
+boot_row("Difference (yes - no)", pt_y.mean() - pt_n.mean(), boots, digits=2).to_string()
+```
+
+## Exercise 3.107
+
+**Does Exertion Boost Pain Tolerance?** We use the same pain tolerance
+ratings to estimate the difference in mean pain tolerance between high and
+low exertion groups (ignoring synchronization).
+
+- **(a)** The parameter is $\mu_H - \mu_L$, the difference in mean pain
+  tolerance between all people who complete a high exertion activity and
+  all who complete a low exertion one.
+- **(b)** $\bar x_H - \bar x_L = 224.1 - 211.4 = 12.7$ mmHg.
+- **(c)** **SE ≈ 9.0** from the bootstrap distribution below.
+- **(d)** $12.717 \pm 2(9.0) = -5.283$ to $30.717$.
+- **(e)** We are 95% sure that the difference in mean pain tolerance between
+  high and low exertion groups is between about −5 and 31 mmHg. Since 0 is
+  within the interval, even this fairly large observed difference of 12.7
+  mmHg does not convince us that exertion boosts pain tolerance — the
+  variability between people is just too large relative to the effect.
+
+*Data:* `data/ch03/SynchronizedMovement.csv`, from
+<https://www.lock5stat.com/datasets3e/SynchronizedMovement.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the difference in mean pain tolerance, high minus low exertion
+pt_h = sync.loc[sync.Exertion == "high", "PainTolerance"].dropna().to_numpy(float)
+pt_l = sync.loc[sync.Exertion == "low", "PainTolerance"].dropna().to_numpy(float)
+boots = boot_stats([pt_h, pt_l], lambda r: r[0].mean() - r[1].mean())
+boot_plot(boots, "Bootstrap difference in means (high - low)")
+```
+
+```{python}
+#| echo: false
+boot_row("Difference (high - low)", pt_h.mean() - pt_l.mean(), boots, digits=2).to_string()
+```
+
+## Exercise 3.108
+
+**What Proportion Go to Maximum Pressure?** In the synchronized movement
+study, 75 of the 264 people let the blood pressure cuff reach its maximum
+level of 300 mmHg without ever saying the pain was too much
+(**MaxPressure** = yes).
+
+- **(a)** The parameter is $p$, the proportion of all people who would let
+  the pressure reach its maximum level; the sample proportion
+  $\hat p = 75/264 \approx 0.284$ estimates it.
+- **(b)** $\hat p = 0.284$.
+- **(c)** **SE ≈ 0.028** from the bootstrap distribution below.
+- **(d)** $0.284 \pm 2(0.028) = 0.228$ to $0.340$.
+- **(e)** We are 95% sure that the proportion of people who would allow the
+  pressure to reach its maximum level is between about 0.23 and 0.34 —
+  somewhere between a fifth and a third of people are willing to endure the
+  maximum pain.
+
+*Data:* `data/ch03/SynchronizedMovement.csv`, from
+<https://www.lock5stat.com/datasets3e/SynchronizedMovement.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the proportion going to maximum pressure
+maxp = (sync["MaxPressure"] == "yes").to_numpy(float)
+boots = boot_stats([maxp], lambda r: r[0].mean())
+boot_plot(boots, "Bootstrap sample proportions")
+```
+
+```{python}
+#| echo: false
+boot_row("Proportion at maximum", maxp.mean(), boots).to_string()
+```
+
+## Exercise 3.109
+
+**Are Males or Females More Likely to Go to Maximum Pressure?** 33 of the
+165 females and 42 of the 99 males allowed the pressure to reach 300 mmHg.
+
+- **(a)** The parameter is $p_F - p_M$, the difference in the proportion who
+  would go to maximum pressure between females and males.
+- **(b)** $\hat p_F - \hat p_M = 33/165 - 42/99 = 0.200 - 0.424 = -0.224$.
+- **(c)** **SE ≈ 0.059** from the bootstrap distribution below (resampling
+  the 165 females and 99 males separately).
+- **(d)** $-0.224 \pm 2(0.059) = -0.342$ to $-0.106$.
+- **(e)** We are 95% sure that the proportion of females who would go to
+  maximum pressure is between 0.106 and 0.342 **lower** than the proportion
+  of males. Since 0 is not in the interval, the data convince us that males
+  are more likely to tolerate the maximum pressure.
+
+*Data:* `data/ch03/SynchronizedMovement.csv`, from
+<https://www.lock5stat.com/datasets3e/SynchronizedMovement.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the difference in proportions going to maximum pressure, females minus males
+fp = (sync.loc[sync.Sex == "f", "MaxPressure"] == "yes").to_numpy(float)
+mp = (sync.loc[sync.Sex == "m", "MaxPressure"] == "yes").to_numpy(float)
+boots = boot_stats([fp, mp], lambda r: r[0].mean() - r[1].mean())
+boot_plot(boots, "Bootstrap difference in proportions (F - M)")
+```
+
+```{python}
+#| echo: false
+boot_row("Difference (F - M)", fp.mean() - mp.mean(), boots).to_string()
+```
+
+## Exercise 3.110
+
+**NHL Penalty Minutes.** Points and penalty minutes for the 26 Ottawa
+Senators players in 2018–2019 (`OttawaSenators2019` data), viewed as a
+sample of all NHL players.
+
+- **(a)** The dotplot/histogram of the original penalty minutes (below, left)
+  is strongly **skewed to the right**: most players sit between 2 and 35
+  minutes while a few outliers stretch up to 56, 75, 81, and 89.
+- **(b)** Computed below: **$\bar x = 24.46$ minutes, $s = 24.92$ minutes.**
+- **(c)** The bootstrap distribution of the sample mean (below, right) is
+  **much more symmetric and bell-shaped than the original data** — averaging
+  26 values washes out the skew — and is centered at 24.46.
+- **(d)** The standard deviation of the bootstrap means is the standard
+  error, **SE ≈ 4.7 minutes** — far smaller than $s = 24.92$, roughly
+  $s/\sqrt{n} = 24.92/\sqrt{26}$.
+- **(e)** $24.46 \pm 2(4.7) = 15.1$ to $33.9$: we are 95% sure that the mean
+  penalty minutes for all NHL players is between about 15 and 34 minutes
+  per season.
+- **(f)** One team is **not a random sample of the league**: rosters are
+  built deliberately (some teams carry an "enforcer" who racks up penalty
+  minutes), teams differ in style and discipline, opponents and schedules
+  differ, and teammates' minutes are not independent of one another. The
+  Senators' mean could be systematically above or below the league mean.
+
+*Data:* `data/ch03/OttawaSenators2019.csv`, from
+<https://www.lock5stat.com/datasets3e/OttawaSenators2019.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Penalty minutes for Ottawa Senators players and the bootstrap distribution of the sample mean
+sen = pd.read_csv("data/ch03/OttawaSenators2019.csv")
+pen = sen["PenMins"].dropna().to_numpy(float)
+fig, axes = plt.subplots(1, 2, figsize=(7, 3))
+sns.histplot(x=pen, bins=12, ax=axes[0], color="#4c72b0")
+axes[0].set_title("Original data (n = 26)", fontsize=10)
+axes[0].set_xlabel("Penalty minutes")
+boots = boot_stats([pen], lambda r: r[0].mean())
+sns.histplot(x=boots, bins=24, ax=axes[1], color="#4c72b0")
+lo, hi = np.percentile(boots, [2.5, 97.5])
+for v in (lo, hi):
+    axes[1].axvline(v, color="#c44e52", ls="--", lw=1)
+axes[1].set_title("Bootstrap means (5000 samples)", fontsize=10)
+axes[1].set_xlabel("Bootstrap sample means")
+plt.tight_layout()
+plt.show()
+```
+
+```{python}
+#| echo: false
+boot_row("Sample mean (PenMins)", pen.mean(), boots, digits=2).to_string()
+```
+
+## Exercise 3.111
+
+**Standard Deviation of NHL Penalty Minutes.** The sample of 26 Senators
+players has a fairly large standard deviation, $s = 24.92$ minutes. We
+bootstrap the **standard deviation**: resample 26 penalty minute values with
+replacement and compute the standard deviation of each bootstrap sample.
+
+- The bootstrap distribution below is centered near the original $s$ (slightly
+  below it, since the sample standard deviation is a biased-high estimate
+  corrected only on average) and is noticeably skewed.
+- **Bootstrap SE ≈ 4.4.**
+- **95% confidence interval (Section 3.3 method):**
+  $s \pm 2 \cdot SE = 24.92 \pm 2(4.35) = 16.2$ to $33.6$ minutes: we are
+  95% sure that the standard deviation of penalty minutes for all NHL
+  players is between about 16 and 34 minutes.
+- Because the bootstrap distribution is skewed, the percentile interval from
+  our run (14.3 to 31.4) sits a bit lower than the ± 2·SE interval — a good
+  example of the two methods disagreeing when the bootstrap distribution is
+  not bell-shaped.
+
+*Data:* `data/ch03/OttawaSenators2019.csv`, from
+<https://www.lock5stat.com/datasets3e/OttawaSenators2019.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the standard deviation of penalty minutes
+boots = boot_stats([pen], lambda r: r[0].std(ddof=1))
+boot_plot(boots, "Bootstrap standard deviations")
+```
+
+```{python}
+#| echo: false
+boot_row("Sample SD (PenMins)", pen.std(ddof=1), boots, digits=2).to_string()
+```
+
+:::

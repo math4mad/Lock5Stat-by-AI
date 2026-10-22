@@ -1,0 +1,999 @@
+---
+execute-dir: project
+title: "Chapter 3 · Section 3.1"
+subtitle: "Sampling Distributions — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 3.1 of Lock⁵ introduces the language that the rest of inference is
+built on. A **parameter** is a number that describes a population — a mean
+$\mu$, a proportion $p$, a correlation $\rho$, a difference in means
+$\mu_1 - \mu_2$ or in proportions $p_1 - p_2$ — and is fixed, though usually
+unknown. A **statistic** is the corresponding number computed from a sample
+($\bar{x}$, $\hat{p}$, $r$, ...) and **varies from sample to sample**: take a
+different random sample and you generally get a different value. The
+collection of statistic values over many random samples of the same size is
+the **sampling distribution** of the statistic. Two facts make it useful:
+statistics from random samples tend to be **centered at the population
+parameter** (no systematic **bias** — a biased sampling method produces
+statistics centered at the wrong value), and the spread of the sampling
+distribution — measured by its **standard error** — shrinks as the **sample
+size grows**, so larger samples give more precise estimates.
+The exercises below are from *Statistics: Unlocking the Power of Data*
+(Lock⁵, 3rd ed., pp. 225–232). Skill Builders 3.1–3.5 identify parameters and
+statistics, 3.6–3.11 practice notation, 3.12–3.19 read sampling distributions
+off Figure 3.5, and 3.20–3.42 apply the ideas to real settings — several are
+simulated below with data already downloaded for earlier sections plus
+`ICUAdmissions`, `OttawaSenators2019`, `FloridaLakes`, `NFLContracts2019` and
+`RockandRoll2019`. Values that depend on a particular set of random samples
+(your samples, our simulated samples) will differ from run to run.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+sns.set_theme(style="whitegrid")
+
+def sim_props(p, n, reps=10000, seed=2026):
+    """Sampling distribution of p-hat from many binomial samples."""
+    rng = np.random.default_rng(seed)
+    return rng.binomial(n, p, reps) / n
+
+def sim_means(data, n, reps=5000, seed=2026):
+    """Sampling distribution of x-bar by resampling from a population."""
+    rng = np.random.default_rng(seed)
+    data = np.asarray(data, dtype=float)
+    return data[rng.integers(0, len(data), size=(reps, n))].mean(axis=1)
+```
+
+::: {.panel-tabset}
+
+## Exercise 3.1
+
+*(Skill Builder 1: parameter or statistic?)* Average household income for all
+houses in the US, using data from the US Census.
+
+- **Parameter, notated $\mu$.** The Census covers the entire population of
+  interest, so the average describes the population itself.
+
+## Exercise 3.2
+
+Correlation between height and weight for players on the 2020 Brazil World Cup
+Team, using data from all players on the roster.
+
+- **Parameter, notated $\rho$.** Data from *all* players on the roster means
+  the whole population is measured.
+
+## Exercise 3.3
+
+Proportion of people who use an electric toothbrush, using data from a sample
+of 300 adults.
+
+- **Statistic, notated $\hat{p}$.** The value comes from a sample of 300, one
+  of many possible samples.
+
+## Exercise 3.4
+
+Proportion of registered voters in a county who voted in the last election,
+using data from the county voting records.
+
+- **Parameter, notated $p$.** The voting records give every registered voter
+  in the county — the full population.
+
+## Exercise 3.5
+
+Average number of television sets per household in North Carolina, using data
+from a sample of 1000 households.
+
+- **Statistic, notated $\bar{x}$.** The average comes from a sample of 1000
+  households and would vary from sample to sample.
+
+## Exercise 3.6
+
+*(Skill Builder 2: correct notation and value.)* Proportion of families in the
+US who were homeless in 2010: about 170,000 homeless families out of 78
+million families total (2010 Census).
+
+- All families in the US are included, so this is a **parameter**:
+  $p = \frac{170{,}000}{78{,}000{,}000} = \mathbf{0.0022}$ (about 0.22%).
+
+```{python}
+#| echo: false
+pd.Series({"p": round(170000 / 78e6, 4)}).to_string()
+```
+
+## Exercise 3.7
+
+Average enrollment in charter schools in Illinois: in 2014 there were 148
+charter schools with a total of 59,388 students.
+
+- All Illinois charter schools are included, so this is a **parameter**:
+  $\mu = \frac{59{,}388}{148} = \mathbf{401.3}$ students per school.
+
+```{python}
+#| echo: false
+pd.Series({"mu": round(59388 / 148, 1)}).to_string()
+```
+
+## Exercise 3.8
+
+Proportion of US adults who own a cell phone: in a survey of 1502 US adults in
+2019, 98% said they had a cell phone.
+
+- The 98% comes from a **sample** of 1502 adults, so it is a **statistic**:
+  $\hat{p} = \mathbf{0.98}$.
+
+## Exercise 3.9
+
+Correlation between age and heart rate for patients admitted to an Intensive
+Care Unit: data from the 200 patients in the `ICUAdmissions` file give a
+correlation of 0.037.
+
+- The 200 ICU-admitted patients are the whole group of interest, so this is a
+  **parameter**: $r = \mathbf{0.037}$ — essentially no linear relationship
+  between age and heart rate in this group.
+
+*Data:* `data/ch03/ICUAdmissions.csv`, from
+<https://www.lock5stat.com/datasets3e/ICUAdmissions.csv>:
+
+```{python}
+#| echo: false
+icu = pd.read_csv("data/ch03/ICUAdmissions.csv")
+pd.Series({"n": len(icu), "r (Age, HeartRate)": round(icu["Age"].corr(icu["HeartRate"]), 3)}).to_string()
+```
+
+## Exercise 3.10
+
+Mean number of cell phone calls made or received per day by cell phone users:
+in a survey of 1917 cell phone users, the mean was 13.10 calls a day.
+
+- The mean comes from a **sample** of 1917 users, so it is a **statistic**:
+  $\bar{x} = \mathbf{13.10}$ calls per day.
+
+## Exercise 3.11
+
+Correlation between points and penalty minutes for all 26 regular players (at
+least 20 games played) on the 2018–2019 Ottawa Senators. The data are given in
+Table 3.4 and in the file `OttawaSenators2019`.
+
+- All 26 regular players are included, so this is a **parameter**:
+  $\rho = \mathbf{0.139}$ — a weak positive relationship (players who score
+  more points tend to sit slightly more penalty minutes, but only slightly).
+
+*Data:* `data/ch03/OttawaSenators2019.csv`, from
+<https://www.lock5stat.com/datasets3e/OttawaSenators2019.csv> — the Table 3.4
+values (hardcoded below) reproduce the dataset value:
+
+```{python}
+#| echo: false
+pts = np.array([48, 19, 42, 22, 26, 45, 41, 35, 55, 28, 10, 62, 44,
+                15, 5, 5, 58, 12, 2, 14, 12, 14, 14, 9, 8, 2])
+pim = np.array([26, 6, 35, 32, 18, 75, 24, 6, 32, 81, 27, 22, 29,
+                20, 89, 56, 6, 14, 2, 10, 6, 2, 4, 6, 4, 4])
+ott = pd.read_csv("data/ch03/OttawaSenators2019.csv")
+reg = ott[ott["Games"] >= 20]
+pd.Series({"Players with 20+ games": len(reg),
+           "rho from Table 3.4": round(np.corrcoef(pts, pim)[0, 1], 3),
+           "rho from OttawaSenators2019": round(reg["Points"].corr(reg["PenMins"]), 3)}).to_string()
+```
+
+## Exercise 3.12
+
+*(Skill Builder 3, Figure 3.5.)* Panel (a) shows sample proportions from
+samples of size $n = 40$ from a population.
+
+- **Parameter: $p \approx 0.30$** — the dotplot is centered at about 0.30.
+- **Standard error $\approx 0.07$** — the sample proportions spread over
+  roughly 0.16 to 0.44, about two standard errors on either side of the
+  center.
+
+The simulated replica of Figure 3.5 below (using distributions that match each
+panel's center and spread) applies to Exercises 3.12–3.19:
+
+```{python}
+#| echo: false
+#| fig-cap: Simulated replica of Figure 3.5, four sampling distributions
+rng = np.random.default_rng(2030)
+panels = [("a) proportions, n = 40", sim_props(0.30, 40, reps=5000)),
+          ("b) means, n = 30", rng.normal(85, 20, 5000)),
+          ("c) means, n = 100", rng.normal(300, 5, 5000)),
+          ("d) proportions, n = 180", sim_props(0.80, 180, reps=5000, seed=2031))]
+fig, axes = plt.subplots(2, 2, figsize=(7, 4))
+for ax, (lbl, v) in zip(axes.flat, panels):
+    ax.hist(v, bins=28, color="#4c72b0")
+    ax.set_title(lbl, fontsize=9)
+    ax.set_yticks([])
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 3.13
+
+Figure 3.5(b) shows sample means from samples of size $n = 30$.
+
+- **Parameter: $\mu \approx 85$** — the sample means center around 85.
+- **Standard error $\approx 20$** — the means spread over roughly 45 to 125,
+  so values about 20 from the center are common.
+
+## Exercise 3.14
+
+Figure 3.5(c) shows sample means from samples of size $n = 100$.
+
+- **Parameter: $\mu \approx 300$** — the dotplot is centered at about 300.
+- **Standard error $\approx 5$** — nearly all sample means fall within about
+  295 to 305, roughly two standard errors from the center.
+
+## Exercise 3.15
+
+Figure 3.5(d) shows sample proportions from samples of size $n = 180$.
+
+- **Parameter: $p = 0.80$** — the dotplot is centered at 0.80.
+- **Standard error $\approx 0.03$** — the proportions spread over roughly
+  0.77 to 0.83.
+
+## Exercise 3.16
+
+*(Skill Builder 4, using Figure 3.5(a): center 0.30, SE ≈ 0.07.)*
+
+- **(a) $\hat{p} = 0.1$: (ii) unusual but might occur occasionally.** It is
+  about 2.9 standard errors below the center — in the sparse lower tail, but
+  still within the plotted values.
+- **(b) $\hat{p} = 0.35$: (i) reasonably likely.** Only about half a standard
+  error above the center.
+- **(c) $\hat{p} = 0.6$: (iii) extremely unlikely to ever occur.** It lies
+  beyond the largest plotted values, more than 4 standard errors above the
+  center.
+
+## Exercise 3.17
+
+*(Using Figure 3.5(b): center 85, SE ≈ 20.)*
+
+- **(a) $\bar{x} = 70$: (i) reasonably likely.** Less than one standard error
+  below the center.
+- **(b) $\bar{x} = 100$: (i) reasonably likely.** Less than one standard error
+  above the center.
+- **(c) $\bar{x} = 140$: (ii) unusual but might occur occasionally.** About
+  2.75 standard errors above the center, at the far edge of the plotted
+  values.
+
+## Exercise 3.18
+
+*(Using Figure 3.5(c): center 300, SE ≈ 5.)*
+
+- **(a) $\bar{x} = 250$: (iii) extremely unlikely to ever occur.** Ten
+  standard errors below the center — far outside the plotted range.
+- **(b) $\bar{x} = 305$: (i) reasonably likely.** One standard error above the
+  center.
+- **(c) $\bar{x} = 315$: (ii) unusual but might occur occasionally.** About
+  3 standard errors above the center, right at the edge of the plotted
+  values.
+
+## Exercise 3.19
+
+*(Using Figure 3.5(d): center 0.80, SE ≈ 0.03.)*
+
+- **(a) $\hat{p} = 0.72$: (ii) unusual but might occur occasionally.** About
+  2.7 standard errors below the center.
+- **(b) $\hat{p} = 0.88$: (ii) unusual but might occur occasionally.** About
+  2.7 standard errors above the center.
+- **(c) $\hat{p} = 0.95$: (iii) extremely unlikely to ever occur.** Five
+  standard errors above the center — beyond every plotted value.
+
+## Exercise 3.20
+
+**Downloading Apps for Your Smartphone.** A random sample of $n = 461$
+smartphone users in the US in January 2015 found that 355 of them have
+downloaded an app.
+
+- **(a)** The parameter is $p$, the **proportion of all US smartphone users
+  who have downloaded an app**.
+- **(b)** The best estimate is the sample proportion
+  $\hat{p} = \frac{355}{461} = \mathbf{0.77}$.
+- **(c)** To compute the parameter exactly we would have to ask **every US
+  smartphone user** (a census).
+
+```{python}
+#| echo: false
+pd.Series({"p-hat": round(355 / 461, 2)}).to_string()
+```
+
+## Exercise 3.21
+
+**How Many Apps for Your Smartphone?** Of the $n = 355$ users in Exercise 3.20
+who had downloaded an app, the average number of apps downloaded was 19.7.
+
+- **(a)** The parameter is $\mu$, the **mean number of apps downloaded by all
+  US smartphone users** (who have downloaded an app).
+- **(b)** The best estimate is the sample mean $\bar{x} = \mathbf{19.7}$ apps.
+- **(c)** To compute $\mu$ exactly we would have to ask **all US smartphone
+  users** how many apps they have downloaded.
+
+## Exercise 3.22
+
+**Socially Conscious Consumers.** A March 2015 Nielsen global online survey of
+over 30,000 people in 60 countries found that 66% of respondents were willing
+to pay more for products from companies committed to positive social and
+environmental impact.
+
+- **Parameter:** $p$, the **proportion of all consumers worldwide who are
+  willing to pay more** for products and services from socially responsible
+  companies.
+- **Statistic:** $\hat{p} = \mathbf{0.66}$, the proportion among the 30,000+
+  people polled.
+- **Best estimate: 0.66.**
+
+## Exercise 3.23
+
+**Florida Lakes.** Florida has over 7700 lakes. We wish to estimate the
+correlation between the pH levels of all Florida lakes and the mercury levels
+of fish in the lakes; for a sample of $n = 53$ lakes the correlation is
+$-0.575$.
+
+- **(a)** Parameter: $\rho$, the **correlation between pH and mercury for all
+  Florida lakes**. Statistic: $r = \mathbf{-0.575}$, the correlation in the
+  sample of 53 lakes, which is the best estimate.
+- **(b)** An estimate is necessary because measuring every lake is
+  impractical — to compute $\rho$ exactly we would have to test **all 7700+
+  lakes** for both pH and fish mercury levels.
+
+*Data:* `data/ch03/FloridaLakes.csv`, from
+<https://www.lock5stat.com/datasets3e/FloridaLakes.csv> — the sample
+correlation reproduces $-0.575$:
+
+```{python}
+#| echo: false
+fl = pd.read_csv("data/ch03/FloridaLakes.csv")
+pd.Series({"n": len(fl), "r (pH, AvgMercury)": round(fl["pH"].corr(fl["AvgMercury"]), 3)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Mercury level of fish versus pH for a sample of 53 Florida lakes
+fig, ax = plt.subplots(figsize=(5, 3))
+ax.scatter(fl["pH"], fl["AvgMercury"], color="#4c72b0", s=22)
+r = fl["pH"].corr(fl["AvgMercury"])
+ax.text(6.3, 1.25, f"r = {r:.3f}", fontsize=9, color="#c44e52")
+ax.set_xlabel("pH of lake")
+ax.set_ylabel("Average mercury (mg/kg)")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 3.24
+
+**Topical Painkiller Ointment.** Insurance records show the average copayment
+for a month's supply of topical painkiller ointment for regular users is \$30;
+a sample of $n = 75$ regular users found a sample mean of \$27.90.
+
+- **(a)** The population average $\mu = 30$ dollars is a **parameter**; the
+  sample average $\bar{x} = 27.90$ dollars is a **statistic**.
+- **(b)** The dotplot of 1000 sample means of size $n = 75$ would be roughly
+  symmetric and bell-shaped (averages of 75 copayments vary less and more
+  smoothly than individual copayments), and it would be **centered at 30
+  dollars**, the population mean.
+- **(c)** There would be **1000 dots**, and **each dot is one sample mean** —
+  the average copayment from a single random sample of 75 regular users.
+
+## Exercise 3.25
+
+**Don't Text and Drive!** At least 14% of distracted-driving traffic fatal-
+ities are clearly linked to cell phone use. For samples of $n = 500$ such
+fatalities, Figure 3.6 shows the sampling distribution of the proportion
+caused by cell phone use (centered at $p = 0.14$, standard error about
+0.015).
+
+Give the notation and value of each sample statistic, and whether it is
+**likely** or **very unlikely** to occur just by random variation:
+
+- **(a)** 38 of 500 deaths: $\hat{p} = \frac{38}{500} = 0.076$ — **unlikely**
+  (about 4 standard errors below 0.14, below every plotted value).
+- **(b)** 64 of 500: $\hat{p} = 0.128$ — **likely** (less than one standard
+  error below 0.14).
+- **(c)** 76 of 500: $\hat{p} = 0.152$ — **likely** (less than one standard
+  error above 0.14).
+- **(d)** 105 of 500: $\hat{p} = 0.210$ — **unlikely** (well above the largest
+  plotted values).
+
+```{python}
+#| echo: false
+#| fig-cap: Simulated sampling distribution of p-hat for n = 500 with p = 0.14, marking the four outcomes
+ph = sim_props(0.14, 500, reps=10000)
+fig, ax = plt.subplots(figsize=(6.5, 3))
+ax.hist(ph, bins=40, color="#4c72b0")
+for x, lbl in [(0.076, "a"), (0.128, "b"), (0.152, "c"), (0.210, "d")]:
+    ax.axvline(x, color="#c44e52", ls="--", lw=1)
+    ax.text(x, ax.get_ylim()[1] * 0.92, lbl, ha="center", fontsize=9, color="#c44e52")
+ax.set_xlim(0.05, 0.23)
+ax.set_xlabel("Sample proportion")
+ax.set_ylabel("Frequency")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 3.26
+
+**What Proportion of Canadian Adults Graduate High School?** The 2016 Canadian
+Census shows that 81.7% of Canadian adults have a secondary or equivalent
+degree.
+
+- **(a)** $p = \mathbf{0.817}$ (a parameter — the census covers the whole
+  population).
+- **(b), (c)** For a sample of $n = 500$ the sample proportion $\hat{p}$ will
+  vary from sample to sample; one sample might give $\hat{p} = 0.82$, four
+  more might give values like 0.80, 0.83, 0.81 and 0.84.
+- **(d)** The simulated sampling distribution below (10,000 samples of
+  $n = 500$) is centered at $p = 0.817$ with **standard error
+  $\approx 0.017$**.
+
+```{python}
+#| echo: false
+ph = sim_props(0.817, 500, reps=10000)
+pd.Series({"Center": round(ph.mean(), 3), "Standard error": round(ph.std(ddof=1), 4)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Simulated sampling distribution of p-hat for n = 500 with p = 0.817
+fig, ax = plt.subplots(figsize=(6, 3))
+ax.hist(ph, bins=30, color="#4c72b0")
+ax.axvline(0.817, color="#c44e52", ls="--", lw=1)
+ax.text(0.8185, ax.get_ylim()[1] * 0.9, "p = 0.817", fontsize=9, color="#c44e52")
+ax.set_xlabel("Sample proportion")
+ax.set_ylabel("Frequency")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 3.27
+
+**Average Household Size.** The US Census lists the average household size as
+2.61. Figure 3.7 shows four dotplots of 1000 sample means, two from random
+samples and two from a biased sampling method.
+
+- **(a) Biased: B and C.** These two dotplots are **not centered at 2.61** —
+  the average household size in their samples systematically misses the
+  population value, which is the signature of bias (random samples are
+  centered at the parameter). For example, dotplot B (centered low) could
+  come from sampling only residents of a retirement community, where most
+  people live alone; a sample that misses large households is biased
+  downward.
+- **(b)** Of the two unbiased dotplots (A and D), **A goes with $n = 100$**
+  (more spread out) and **D goes with $n = 500$** (tighter around 2.61) —
+  larger samples produce less variable sample means.
+
+## Exercise 3.28
+
+**Proportion of US Residents Less Than 25 Years Old.** The US Census
+indicates $p = 0.35$; Figure 3.8 shows sampling distributions of the sample
+proportion for $n = 20$, $n = 100$ and $n = 500$.
+
+- **(a) A ↔ $n = 20$** (spread over about 0.1–0.7), **B ↔ $n = 100$**
+  (about 0.25–0.45), **C ↔ $n = 500$** (about 0.3–0.42) — the larger the
+  sample, the tighter the dotplot.
+- **(b)** Off by more than 0.10: with $n = 20$ this is only about one standard
+  error — **not very surprising** (it happens often); with $n = 100$ it is
+  about 2 standard errors — **somewhat unusual but possible**; with $n = 500$
+  it is almost 5 standard errors — **very surprising, extremely unlikely**.
+- **(c)** Off by 0.05 or more: with $n = 20$ (about half a standard error) and
+  $n = 100$ (about one standard error) this is **common**; with $n = 500$
+  (about 2.4 standard errors) it is **unusual, though it might occur
+  occasionally**.
+- **(d)** Increasing the sample size shrinks the standard error, so larger
+  samples give **more precise** estimates of $p$.
+
+```{python}
+#| echo: false
+#| fig-cap: Simulated sampling distributions of p-hat with p = 0.35 for n = 20, n = 100 and n = 500
+fig, axes = plt.subplots(1, 3, figsize=(7, 2.8), sharey=True)
+for ax, n, sd in zip(axes, [20, 100, 500], [2026, 2027, 2028]):
+    q = sim_props(0.35, n, reps=10000, seed=sd)
+    ax.hist(q, bins=24, color="#4c72b0")
+    ax.set_title(f"n = {n}", fontsize=9)
+    ax.set_yticks([])
+    ax.set_xlim(0, 0.75)
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 3.29
+
+**Mix It Up for Better Learning.** Fourth-graders studied either mixed problem
+sets (average grade 77) or one equation at a time (average grade 38).
+
+- **Parameter:** $\mu_m - \mu_o$, the **difference in the mean grade between
+  all fourth-graders who study mixed problems ($\mu_m$) and those who study
+  one equation at a time ($\mu_o$)**.
+- **Statistic:** $\bar{x}_m - \bar{x}_o$, the difference in sample means.
+- **Best estimate: $77 - 38 = \mathbf{39}$ points** in favor of mixed
+  practice.
+
+## Exercise 3.30
+
+**What Proportion of Adults and Teens Text Message?** A study of $n = 2252$
+adults found 72% of cell phone users text; a study of $n = 800$ teens found
+87% of teen cell phone users text.
+
+- **Parameter:** $p_A - p_T$, the **difference in the proportion of cell phone
+  users who text, between all adults ($p_A$) and all teens ($p_T$)**.
+- **Statistic:** $\hat{p}_A - \hat{p}_T = 0.72 - 0.87$, the difference in
+  sample proportions.
+- **Best estimate: $\mathbf{-0.15}$** — a smaller proportion of adults than
+  teens text (or equivalently, teens exceed adults by 15 percentage points).
+
+## Exercise 3.31
+
+**Hollywood Movies.** Figure 3.9 shows one boxplot of budget data (millions of
+dollars) for a single random sample of $n = 30$ movies and one boxplot of a
+sampling distribution of 1000 sample means of budgets, also from samples of
+size 30.
+
+- **(a) Boxplot B is the single sample; Boxplot A is the sampling
+  distribution.** Individual movie budgets vary enormously (0 to 250+ million,
+  heavily right-skewed), while averages of 30 movies vary much less and sit in
+  a narrow band — only Boxplot A shows that small spread.
+- **(b)** In the single-sample boxplot each value is **the budget of one
+  Hollywood movie in the sample**; $n = 30$ values are included, ranging from
+  about 1 to 150 million dollars, with $\bar{x} \approx 60$ million dollars
+  (heavily influenced by a few big-budget films).
+- **(c)** In the sampling-distribution boxplot each value is **a sample mean
+  from one sample of 30 movies**; $n = 1000$ means are included, ranging from
+  about 20 to 95 million dollars, centered at $\mu \approx 52$ million
+  dollars — our best estimate of the average budget for all Hollywood movies
+  of this period.
+
+*Data:* `data/ch01/HollywoodMovies.csv`, from
+<https://www.lock5stat.com/datasets3e/HollywoodMovies.csv> — one sample of 30
+versus 1000 sample means:
+
+```{python}
+#| echo: false
+bud = pd.read_csv("data/ch01/HollywoodMovies.csv")["Budget"].dropna()
+rng = np.random.default_rng(2026)
+one = rng.choice(bud.to_numpy(), 30, replace=False)
+means = sim_means(bud, 30, reps=1000, seed=2027)
+pd.Series({"One sample: min, max, mean": f"{one.min():.1f}, {one.max():.1f}, {one.mean():.1f}",
+           "1000 means: min, max, mean": f"{means.min():.1f}, {means.max():.1f}, {means.mean():.1f}",
+           "Population mean": round(bud.mean(), 2)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: One random sample of 30 movie budgets versus the sampling distribution of 1000 sample means
+fig, ax = plt.subplots(figsize=(6.5, 2.8))
+ax.boxplot([means, one], vert=False, widths=0.5)
+ax.set_yticklabels(["Sampling distribution (1000 means)", "One sample (30 budgets)"])
+ax.set_xlabel("Budget (millions of dollars)")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 3.32
+
+**What Percent of the US Population Are Senior Citizens?** People 65 and older
+constituted $p = 0.13$ of the US population in 2010. Figure 3.10 shows
+sampling distributions of the sample proportion for samples of size 100 and
+size 1000.
+
+- **(a)** Both distributions are **centered at 0.13** — the population
+  proportion.
+- **(b)** For $n = 100$: minimum $\approx 0.05$ and maximum $\approx 0.21$.
+  For $n = 1000$: minimum $\approx 0.09$ and maximum $\approx 0.17$.
+- **(c)** Roughly half the full spread: **SE $\approx 0.035$** for $n = 100$
+  and **SE $\approx 0.011$** for $n = 1000$ (the simulations below give 0.034
+  and 0.011).
+- **(d)** A sample proportion of 0.17 is about 1.2 standard errors above
+  0.13 — **not very surprising from a sample of size 100**, but almost 4
+  standard errors above the center — **quite surprising from a sample of size
+  1000**.
+
+```{python}
+#| echo: false
+q100 = sim_props(0.13, 100, reps=10000)
+q1000 = sim_props(0.13, 1000, reps=10000, seed=2027)
+pd.Series({"SE (n = 100)": round(q100.std(ddof=1), 4),
+           "SE (n = 1000)": round(q1000.std(ddof=1), 4)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Simulated sampling distributions of p-hat with p = 0.13 for n = 100 and n = 1000
+fig, axes = plt.subplots(1, 2, figsize=(7, 2.8), sharey=True)
+for ax, q, lbl in zip(axes, [q100, q1000], ["n = 100", "n = 1000"]):
+    ax.hist(q, bins=24, color="#4c72b0")
+    ax.axvline(0.13, color="#c44e52", ls="--", lw=1)
+    ax.set_title(lbl, fontsize=9)
+    ax.set_yticks([])
+    ax.set_xlim(0.04, 0.22)
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 3.33
+
+**Enrollment at Two-Year Colleges.** The `CollegeScores2yr` dataset gives
+enrollment for all 1141 two-year colleges.
+
+- **(a), (b)** Two random samples of 10 enrollments (drawn below) give sample
+  means of **3282.6** and **1132.5** students — values will vary from sample
+  to sample, and both happen to fall below the population mean because
+  enrollment is strongly right-skewed (one huge college can dominate a small
+  sample).
+- **(c)** The mean enrollment for the entire population of 1141 two-year
+  colleges is $\mu = \mathbf{4050}$ students. The sample means of parts (a)
+  and (b) are quite far from it — with only $n = 10$ from such a skewed
+  population, a single sample mean can be off by a lot.
+- **(d)** The distribution of many sample means of size $n = 10$ would be
+  **centered at 4050**.
+
+*Data:* `data/ch02/CollegeScores2yr.csv`, from
+<https://www.lock5stat.com/datasets3e/CollegeScores2yr.csv>:
+
+```{python}
+#| echo: false
+enr = pd.read_csv("data/ch02/CollegeScores2yr.csv")["Enrollment"].dropna().reset_index(drop=True)
+rng = np.random.default_rng(2026)
+s1 = rng.choice(len(enr), 10, replace=False)
+s2 = rng.choice(len(enr), 10, replace=False)
+pd.Series({"Sample 1": ", ".join(str(int(enr[i])) for i in sorted(s1)),
+           "Sample 1 mean": round(enr[s1].mean(), 1),
+           "Sample 2": ", ".join(str(int(enr[i])) for i in sorted(s2)),
+           "Sample 2 mean": round(enr[s2].mean(), 1),
+           "Population mean (n = 1141)": round(enr.mean(), 1)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Population of 1141 two-year college enrollments and the sampling distribution of the mean for n = 10
+m10 = sim_means(enr, 10, reps=5000)
+fig, axes = plt.subplots(1, 2, figsize=(7, 2.8))
+axes[0].hist(enr, bins=40, color="#4c72b0")
+axes[0].axvline(enr.mean(), color="#c44e52", ls="--", lw=1)
+axes[0].set_title("Population (n = 1141), mean 4050", fontsize=9)
+axes[1].hist(m10, bins=40, color="#4c72b0")
+axes[1].axvline(enr.mean(), color="#c44e52", ls="--", lw=1)
+axes[1].set_title("Sample means, n = 10", fontsize=9)
+for ax in axes:
+    ax.set_yticks([])
+    ax.set_xlabel("Enrollment")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 3.34
+
+**Average Salary of NFL Players.** The `NFLContracts2019` dataset contains the
+yearly salary (millions of dollars) for all players on NFL rosters at the
+start of the 2019 season.
+
+- **(a), (b)** Two random samples of 5 players (drawn below) give sample means
+  of **\$4.69 million** and **\$0.88 million** — values will vary from sample
+  to sample.
+- **(c)** The mean for the entire population of players is
+  $\mu = \mathbf{\$3.03}$ million. With samples of only 5 from a heavily
+  right-skewed population (one star quarterback can dominate a sample), the
+  sample means are quite inaccurate — the first overshot the population mean
+  and the second undershot it.
+
+*Data:* `data/ch03/NFLContracts2019.csv`, from
+<https://www.lock5stat.com/datasets3e/NFLContracts2019.csv>:
+
+```{python}
+#| echo: false
+nf = pd.read_csv("data/ch03/NFLContracts2019.csv").dropna(subset=["YearlySalary"]).reset_index(drop=True)
+rng = np.random.default_rng(2026)
+i1 = rng.choice(len(nf), 5, replace=False)
+i2 = rng.choice(len(nf), 5, replace=False)
+tab = pd.concat([nf.loc[i1, ["Player", "YearlySalary"]].assign(Sample="1"),
+                 nf.loc[i2, ["Player", "YearlySalary"]].assign(Sample="2")])
+tab["YearlySalary"] = tab["YearlySalary"].round(2)
+print(tab[["Sample", "Player", "YearlySalary"]].set_index("Sample").to_string())
+pd.Series({"Sample 1 mean": round(nf.loc[i1, "YearlySalary"].mean(), 2),
+           "Sample 2 mean": round(nf.loc[i2, "YearlySalary"].mean(), 2),
+           "Population mean": round(nf["YearlySalary"].mean(), 2)}).to_string()
+```
+
+## Exercise 3.35
+
+**A Sampling Distribution for Two-Year College Enrollments.** Generate a
+sampling distribution of sample means with $n = 10$ from the `Enrollment`
+values of `CollegeScores2yr`, then repeat with $n = 60$.
+
+- **(a)** With $n = 10$ the distribution is **somewhat right-skewed** (it
+  inherits the skew of the enrollment population), **centered at
+  approximately 4050**, with **standard error around 1900** (our simulation:
+  1940).
+- **(b)** With $n = 60$ the distribution is **more symmetric (more
+  bell-shaped)**, still **centered around 4050**, with **standard error
+  around 760** (our simulation: 783) — four times the sample size cuts the
+  standard error roughly in half.
+
+```{python}
+#| echo: false
+m60 = sim_means(enr, 60, seed=2027)
+pd.Series({"SE (n = 10)": round(m10.std(ddof=1), 0),
+           "SE (n = 60)": round(m60.std(ddof=1), 0)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Sampling distributions of mean enrollment for n = 10 and n = 60
+fig, axes = plt.subplots(1, 2, figsize=(7, 2.8))
+for ax, q, lbl in zip(axes, [m10, m60], ["n = 10", "n = 60"]):
+    ax.hist(q, bins=36, color="#4c72b0")
+    ax.axvline(enr.mean(), color="#c44e52", ls="--", lw=1)
+    ax.set_title(lbl, fontsize=9)
+    ax.set_yticks([])
+    ax.set_xlim(0, 12000)
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 3.36
+
+**A Sampling Distribution for Average Salary of NFL Players.** Generate a
+sampling distribution of sample means with $n = 5$ from the `YearlySalary`
+values in `NFLContracts2019`, then repeat with $n = 50$.
+
+- **(a)** The smallest `YearlySalary` in the population is **\$0.488 million**
+  (\$488,000) and the largest is **\$35 million**.
+- **(b)** In our simulated distribution for $n = 5$, the sample means range
+  from about **\$0.56 million to \$14.12 million** (values will vary) — huge
+  spread compared with the population range, because a single star player can
+  dominate a sample of 5.
+- **(c)** The standard error for $n = 5$ is about **\$1.96 million**.
+- **(d)** With $n = 50$ the standard error drops to about **\$0.63 million**,
+  and the means range only from about \$1.31 to \$5.71 million — ten times
+  the sample size shrinks the standard error by roughly
+  $\sqrt{10} \approx 3.2$.
+
+```{python}
+#| echo: false
+sal = nf["YearlySalary"]
+m5 = sim_means(sal, 5)
+m50 = sim_means(sal, 50, seed=2027)
+pd.Series({"Population min, max": f"{sal.min():.3f}, {sal.max():.2f}",
+           "Means n = 5: min, max, SE": f"{m5.min():.2f}, {m5.max():.2f}, {m5.std(ddof=1):.2f}",
+           "Means n = 50: min, max, SE": f"{m50.min():.2f}, {m50.max():.2f}, {m50.std(ddof=1):.2f}"}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Sampling distributions of mean NFL yearly salary for n = 5 and n = 50
+fig, axes = plt.subplots(1, 2, figsize=(7, 2.8))
+for ax, q, lbl in zip(axes, [m5, m50], ["n = 5", "n = 50"]):
+    ax.hist(q, bins=36, color="#4c72b0")
+    ax.axvline(sal.mean(), color="#c44e52", ls="--", lw=1)
+    ax.set_title(lbl, fontsize=9)
+    ax.set_yticks([])
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 3.37
+
+**What Is an Average Budget for a Hollywood Movie?** Treat the `HollywoodMovies`
+dataset as the population of all Hollywood movies from 2012–2018; the variable
+is the budget in millions of dollars.
+
+- **(a)** For the whole population, $\mu = \mathbf{51.38}$ million dollars and
+  $\sigma = \mathbf{57.93}$ million dollars (computed below; notation $\mu$
+  and $\sigma$ because this is the entire population).
+- **(b)** For samples of size $n = 20$, the sampling distribution of the
+  sample mean is roughly **bell-shaped (with a slight right skew)**, centered
+  near $\mu = 51.4$ million, with **standard error about 13** million
+  ($\sigma/\sqrt{20} = 12.95$; our simulation gives 13.03).
+
+*Data:* `data/ch01/HollywoodMovies.csv`, from
+<https://www.lock5stat.com/datasets3e/HollywoodMovies.csv>:
+
+```{python}
+#| echo: false
+m20 = sim_means(bud, 20)
+pd.Series({"Population n": len(bud), "mu": round(bud.mean(), 2),
+           "sigma": round(bud.std(ddof=1), 2),
+           "SE (n = 20), simulated": round(m20.std(ddof=1), 2)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Sampling distribution of the mean movie budget for samples of size n = 20
+fig, ax = plt.subplots(figsize=(6, 2.8))
+ax.hist(m20, bins=36, color="#4c72b0")
+ax.axvline(bud.mean(), color="#c44e52", ls="--", lw=1)
+ax.text(bud.mean() + 1, ax.get_ylim()[1] * 0.9, "mu = 51.4", fontsize=9, color="#c44e52")
+ax.set_yticks([])
+ax.set_xlabel("Sample mean budget (millions of dollars)")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 3.38
+
+**College Graduates.** In Example 3.1, 27.5% of US adults are college
+graduates, so $p = 0.275$.
+
+- **(a)** For $n = 50$ (1000+ sample proportions simulated below): the
+  distribution is roughly **bell-shaped (discrete, since only multiples of
+  1/50 are possible)**, **centered at $p = 0.275$**, with **standard error
+  about 0.063**.
+- **(b)** For $n = 500$: still **centered at 0.275** and more tightly
+  concentrated and bell-shaped, with **standard error about 0.020** — five
+  times the sample size cuts the standard error by about
+  $\sqrt{5} \approx 2.2$.
+
+```{python}
+#| echo: false
+p50 = sim_props(0.275, 50)
+p500 = sim_props(0.275, 500, seed=2027)
+pd.Series({"SE (n = 50)": round(p50.std(ddof=1), 3),
+           "SE (n = 500)": round(p500.std(ddof=1), 3)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Sampling distributions of p-hat with p = 0.275 for n = 50 and n = 500
+fig, axes = plt.subplots(1, 2, figsize=(7, 2.8), sharey=True)
+for ax, q, lbl in zip(axes, [p50, p500], ["n = 50", "n = 500"]):
+    ax.hist(q, bins=24, color="#4c72b0")
+    ax.axvline(0.275, color="#c44e52", ls="--", lw=1)
+    ax.set_title(lbl, fontsize=9)
+    ax.set_yticks([])
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 3.39
+
+**Females in the Rock and Roll Hall of Fame.** From its founding through 2019
+the Hall inducted 329 groups or individuals; 52 have been female or have
+included female members (`RockandRoll2019`).
+
+- **(a)** $p = \frac{52}{329} = \mathbf{0.158}$ — the proportion of all
+  inductees that are female or include female members.
+- **(b)** For many samples of size $n = 50$, the distribution of sample
+  proportions is expected to be roughly **bell-shaped** and **centered at
+  $p = 0.158$** (random samples are unbiased). Our simulation gives a standard
+  error of about 0.051.
+
+*Data:* `data/ch03/RockandRoll2019.csv`, from
+<https://www.lock5stat.com/datasets3e/RockandRoll2019.csv>:
+
+```{python}
+#| echo: false
+rr = pd.read_csv("data/ch03/RockandRoll2019.csv")
+fem = (rr["FemaleMembers"] == "Yes").to_numpy()
+pd.Series({"Female or includes females": int(fem.sum()), "Total inductees": len(rr),
+           "p": round(fem.mean(), 3)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Sampling distribution of the proportion female or with female members for samples of size n = 50
+f50 = sim_means(fem, 50)
+fig, ax = plt.subplots(figsize=(6, 2.8))
+ax.hist(f50, bins=20, color="#4c72b0")
+ax.axvline(fem.mean(), color="#c44e52", ls="--", lw=1)
+ax.text(fem.mean() + 0.004, ax.get_ylim()[1] * 0.9, "p = 0.158", fontsize=9, color="#c44e52")
+ax.set_yticks([])
+ax.set_xlabel("Sample proportion")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 3.40
+
+**Performers in the Rock and Roll Hall of Fame.** Of the 329 inductees, 230
+have been performers (`RockandRoll2019`).
+
+- **(a)** $p = \frac{230}{329} = \mathbf{0.699}$ — the proportion of all
+  inductees who are performers.
+- **(b)** For many samples of size $n = 50$, the distribution of sample
+  proportions is expected to be roughly **bell-shaped** and **centered at
+  $p = 0.699$**. Our simulation gives a standard error of about 0.064.
+
+```{python}
+#| echo: false
+per = (rr["Category"] == "Performer").to_numpy()
+pr50 = sim_means(per, 50)
+pd.Series({"Performers": int(per.sum()), "Total inductees": len(rr),
+           "p": round(per.mean(), 3),
+           "SE (n = 50), simulated": round(pr50.std(ddof=1), 3)}).to_string()
+```
+
+## Exercise 3.41
+
+**A Sampling Distribution for Females in the Rock and Roll Hall of Fame.**
+Using all 329 inductees as the population ($p = 0.158$), take many samples and
+record the proportion female or with female members.
+
+- **(a)** For $n = 10$: **SE ≈ 0.115**; in our simulation the farthest sample
+  proportion was $\hat{p} = 0.70$ (a sample with 7 of 10 female-related
+  inductees), about **0.54 away** from 0.158. Values will vary.
+- **(b)** For $n = 20$: **SE ≈ 0.080**; the farthest $\hat{p}$ was 0.50, about
+  **0.34 away**.
+- **(c)** For $n = 50$: **SE ≈ 0.052**; the farthest $\hat{p}$ was 0.38, about
+  **0.22 away**.
+- **(d)** Increasing the sample size shrinks the standard error and pulls the
+  extreme sample proportions closer to $p$ — **larger samples give more
+  accurate estimates** of the population proportion.
+
+```{python}
+#| echo: false
+rows = []
+for n, sd in [(10, 2026), (20, 2027), (50, 2028)]:
+    q = sim_means(fem, n, reps=10000, seed=sd)
+    far = q[np.abs(q - fem.mean()).argmax()]
+    rows.append({"n": n, "Standard error": round(q.std(ddof=1), 3),
+                 "Farthest sample proportion": round(far, 2),
+                 "Distance from p": round(abs(far - fem.mean()), 2)})
+pd.DataFrame(rows).set_index("n").to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Sampling distributions of the proportion female or with female members for n = 10, 20 and 50
+fig, axes = plt.subplots(1, 3, figsize=(7, 2.6), sharey=True)
+for ax, n, sd in zip(axes, [10, 20, 50], [2026, 2027, 2028]):
+    q = sim_means(fem, n, reps=10000, seed=sd)
+    ax.hist(q, bins=20, color="#4c72b0")
+    ax.axvline(fem.mean(), color="#c44e52", ls="--", lw=1)
+    ax.set_title(f"n = {n}", fontsize=9)
+    ax.set_yticks([])
+    ax.set_xlim(-0.02, 0.8)
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 3.42
+
+**A Sampling Distribution for Performers in the Rock and Roll Hall of Fame.**
+Same setup as Exercise 3.41, but now recording the proportion of performers
+($p = 0.699$).
+
+- **(a)** For $n = 10$: **SE ≈ 0.145**; in our simulation the farthest sample
+  proportion was $\hat{p} = 0.10$ (only 1 performer in a sample of 10), about
+  **0.60 away** from 0.699. Values will vary.
+- **(b)** For $n = 20$: **SE ≈ 0.103**; the farthest $\hat{p}$ was 0.30, about
+  **0.40 away**.
+- **(c)** For $n = 50$: **SE ≈ 0.065**; the farthest $\hat{p}$ was 0.44, about
+  **0.26 away**.
+- **(d)** As in Exercise 3.41, increasing the sample size makes the sample
+  proportions cluster more tightly around the population proportion —
+  **accuracy improves as $n$ grows**.
+
+```{python}
+#| echo: false
+rows = []
+for n, sd in [(10, 2026), (20, 2027), (50, 2028)]:
+    q = sim_means(per, n, reps=10000, seed=sd)
+    far = q[np.abs(q - per.mean()).argmax()]
+    rows.append({"n": n, "Standard error": round(q.std(ddof=1), 3),
+                 "Farthest sample proportion": round(far, 2),
+                 "Distance from p": round(abs(far - per.mean()), 2)})
+pd.DataFrame(rows).set_index("n").to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Sampling distributions of the proportion of performers for n = 10, 20 and 50
+fig, axes = plt.subplots(1, 3, figsize=(7, 2.6), sharey=True)
+for ax, n, sd in zip(axes, [10, 20, 50], [2026, 2027, 2028]):
+    q = sim_means(per, n, reps=10000, seed=sd)
+    ax.hist(q, bins=20, color="#4c72b0")
+    ax.axvline(per.mean(), color="#c44e52", ls="--", lw=1)
+    ax.set_title(f"n = {n}", fontsize=9)
+    ax.set_yticks([])
+    ax.set_xlim(0.2, 1.0)
+plt.tight_layout()
+plt.show()
+```
+
+:::

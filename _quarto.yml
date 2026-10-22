@@ -75,6 +75,14 @@ website:
             text: "Ch. 2 · Section 2.6"
           - href: chapters/ch02/s2-7.qmd
             text: "Ch. 2 · Section 2.7"
+          - href: chapters/ch03/s3-1.qmd
+            text: "Ch. 3 · Section 3.1"
+          - href: chapters/ch03/s3-2.qmd
+            text: "Ch. 3 · Section 3.2"
+          - href: chapters/ch03/s3-3.qmd
+            text: "Ch. 3 · Section 3.3"
+          - href: chapters/ch03/s3-4.qmd
+            text: "Ch. 3 · Section 3.4"
 
 format:
   html:

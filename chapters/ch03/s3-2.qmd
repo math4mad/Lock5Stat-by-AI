@@ -1,0 +1,704 @@
+---
+execute-dir: project
+title: "Chapter 3 · Section 3.2"
+subtitle: "Understanding and Interpreting Confidence Intervals — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 3.2 of Lock⁵ asks what a **confidence interval** really says. An interval estimate,
+$\text{statistic} \pm \text{margin of error}$, gives a **range of plausible values** for the
+population parameter: values inside the interval are consistent with the sample data, values
+outside it are not. The **margin of error** measures how accurate the estimate is likely to be
+— for a symmetric, bell-shaped sampling distribution it is about $2 \times SE$, half the width
+of a 95% interval. Crucially, the **95% confidence refers to the method, not to any single
+interval**: if we took many samples and built an interval from each, about 95% of those
+intervals would capture the true parameter — but we never know whether *our* one interval is
+among the lucky ones. There is also a **precision–confidence trade-off**: narrower intervals
+are more precise but less reliable, while a higher confidence level widens the interval. The
+way to get both precision *and* confidence is a **larger sample**, which shrinks the standard
+error and hence the margin of error.
+The exercises below are from *Statistics: Unlocking the Power of Data* (Lock⁵, 3rd ed.,
+pp. 242–247). Skill Builders 3.43–3.58 practice parameter/statistic notation, building
+intervals from a statistic and a margin of error, judging plausible parameter values, and
+turning standard errors into intervals; 3.59–3.79 apply the ideas to real studies. None of
+these exercises draw on a named Lock5 dataset, so the executable cells below simply recompute
+the printed numbers, and simulate where the book invites technology (Exercise 3.78).
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+sns.set_theme(style="whitegrid")
+```
+
+::: {.panel-tabset}
+
+## Exercise 3.43
+
+*(Skill Builder 1: give notation for the quantity being estimated and for the best
+estimate.)* A random sample of registered voters in the US is used to estimate the
+proportion of all US registered voters who voted in the last election.
+
+- **(a) Parameter:** $p$ = the proportion of **all US registered voters** who voted in the
+  last election.
+- **(b) Best estimate:** $\hat{p}$ = the proportion of the **sampled** registered voters who
+  voted.
+
+## Exercise 3.44
+
+A random sample of maple trees in a forest is used to estimate the mean base circumference
+of all maple trees in the forest.
+
+- **(a) Parameter:** $\mu$ = the mean base circumference of **all** maple trees in the forest.
+- **(b) Best estimate:** $\bar{x}$ = the mean base circumference of the **sampled** maple
+  trees.
+
+## Exercise 3.45
+
+Random samples of organic eggs and eggs that are not organic are used to estimate the
+difference in mean protein level between the two types of eggs.
+
+- **(a) Parameter:** $\mu_O - \mu_N$ = the difference in mean protein level between **all
+  organic eggs** and **all non-organic eggs** (organic minus not organic).
+- **(b) Best estimate:** $\bar{x}_O - \bar{x}_N$ = the difference in mean protein level
+  between the two samples.
+
+## Exercise 3.46
+
+Random samples of people in Canada and people in Sweden are used to estimate the difference
+between the two countries in the proportion of people who have seen a hockey game in the
+past year.
+
+- **(a) Parameter:** $p_C - p_S$ = the difference in the proportion of **all** people in
+  Canada and **all** people in Sweden who have seen a hockey game (at any level) in the past
+  year.
+- **(b) Best estimate:** $\hat{p}_C - \hat{p}_S$ = the difference in the two sample
+  proportions.
+
+## Exercise 3.47
+
+*(Skill Builder 2: construct the interval statistic $\pm$ margin of error.)* For $\mu$,
+using $\bar{x} = 25$ with margin of error 3.
+
+- $25 \pm 3$ gives the interval **22 to 28**.
+
+```{python}
+#| echo: false
+pd.Series({"Interval": "25 ± 3 = (22, 28)"}).to_string()
+```
+
+## Exercise 3.48
+
+For $p$, using $\hat{p} = 0.37$ with margin of error 0.02.
+
+- $0.37 \pm 0.02$ gives the interval **0.35 to 0.39**.
+
+```{python}
+#| echo: false
+pd.Series({"Interval": "0.37 ± 0.02 = (0.35, 0.39)"}).to_string()
+```
+
+## Exercise 3.49
+
+For $\rho$, using $r = 0.62$ with margin of error 0.05.
+
+- $0.62 \pm 0.05$ gives the interval **0.57 to 0.67**.
+
+```{python}
+#| echo: false
+pd.Series({"Interval": "0.62 ± 0.05 = (0.57, 0.67)"}).to_string()
+```
+
+## Exercise 3.50
+
+For $\mu_1 - \mu_2$, using $\bar{x}_1 - \bar{x}_2 = 5$ with margin of error 8.
+
+- $5 \pm 8$ gives the interval **−3 to 13** — which includes 0, so a difference of 0 would
+  be plausible.
+
+```{python}
+#| echo: false
+pd.Series({"Interval": "5 ± 8 = (−3, 13)"}).to_string()
+```
+
+## Exercise 3.51
+
+*(Skill Builder 3: which of the values are plausible?)* A 95% confidence interval for a mean
+is 112.1 to 128.2. A value is plausible if it lies **inside** the interval.
+
+- **(a) $\mu = 121$: plausible** — 121 is inside (112.1, 128.2).
+- **(b) $\mu = 113.4$: plausible** — inside the interval.
+- **(c) $\mu = 105.3$: not plausible** — below the low end of 112.1.
+
+## Exercise 3.52
+
+A 95% confidence interval for a proportion is 0.72 to 0.79.
+
+- **(a) $p = 0.85$: not plausible** — above the upper end of 0.79.
+- **(b) $p = 0.75$: plausible** — inside the interval.
+- **(c) $p = 0.07$: not plausible** — far below the lower end of 0.72.
+
+## Exercise 3.53
+
+*(Skill Builder 4: statistic $\pm\, 2 \times SE$.)* $\hat{p} = 0.32$ and the standard error
+is 0.04. Parameter being estimated: $p$.
+
+- $0.32 \pm 2(0.04) = 0.32 \pm 0.08$ gives the 95% confidence interval **0.24 to 0.40** for
+  $p$.
+
+```{python}
+#| echo: false
+pd.Series({"Interval for p": "0.32 ± 2(0.04) = (0.24, 0.40)"}).to_string()
+```
+
+## Exercise 3.54
+
+$\bar{x} = 55$ and the standard error is 1.5. Parameter being estimated: $\mu$.
+
+- $55 \pm 2(1.5) = 55 \pm 3$ gives the interval **52 to 58** for $\mu$.
+
+```{python}
+#| echo: false
+pd.Series({"Interval for mu": "55 ± 2(1.5) = (52, 58)"}).to_string()
+```
+
+## Exercise 3.55
+
+$r = 0.34$ and the standard error is 0.02. Parameter being estimated: $\rho$.
+
+- $0.34 \pm 2(0.02) = 0.34 \pm 0.04$ gives the interval **0.30 to 0.38** for $\rho$.
+
+```{python}
+#| echo: false
+pd.Series({"Interval for rho": "0.34 ± 2(0.02) = (0.30, 0.38)"}).to_string()
+```
+
+## Exercise 3.56
+
+$r = -0.46$ and the margin of error for 95% confidence is 0.05. Parameter being estimated:
+$\rho$.
+
+- $-0.46 \pm 0.05$ gives the interval **−0.51 to −0.41** for $\rho$.
+
+```{python}
+#| echo: false
+pd.Series({"Interval for rho": "−0.46 ± 0.05 = (−0.51, −0.41)"}).to_string()
+```
+
+## Exercise 3.57
+
+$\bar{x}_1 - \bar{x}_2 = 3.0$ and the margin of error for 95% confidence is 1.2. Parameter
+being estimated: $\mu_1 - \mu_2$.
+
+- $3.0 \pm 1.2$ gives the interval **1.8 to 4.2** for $\mu_1 - \mu_2$ — entirely positive,
+  so a difference of 0 is not plausible.
+
+```{python}
+#| echo: false
+pd.Series({"Interval for mu1 - mu2": "3.0 ± 1.2 = (1.8, 4.2)"}).to_string()
+```
+
+## Exercise 3.58
+
+$\hat{p}_1 - \hat{p}_2 = 0.08$ and the margin of error for 95% confidence is ±3%.
+Parameter being estimated: $p_1 - p_2$.
+
+- $0.08 \pm 0.03$ gives the interval **0.05 to 0.11** for $p_1 - p_2$ — entirely above 0.
+
+```{python}
+#| echo: false
+pd.Series({"Interval for p1 - p2": "0.08 ± 0.03 = (0.05, 0.11)"}).to_string()
+```
+
+## Exercise 3.59
+
+**What Proportion of College Students Change Their Major?** A survey of 5204 first-year
+full-time college students in the US, administered at the end of the first year, found that
+35.6% had changed their choice of major during the year.
+
+- **(a) Sample.** The 5204 students are a subset of all US first-year full-time college
+  students.
+- **(b) Statistic**, $\hat{p} = 0.356$ — it describes the sample.
+- **(c) Parameter:** $p$ = the proportion of **all US first-year full-time college students**
+  who change their choice of major during the first year.
+- **(d)** $\hat{p} \pm 2 \cdot SE = 0.356 \pm 2(0.007) = 0.356 \pm 0.014$: the 95% confidence
+  interval is **0.342 to 0.370**.
+
+```{python}
+#| echo: false
+phat, se = 0.356, 0.007
+pd.Series({"Best estimate": phat, "Margin of error": 2 * se,
+           "95% CI": f"({phat - 2*se:.3f}, {phat + 2*se:.3f})"}).to_string()
+```
+
+## Exercise 3.60
+
+**Do You Ever Feel Homesick?** In a survey by the UCLA Higher Education Institute, 69
+percent of the first-year college students in the sample reported feeling homesick; the
+margin of error for the estimate is ±2% at 95% confidence.
+
+- **(a) Statistic**, $\hat{p} = 0.69$ — it describes the sample of surveyed students.
+- **(b) Parameter:** $p$ = the proportion of **all first-year college students** who feel
+  homesick.
+- **(c)** $0.69 \pm 0.02$ gives the 95% confidence interval **0.67 to 0.71**: we are 95%
+  sure that between 67% and 71% of all first-year college students feel homesick.
+
+```{python}
+#| echo: false
+pd.Series({"Interval for p": "0.69 ± 0.02 = (0.67, 0.71)"}).to_string()
+```
+
+## Exercise 3.61
+
+**Adolescent Brains Are Different.** Participants first learned to associate fear with a
+particular sound, then their ability to "unlearn" the connection was measured (larger
+numbers indicate less fear). We estimate the difference in mean response between adults and
+teenagers: mean response 0.225 for adults, 0.059 for teenagers, standard error 0.091.
+
+- **(a)** $\mu_A - \mu_T$ = the difference in mean physiological fear response between all
+  adults and all teenagers (adults minus teenagers).
+- **(b)** $\bar{x}_A - \bar{x}_T = 0.225 - 0.059 = \mathbf{0.166}$.
+- **(c)** $0.166 \pm 2(0.091) = 0.166 \pm 0.182$: the 95% confidence interval is
+  **−0.016 to 0.348**.
+- **(d) An experiment** — the fear association was deliberately created by the researchers
+  as part of the study protocol (although the adult/teen comparison itself was not
+  randomized: age is pre-existing).
+
+```{python}
+#| echo: false
+est, se = 0.225 - 0.059, 0.091
+pd.Series({"Best estimate": round(est, 3), "Margin of error": round(2 * se, 3),
+           "95% CI": f"({est - 2*se:.3f}, {est + 2*se:.3f})"}).to_string()
+```
+
+## Exercise 3.62
+
+**Do You Find Solitude Distressing?** 146 college students sat alone thinking for about 10
+minutes; 76 rated the experience as unpleasant. We estimate the proportion of all college
+students who would find it unpleasant; the margin of error is 8%.
+
+- **(a)** $p$ = the proportion of **all college students** who would find sitting alone with
+  their thoughts unpleasant.
+- **(b)** $\hat{p} = 76/146 = \mathbf{0.52}$.
+- **(c)** $0.52 \pm 0.08$ gives the 95% confidence interval **0.44 to 0.60**.
+
+```{python}
+#| echo: false
+phat = 76 / 146
+pd.Series({"Best estimate": round(phat, 3),
+           "95% CI": f"({phat - 0.08:.3f}, {phat + 0.08:.3f})"}).to_string()
+```
+
+## Exercise 3.63
+
+**Do You Prefer Pain over Solitude?** In a second study, 12 of 18 men and 6 of 24 women
+voluntarily gave themselves at least one electric shock rather than sit in solitary thought;
+the standard error of the estimate is 0.154.
+
+- **(a)** $p_M - p_W$ = the difference in the proportion of **all** men and **all** women
+  (like those in the study) who would prefer pain over solitude (men minus women).
+- **(b)** $\hat{p}_M - \hat{p}_W = 12/18 - 6/24 = 0.667 - 0.250 = \mathbf{0.417}$.
+- **(c)** $0.417 \pm 2(0.154) = 0.417 \pm 0.308$: the 95% confidence interval is
+  **0.109 to 0.725**.
+- **(d) No.** Zero is not in the interval, so "no difference" between males and females is
+  not plausible — men are more likely to prefer pain over solitude.
+
+```{python}
+#| echo: false
+est = 12/18 - 6/24
+se = 0.154
+pd.Series({"p-hat (men)": round(12/18, 3), "p-hat (women)": round(6/24, 3),
+           "Best estimate": round(est, 3),
+           "95% CI": f"({est - 2*se:.3f}, {est + 2*se:.3f})"}).to_string()
+```
+
+## Exercise 3.64
+
+**Moose Drool Makes Grass More Appetizing.** One grass species produces the toxin
+ergovaline (about 1.0 ppm) to deter grazers; saliva from a moose counteracts the toxin.
+Scientists estimate that, after treatment with moose drool, the mean ergovaline level on the
+grass is 0.183 ppm, with standard error 0.016.
+
+- **(a)** $\mu$ = the mean level of ergovaline (in ppm) on grass **after treatment with
+  moose drool** (for all such grass).
+- **(b)** $\bar{x} = \mathbf{0.183}$ ppm.
+- **(c)** $0.183 \pm 2(0.016) = 0.183 \pm 0.032$: the 95% confidence interval is
+  **0.151 to 0.215 ppm**. We are 95% sure that the mean toxin level on drool-treated grass
+  is between 0.151 and 0.215 ppm — far below the roughly 1.0 ppm without treatment, so moose
+  saliva does appear to make the grass more appetizing.
+
+```{python}
+#| echo: false
+est, se = 0.183, 0.016
+pd.Series({"Best estimate": est, "Margin of error": round(2 * se, 3),
+           "95% CI": f"({est - 2*se:.3f}, {est + 2*se:.3f})"}).to_string()
+```
+
+## Exercise 3.65
+
+**Have You Ever Been Arrested?** A study of 7335 young people in the US found that 30% had
+been arrested (for a crime other than a traffic violation) by age 23.
+
+- **(a) Statistic**, $\hat{p} = 0.30$ — it describes the 7335 people studied.
+- **(b) Parameter:** $p$ = the proportion of **all young people in the US** who have been
+  arrested (other than for a traffic violation) by age 23.
+- **(c)** $0.30 \pm 0.01$: the range of plausible values is **0.29 to 0.31**.
+- **(d) No.** The interval (0.29, 0.31) lies entirely above 0.25, so it is very unlikely
+  that the actual proportion is less than 25%.
+
+```{python}
+#| echo: false
+pd.Series({"Best estimate": 0.30, "95% CI": "(0.29, 0.31)"}).to_string()
+```
+
+## Exercise 3.66
+
+**Employer-Based Health Insurance.** A Gallup poll reports "Forty-five percent of American
+adults reported getting their health insurance from an employer," based on "a random sample
+of 147,291 adults, aged 18 and over, living in the US," with "a maximum margin of sampling
+error is ±1 percentage point."
+
+- **(a) Population:** all American adults, aged 18 and over, living in the US.
+  **Sample:** the 147,291 adults polled. **Parameter:** $p$ = the proportion of all American
+  adults who get their health insurance from an employer. **Statistic:**
+  $\hat{p} = 0.45$.
+- **(b)** $0.45 \pm 0.01$ gives **0.44 to 0.46**: we are 95% confident that between 44% and
+  46% of American adults get their health insurance from an employer.
+
+```{python}
+#| echo: false
+pd.Series({"Interval for p": "0.45 ± 0.01 = (0.44, 0.46)"}).to_string()
+```
+
+## Exercise 3.67
+
+**Subtle Language Changes Impact Conflict Resolution.** Participants were randomly divided
+into two groups hearing controversial statements in noun form (Group 1) or verb form
+(Group 2), then rated their anger on a 1–6 scale. A 90% confidence interval for the
+difference in mean anger rating (Group 1 − Group 2) is −0.86 to −0.06.
+
+- **(a)** $\mu_N - \mu_V$ = the difference in mean anger rating between all people hearing
+  statements in **noun form** and all people hearing them in **verb form**.
+- **(b)** $\bar{x}_N - \bar{x}_V$ — the midpoint of the interval:
+  $(-0.86 + (-0.06))/2 = \mathbf{-0.46}$ (matching Exercise 2.82).
+- **(c) No.** Zero is not in the interval, so "basically the same" mean anger is not
+  plausible at the 90% level. The interval is entirely negative, so the **noun form has the
+  lower mean anger** and the verb form the higher.
+- **(d) Yes** — participants were **randomly assigned** to a language form, so the
+  difference in anger can be attributed to the language structure itself.
+- **(e) Yes, it matters:** to keep anger low, use the **noun form** ("the division of
+  Jerusalem" rather than "dividing Jerusalem").
+
+```{python}
+#| echo: false
+mid = (-0.86 + -0.06) / 2
+pd.Series({"Best estimate": mid, "90% CI": "(-0.86, -0.06)",
+           "Zero plausible?": bool(-0.86 <= 0 <= -0.06)}).to_string()
+```
+
+## Exercise 3.68
+
+**Soda Consumption and Mortality in Europe.** A hazard ratio of 1 means no discernible
+difference in risk between groups. In a large European study, the hazard ratio for mortality
+for people drinking two or more glasses of soda per day (relative to less than one glass a
+month) was 1.17, with 95% confidence interval 1.11 to 1.22.
+
+- **(a) Yes.** The entire interval lies **above 1**, so with 95% confidence, high soda
+  consumption is associated with an increased risk of death.
+- **(b) No.** This is an **observational study** — soda consumption was not assigned — so
+  association does not imply causation; confounding variables (diet, lifestyle, weight...)
+  could explain the association.
+
+## Exercise 3.69
+
+**Is a Car a Necessity?** A random sample of $n = 1483$ US adults found a 95% confidence
+interval of 0.83 to 0.89 for the proportion saying a car is a necessity.
+
+- **Correct interpretation:** We are 95% confident that the **proportion of all US adults**
+  who consider a car a necessity is **between 0.83 and 0.89** — these are the plausible
+  values of the parameter.
+- It does *not* mean 95% of adults say "necessity", nor that 95% of future samples fall in
+  this interval, nor anything about individual people — the interval estimates one
+  population proportion, and the 95% describes the reliability of the *method*.
+
+## Exercise 3.70
+
+**Number of Text Messages a Day.** A random sample of $n = 755$ US cell phone users age 18
+and older in May 2011 found an average of 41.5 messages sent or received per day, with
+standard error about 6.1.
+
+- **(a) Population:** all US cell phone users age 18 and older.
+  **Parameter:** $\mu$ = the mean number of text messages sent or received per day (for all
+  such users). **Best estimate:** $\bar{x} = 41.5$ messages.
+- **(b)** $41.5 \pm 2(6.1) = 41.5 \pm 12.2$: the 95% confidence interval is **29.3 to 53.7
+  messages**. We are 95% sure that the mean number of daily texts for all US adult cell
+  phone users is between about 29 and 54.
+
+```{python}
+#| echo: false
+est, se = 41.5, 6.1
+pd.Series({"Best estimate": est, "Margin of error": 2 * se,
+           "95% CI": f"({est - 2*se:.1f}, {est + 2*se:.1f})"}).to_string()
+```
+
+## Exercise 3.71
+
+**What Proportion Believe in One True Love?** In Data 2.1, a random sample of 2625 US
+adults was asked whether there is "only one true love for each person"; 735 agreed. The
+standard error for this sample proportion is 0.009.
+
+- **Parameter:** $p$ = the proportion of all US adults who agree that there is only one true
+  love for each person.
+- **Best estimate:** $\hat{p} = 735/2625 = \mathbf{0.28}$.
+- **Margin of error:** $2(0.009) = \mathbf{0.018}$.
+- **95% confidence interval:** $0.28 \pm 0.018$ = **0.262 to 0.298**. We are 95% confident
+  that between about 26.2% and 29.8% of all US adults believe there is only one true love.
+
+```{python}
+#| echo: false
+phat = 735 / 2625
+se = 0.009
+pd.Series({"n": 2625, "Best estimate": round(phat, 3),
+           "Margin of error": round(2 * se, 3),
+           "95% CI": f"({phat - 2*se:.3f}, {phat + 2*se:.3f})"}).to_string()
+```
+
+## Exercise 3.72
+
+**Males vs Females and One True Love.** The responses by sex from Table 3.6 (n = 2625):
+
+| | Male | Female | Total |
+|---|---|---|---|
+| Agree | 372 | 363 | 735 |
+| Disagree | 807 | 1005 | 1812 |
+| Don't know | 34 | 44 | 78 |
+| Total | 1213 | 1412 | 2625 |
+
+Using the fact that the standard error for the difference is 0.018, the 95% confidence
+interval for $p_M - p_F$ is $\hat{p}_M - \hat{p}_F \pm 2(0.018) = 0.0496 \pm 0.036$, i.e.
+**0.014 to 0.086**.
+
+- **Interpretation:** We are 95% confident that the proportion of males agreeing exceeds the
+  proportion of females agreeing by between 1.4 and 8.6 percentage points.
+- **No** — zero is not in the interval, so it is not plausible that there is no difference
+  between males and females; males are somewhat more likely to agree.
+
+```{python}
+#| echo: false
+t36 = pd.DataFrame({"Agree": [372, 363], "Disagree": [807, 1005],
+                    "Don't know": [34, 44]},
+                   index=["Male", "Female"]).T
+t36.loc["Total"] = t36.sum()
+t36.to_string()
+```
+
+```{python}
+#| echo: false
+pm, pf = 372/1213, 363/1412
+d = pm - pf
+pd.Series({"p-hat (male)": round(pm, 4), "p-hat (female)": round(pf, 4),
+           "Difference": round(d, 4),
+           "95% CI": f"({d - 2*0.018:.4f}, {d + 2*0.018:.4f})"}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: 95% confidence intervals for the proportion agreeing there is one true love, by sex
+fig, ax = plt.subplots(figsize=(4.5, 2.6))
+ax.errorbar([pm, pf], [1, 0], xerr=2 * 0.018, fmt="o",
+            color="#4c72b0", capsize=4)
+ax.set_yticks([1, 0], ["Male", "Female"])
+ax.set_xlim(0.20, 0.36)
+ax.set_xlabel("Proportion agreeing")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 3.73
+
+**Playing Video Games.** 23 male volunteers: 11 action video game players, 12 non-players.
+A 95% confidence interval for mean response time, players minus non-players, is −1.8 to
+−1.2 seconds; for mean accuracy score, players minus non-players, it is −4.2 to +5.8.
+
+- **(a)** We are 95% confident that the mean response time for game players is between 1.2
+  and 1.8 seconds **lower** than for non-players (the interval for players − non-players is
+  entirely negative).
+- **(b) Not plausible.** Zero is not in the interval, so the groups are not basically the
+  same in response time — **game players are faster** (smaller response time).
+- **(c)** We are 95% confident that the mean accuracy score for game players is between 4.2
+  points lower and 5.8 points higher than for non-players.
+- **(d) Plausible.** Zero is in the interval, so the groups may be basically the same in
+  accuracy; if they do differ, the interval does not even tell us which group is more
+  accurate.
+
+## Exercise 3.74
+
+**Bisphenol A in Your Soup Cans.** 75 participants ate canned soup or fresh soup for lunch
+for five days, switched groups after a break, and the difference in urinary BPA between the
+two treatments was measured for each participant. A 95% confidence interval for the
+difference in means (canned minus fresh) is 19.6 to 25.5 μg/L.
+
+- **(a) A matched pairs experiment.** Each participant experienced **both** treatments (in
+  sequence), so each person serves as their own control — this removes person-to-person
+  variability in baseline BPA. (It is an experiment because the diet was imposed.)
+- **(b)** $\mu_d$ = the mean difference in urinary BPA concentration (canned minus fresh)
+  for the population of participants like these.
+- **(c)** The entire interval is positive: we are 95% confident that canned soup
+  consumption raises mean urinary BPA by between 19.6 and 25.5 μg/L — consistent with the
+  reported "more than 1000% increase."
+- **(d) Narrower.** With 500 participants instead of 75 the standard error would shrink
+  (roughly by a factor of $\sqrt{500/75}$), so the margin of error — and the interval —
+  would be smaller.
+
+## Exercise 3.75
+
+**Predicting Election Results.** For each poll, the candidate wins with confidence only if
+their interval lies **entirely above 50%** (and above the opponent's interval):
+
+```{python}
+#| echo: false
+polls = pd.DataFrame({"Poll": list("abcd"),
+                      "A": [54, 52, 53, 58], "B": [46, 48, 47, 42],
+                      "ME": [5, 1, 2, 10]})
+rows = []
+for _, r in polls.iterrows():
+    a_lo, a_hi = r["A"] - r["ME"], r["A"] + r["ME"]
+    b_lo, b_hi = r["B"] - r["ME"], r["B"] + r["ME"]
+    rows.append({"Poll": r["Poll"], "A interval": f"({a_lo}, {a_hi})",
+                 "B interval": f"({b_lo}, {b_hi})",
+                 "Intervals overlap": a_lo <= b_hi,
+                 "A entirely above 50%": a_lo > 50,
+                 "Confident A wins": (a_lo > 50) and not (a_lo <= b_hi)})
+pd.DataFrame(rows).set_index("Poll").to_string()
+```
+
+- **(a) Not confident.** A: 54 ± 5 = (49, 59); B: 46 ± 5 = (41, 51). The intervals overlap
+  and A's dips below 50%.
+- **(b) Confident.** A: (51, 53); B: (47, 49). No overlap, and all of A's interval is above
+  50%.
+- **(c) Confident.** A: (51, 55); B: (45, 49). No overlap, A entirely above 50%.
+- **(d) Not confident.** A: (48, 68); B: (32, 52). The intervals overlap (48 to 52), so B
+  could still win.
+
+```{python}
+#| echo: false
+#| fig-cap: Poll intervals for candidates A and B in each of the four polls, with the 50 percent line
+fig, ax = plt.subplots(figsize=(6, 3))
+for i, (_, r) in enumerate(polls.iterrows()):
+    ax.errorbar(i - 0.15, r["A"], yerr=r["ME"], fmt="o", color="#4c72b0",
+                capsize=4, label="Candidate A" if i == 0 else "")
+    ax.errorbar(i + 0.15, r["B"], yerr=r["ME"], fmt="o", color="#c44e52",
+                capsize=4, label="Candidate B" if i == 0 else "")
+ax.axhline(50, color="gray", ls="--", lw=1)
+ax.text(3.42, 50.4, "50%", color="gray", fontsize=9)
+ax.set_xticks(range(4), ["(a) ±5", "(b) ±1", "(c) ±2", "(d) ±10"])
+ax.set_xlabel("Poll (margin of error)")
+ax.set_ylabel("Support (%)")
+ax.legend(loc="upper left", frameon=True)
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 3.76
+
+**Effect of Overeating for One Month: Average Long-Term Weight Gain.** 18 healthy,
+normal-weight people increased calorie intake by 70% and limited activity for four weeks.
+Two and a half years later, the mean weight gain for participants was 6.8 lbs with a
+standard error of 1.2 lbs (a control group that did not binge had no change).
+
+- **(a)** $\mu$ = the **mean weight gain two and a half years later** for all people (like
+  these) who overeat for a month.
+- **(b)** The exact value could only be found with a **census** — measuring the weight gain
+  2.5 years later for *everyone* in the population — which is impractical; that is why we
+  estimate with a confidence interval.
+- **(c)** $6.8 \pm 2(1.2) = 6.8 \pm 2.4$: the 95% confidence interval is **4.4 to 9.2
+  lbs**. We are 95% sure that, on average, people who overeat for a month gain between 4.4
+  and 9.2 pounds two and a half years later.
+- **(d)** Margin of error $= 2(1.2) = \mathbf{2.4}$ lbs: our best estimate of 6.8 lbs is
+  likely within about 2.4 lbs of the true population mean.
+
+```{python}
+#| echo: false
+est, se = 6.8, 1.2
+pd.Series({"Best estimate": est, "Margin of error": 2 * se,
+           "95% CI": f"({est - 2*se:.1f}, {est + 2*se:.1f})"}).to_string()
+```
+
+## Exercise 3.77
+
+**Fluoride Exposure in Pregnant Women.** Regression lines predicting children's IQ scores
+from maternal fluoride concentration were fit separately for boys and girls; the effect
+seems real for boys but inconclusive for girls. The two 95% confidence intervals for the
+slope are −2.53 to 7.33 and −8.38 to −0.60.
+
+- **Boys: −8.38 to −0.60.** This interval is entirely negative — a negative slope (more
+  fluoride ↔ lower IQ) is detected, matching the "true for boys" conclusion.
+- **Girls: −2.53 to 7.33.** This interval contains 0, so a slope of 0 (no effect) remains
+  plausible — matching the "inconclusive for girls" conclusion.
+
+```{python}
+#| echo: false
+pd.Series({"Boys": "(-8.38, -0.60) — excludes 0: significant negative slope",
+           "Girls": "(-2.53, 7.33) — includes 0: inconclusive"}).to_string()
+```
+
+## Exercise 3.78
+
+**What Proportion of Canadian Adults Are Married?** The 2016 Canadian Census shows
+$p = 0.457$ of Canadian adults are married. Draw samples of size $n = 100$ (as StatKey
+would) and build each 95% interval as $\hat{p} \pm 2(0.050)$:
+
+- **(a)** The simulation below draws sample proportions: with the fixed seed shown, the
+  first sample gives $\hat{p} = \mathbf{0.42}$ (your value will differ — that is the point).
+- **(b)** $0.42 \pm 0.10$: interval **0.320 to 0.520**.
+- **(c) Yes** — $p = 0.457$ is inside this interval (the method worked this time).
+- **(d)** A second sample gives $\hat{p} = \mathbf{0.47}$, interval **0.370 to 0.570**, which
+  also contains 0.457 — but any single interval may miss; about 95% of such intervals
+  capture $p$.
+
+```{python}
+#| echo: false
+rng = np.random.default_rng(2026)
+rows = []
+for k in range(2):
+    phat = rng.choice([1, 0], size=100, p=[0.457, 0.543]).mean()
+    lo, hi = phat - 2 * 0.050, phat + 2 * 0.050
+    rows.append({"Sample": k + 1, "p-hat": phat,
+                 "95% CI": f"({lo:.3f}, {hi:.3f})",
+                 "Contains p = 0.457?": bool(lo <= 0.457 <= hi)})
+pd.DataFrame(rows).set_index("Sample").to_string()
+```
+
+## Exercise 3.79
+
+**Student Misinterpretations.** The data are pulse rates from a random sample of 100
+students at *her college*, and the 95% confidence interval for the mean pulse rate is
+(65.5, 71.8). The **correct** interpretation is: *we are 95% confident that the mean pulse
+rate for all students at this college is between 65.5 and 71.8 beats per minute.* Each
+statement below is improper:
+
+- **(a)** Speaks of **all students' individual pulse rates** — the interval estimates the
+  *mean*, not every individual value.
+- **(b)** Speaks of the mean **for this sample** — the sample mean is known exactly (68.65,
+  the center of the interval); no estimation needed.
+- **(c)** We are 100% sure the interval goes from 65.5 to 71.8 — it was *computed* to do so;
+  the 95% describes how often the *method* captures the parameter, not the interval itself.
+- **(d)** "95% of all students" — again confuses an interval for the **mean** with an
+  interval for **individual** pulse rates.
+- **(e)** Wrong **population**: the sample came from *this college*, not all US college
+  students.
+- **(f)** Individual students do not have "mean pulse rates" — the statement garbles what
+  quantity is being estimated (the population mean, one fixed number).
+- **(g)** Closest to right, but still improper: 95% of sample means fall within $2 \times SE$
+  of the **population mean** $\mu$, not within this one fixed interval centered at
+  $\bar{x} = 68.65$; the interval (65.5, 71.8) either captures $\mu$ or it does not.
+
+:::
