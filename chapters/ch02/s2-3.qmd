@@ -1,0 +1,1140 @@
+---
+execute-dir: project
+title: "Chapter 2 · Section 2.3"
+subtitle: "One Quantitative Variable: Measures of Spread — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 2.3 of Lock⁵ moves beyond measures of center to measures of **spread**:
+how variable are the data? The simplest measure is the **range** (maximum minus
+minimum), but it depends entirely on the two extreme values. The **five-number
+summary** (minimum, first quartile $Q_1$, median, third quartile $Q_3$, maximum)
+resists outliers, and the distance between the quartiles — the **interquartile
+range (IQR)** — describes the spread of the middle 50% of the data. The
+**standard deviation** $s$ measures spread by averaging (roughly) the squared
+distances of the data values from their mean, and is the natural companion to
+the mean. For distributions that are symmetric and bell-shaped, the **95% rule**
+says about 95% of values fall within two standard deviations of the mean, which
+also underlies **standardization**: a **z-score**,
+$z = \frac{x - \text{mean}}{s}$, counts how many standard deviations a value
+sits above (positive) or below (negative) the mean and puts values from
+different variables on a common scale.
+The exercises below are from *Statistics: Unlocking the Power of Data*
+(Lock⁵, 3rd ed., pp. 96–103). Skill Builders 2.94–2.121 compute and match
+summaries, estimate them from graphs, judge skewness, find z-scores and apply
+the 95% rule; 2.122–2.152 apply the ideas to real datasets, several of which
+are loaded below with a small executable EDA. Quartiles shown use the
+median-of-halves convention; different technologies may give quartiles that
+differ slightly.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+sns.set_theme(style="whitegrid")
+
+def five_num(x):
+    """Five-number summary with the median-of-halves quartile convention."""
+    x = np.sort(np.asarray(list(x), dtype=float))
+    n = len(x)
+    med = lambda v: (v[(len(v) - 1) // 2] + v[len(v) // 2]) / 2
+    lo, hi = (x[: n // 2], x[n // 2:]) if n % 2 == 0 else (x[: n // 2], x[n // 2 + 1 :])
+    return (x[0], med(lo), med(x), med(hi), x[-1])
+```
+
+::: {.panel-tabset}
+
+## Exercise 2.94
+
+*(Skill Builder 1: find the mean, standard deviation, and five number summary.)*
+Data: 10, 11, 13, 14, 14, 17, 18, 20, 21, 25, 28
+
+- **Mean $\bar{x} = 17.36$; standard deviation $s = 5.73$.**
+- **Five number summary: (10, 13, 17, 21, 28).**
+
+```{python}
+#| echo: false
+d = np.array([10, 11, 13, 14, 14, 17, 18, 20, 21, 25, 28])
+pd.Series({"Mean": round(d.mean(), 2), "StDev": round(d.std(ddof=1), 2),
+           "Five number summary": str(tuple(int(v) for v in five_num(d)))}).to_string()
+```
+
+## Exercise 2.95
+
+Data: 1, 3, 4, 5, 7, 10, 18, 20, 25, 31, 42
+
+- **Mean $\bar{x} = 15.09$; standard deviation $s = 13.30$.**
+- **Five number summary: (1, 4, 10, 25, 42).**
+
+```{python}
+#| echo: false
+d = np.array([1, 3, 4, 5, 7, 10, 18, 20, 25, 31, 42])
+pd.Series({"Mean": round(d.mean(), 2), "StDev": round(d.std(ddof=1), 2),
+           "Five number summary": str(tuple(int(v) for v in five_num(d)))}).to_string()
+```
+
+## Exercise 2.96
+
+Data: 4, 5, 8, 4, 11, 8, 18, 12, 5, 15, 22, 7, 14, 11, 12
+
+- **Mean $\bar{x} = 10.40$; standard deviation $s = 5.32$.**
+- **Five number summary: (4, 5, 11, 14, 22).**
+
+```{python}
+#| echo: false
+d = np.array([4, 5, 8, 4, 11, 8, 18, 12, 5, 15, 22, 7, 14, 11, 12])
+pd.Series({"Mean": round(d.mean(), 2), "StDev": round(d.std(ddof=1), 2),
+           "Five number summary": str(tuple(int(v) for v in five_num(d)))}).to_string()
+```
+
+## Exercise 2.97
+
+Data: 25, 72, 77, 31, 80, 80, 64, 39, 75, 58, 43, 67, 54, 71, 60
+
+- **Mean $\bar{x} = 59.73$; standard deviation $s = 17.89$.**
+- **Five number summary: (25, 43, 64, 75, 80).**
+
+```{python}
+#| echo: false
+d = np.array([25, 72, 77, 31, 80, 80, 64, 39, 75, 58, 43, 67, 54, 71, 60])
+pd.Series({"Mean": round(d.mean(), 2), "StDev": round(d.std(ddof=1), 2),
+           "Five number summary": str(tuple(int(v) for v in five_num(d)))}).to_string()
+```
+
+## Exercise 2.98
+
+The variable **Exercise**, number of hours spent exercising per week, in the
+`StudentSurvey` dataset.
+
+- **Mean $\bar{x} = 9.05$ hours; standard deviation $s = 5.74$ hours.**
+- **Five number summary: (0, 5, 8, 12, 40).** Half the students exercise between
+  5 and 12 hours a week, but the maximum of 40 hours is far from the rest of the
+  data.
+
+*Data:* `data/ch01/StudentSurvey.csv` (n = 361 with responses), from
+<https://www.lock5stat.com/datasets3e/StudentSurvey.csv>:
+
+```{python}
+#| echo: false
+ex = pd.read_csv("data/ch01/StudentSurvey.csv")["Exercise"].dropna()
+pd.Series({"Mean": round(ex.mean(), 2), "StDev": round(ex.std(ddof=1), 2),
+           "Five number summary": str(tuple(round(v, 1) for v in five_num(ex)))}).to_string()
+```
+
+## Exercise 2.99
+
+The variable **TV**, number of hours spent watching television per week, in the
+`StudentSurvey` dataset.
+
+- **Mean $\bar{x} = 6.50$ hours; standard deviation $s = 5.58$ hours.**
+- **Five number summary: (0, 3, 5, 9.5, 40).** A quarter of the students watch
+  no television at all, and viewing ranges up to 40 hours a week.
+
+```{python}
+#| echo: false
+tv = pd.read_csv("data/ch01/StudentSurvey.csv")["TV"].dropna()
+pd.Series({"Mean": round(tv.mean(), 2), "StDev": round(tv.std(ddof=1), 2),
+           "Five number summary": str(tuple(round(v, 1) for v in five_num(tv)))}).to_string()
+```
+
+## Exercise 2.100
+
+*(Skill Builder 2: match the standard deviations $s=1$, $s=3$, $s=5$ with the
+three histograms in Figure 2.22.)*
+
+- **$s = 1$ ↔ Histogram B**, whose values are packed tightly around 10 (from
+  about 5 to 15).
+- **$s = 3$ ↔ Histogram C**, moderately spread over roughly 0 to 20.
+- **$s = 5$ ↔ Histogram A**, spread across the entire −5 to 25 axis.
+
+The larger the standard deviation, the more spread out (and flatter) the
+histogram.
+
+## Exercise 2.101
+
+Match each standard deviation with one of the histograms in Figure 2.23:
+
+- **(a) $s = 0.5$ ↔ V** (values spread over about $-1$ to $1$)
+- **(b) $s = 10$ ↔ III** (values spread over about 70 to 130)
+- **(c) $s = 50$ ↔ IV** (values spread over about 0 to 250)
+- **(d) $s = 1$ ↔ I** (values spread over about $-3$ to $3$)
+- **(e) $s = 1000$ ↔ VI** (values spread over about $-1500$ to $1500$)
+- **(f) $s = 0.29$ ↔ II** (values confined to about 0 to 0.8)
+
+Each standard deviation matches the scale over which its histogram spreads.
+
+## Exercise 2.102
+
+Match each five number summary with one of the histograms in Figure 2.23 — the
+minimum and maximum locate the histogram's extent, and the quartiles show where
+the middle 50% sits:
+
+- **(a) $(0, 0.25, 0.5, 0.75, 1)$ ↔ II** — the only summary on a 0-to-1 scale.
+- **(b) $(-1.08, -0.30, 0.01, 0.35, 1.27)$ ↔ V** — spans about $-1$ to $1$.
+- **(c) $(0.64, 27.25, 53.16, 100, 275.7)$ ↔ IV** — spans about 0 to 250.
+- **(d) $(-3.5, -0.63, -0.11, 0.59, 2.66)$ ↔ I** — spans about $-3$ to $3$.
+- **(e) $(71.45, 92.77, 99.41, 106.60, 129.70)$ ↔ III** — spans about 70 to 130.
+- **(f) $(-1296, -1005, -705, 998, 1312)$ ↔ VI** — spans about $-1500$ to $1500$.
+
+## Exercise 2.103
+
+Match each five number summary with one of the boxplot-shaped histograms
+W, X, Y, Z in Figure 2.24 (same scale on all four):
+
+- **(a) $(1, 3, 5, 7, 9)$ ↔ W** — the box fills the middle of the range:
+  evenly spread, flat-topped.
+- **(b) $(1, 4, 5, 6, 9)$ ↔ X** — a narrow box centered at 5 with long
+  whiskers: a single-peaked mound.
+- **(c) $(1, 5, 7, 8, 9)$ ↔ Y** — the box (5 to 8) sits at the high end with a
+  long lower tail: skewed to the left.
+- **(d) $(1, 1, 2, 4, 9)$ ↔ Z** — the box (1 to 4) sits at the low end with a
+  long upper tail: skewed to the right.
+
+```{python}
+#| echo: false
+#| fig-cap: The four five number summaries drawn as boxplots on a common 0 to 10 scale
+stats = [("a (1,3,5,7,9)", 1, 3, 5, 7, 9), ("b (1,4,5,6,9)", 1, 4, 5, 6, 9),
+         ("c (1,5,7,8,9)", 1, 5, 7, 8, 9), ("d (1,1,2,4,9)", 1, 1, 2, 4, 9)]
+fig, ax = plt.subplots(figsize=(6, 2.6))
+ax.bxp([{"label": lbl, "med": m, "q1": q1, "q3": q3, "whislo": lo, "whishi": hi,
+         "fliers": []} for lbl, lo, q1, m, q3, hi in stats], vert=False, widths=0.5)
+ax.set_xlim(0, 10.5)
+ax.set_xlabel("Value")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.104
+
+*(Skill Builder 4: estimate summary statistics from Figure 2.25, a bell-shaped
+histogram of $x$ centered at 500 with values from 440 to 560.)* Estimate the
+mean and the standard deviation.
+
+- **Mean ≈ 500.** The histogram is symmetric with its peak at 500.
+- **Standard deviation ≈ 20.** The values spread over roughly 440 to 560
+  (about 3 SDs on either side of the mean), and the middle 95% or so lies within
+  about 460 to 540.
+
+## Exercise 2.105
+
+Estimate the 10th and 90th percentiles for the data in Figure 2.25.
+
+- **10th percentile ≈ 460** — about 10% of the area lies to the left of 460.
+- **90th percentile ≈ 540** — about 10% of the area lies to the right of 540.
+- Because the distribution is symmetric, the two percentiles sit equally far
+  (about 40) from the mean of 500.
+
+## Exercise 2.106
+
+Estimate the five number summary for the data in Figure 2.25.
+
+- **Five number summary ≈ (440, 480, 500, 520, 560).**
+- The histogram is roughly symmetric, so the quartiles sit symmetrically about
+  the median of 500, and the minimum and maximum are about 40 on either side.
+
+## Exercise 2.107
+
+Estimate the mean and the standard deviation for the dotplot in Figure 2.26
+($n = 100$, values from about 58 to 77, centered at 68).
+
+- **Mean ≈ 68.** The pile of dots peaks at 68.
+- **Standard deviation ≈ 4.5.** The dots spread over roughly 58 to 77 — about
+  9 or 10 on either side of the mean, or a bit more than 4 standard deviations
+  in each direction... more directly, the middle 95% of dots lie within about
+  9 of 68.
+
+## Exercise 2.108
+
+Estimate the 10th and 90th percentiles for the data in Figure 2.26.
+
+- With $n = 100$ the 10th percentile is roughly the 10th dot from the left and
+  the 90th percentile roughly the 90th.
+- **10th percentile ≈ 62; 90th percentile ≈ 73.** The left tail is slightly
+  longer, so the 10th percentile sits a bit farther from the median (68) than
+  the 90th does.
+
+## Exercise 2.109
+
+Estimate the five number summary for the data in Figure 2.26.
+
+- **Five number summary ≈ (58, 65, 68, 70, 77).**
+- The minimum and maximum are the extreme dots (about 58 and 77); the middle
+  50% of dots fall between about 65 and 70, with the median at 68. The longer
+  lower tail shows mild left skew.
+
+## Exercise 2.110
+
+*(Skill Builder 5: is the distribution skewed left, skewed right, or
+symmetric?)* Five number summary (15, 25, 30, 35, 45).
+
+- **Symmetric.** The quartiles are equidistant from the median (25 to 30 and 30
+  to 35) and the tails match (15 to 25 and 35 to 45).
+
+## Exercise 2.111
+
+Five number summary (100, 110, 115, 160, 220).
+
+- **Skewed to the right.** The lower tail is short (100 to 110) while the upper
+  half stretches much farther (115 to 220); the longer tail points right.
+
+## Exercise 2.112
+
+Five number summary (0, 15, 22, 24, 27).
+
+- **Skewed to the left.** The upper tail is short (24 to 27) while the lower
+  half stretches much farther (0 to 22); the longer tail points left.
+
+## Exercise 2.113
+
+Five number summary (22.4, 30.1, 36.3, 42.5, 50.7).
+
+- **Symmetric.** The quartiles are equidistant from the median (30.1 to 36.3
+  and 36.3 to 42.5) and the two tails match (22.4 to 30.1 and 42.5 to 50.7).
+
+## Exercise 2.114
+
+*(Skill Builder 6: find and interpret the z-score.)* The value 243 in a dataset
+with mean 200 and standard deviation 25.
+
+- $z = \frac{243 - 200}{25} = \mathbf{1.72}$.
+- The value 243 is **1.72 standard deviations above the mean**.
+
+## Exercise 2.115
+
+The value 88 in a dataset with mean 96 and standard deviation 10.
+
+- $z = \frac{88 - 96}{10} = \mathbf{-0.8}$.
+- The value 88 is 0.8 standard deviations **below** the mean.
+
+## Exercise 2.116
+
+The value 5.2 in a dataset with mean 12 and standard deviation 2.3.
+
+- $z = \frac{5.2 - 12}{2.3} = \mathbf{-2.96}$.
+- The value 5.2 is about 3 standard deviations below the mean — quite unusual
+  for a bell-shaped distribution.
+
+## Exercise 2.117
+
+The value 8.1 in a dataset with mean 5 and standard deviation 2.
+
+- $z = \frac{8.1 - 5}{2} = \mathbf{1.55}$.
+- The value 8.1 is 1.55 standard deviations above the mean.
+
+## Exercise 2.118
+
+*(Skill Builder 7: use the 95% rule.)* A bell-shaped distribution with mean 200
+and standard deviation 25.
+
+- About 95% of values fall within $\bar{x} \pm 2s = 200 \pm 2(25)$.
+- **Interval: 150 to 250.**
+
+## Exercise 2.119
+
+A bell-shaped distribution with mean 10 and standard deviation 3.
+
+- $10 \pm 2(3)$.
+- **Interval: 4 to 16.**
+
+## Exercise 2.120
+
+A bell-shaped distribution with mean 1000 and standard deviation 10.
+
+- $1000 \pm 2(10)$.
+- **Interval: 980 to 1020.**
+
+## Exercise 2.121
+
+A bell-shaped distribution with mean 1500 and standard deviation 300.
+
+- $1500 \pm 2(300)$.
+- **Interval: 900 to 2100.**
+
+## Exercise 2.122
+
+**Estimating Summary Statistics.** Data:
+45, 46, 48, 49, 49, 50, 50, 52, 52, 54, 57, 57, 58, 58, 60, 61
+
+- **(a) Closest to the mean: 53.** The values are roughly symmetric around the
+  low-to-mid 50s; 53 sits at the visual center, while 47 and 58 are too low and
+  too high and 60 is beyond most of the data.
+- **(b) Closest to the standard deviation: 5.** The values spread from 45 to 61
+  (range 16 ≈ 3–4 SDs), so the SD is around 4–5 — far smaller than 10, 52, or
+  55 and larger than 1.
+- **(c)** Computed below: **$\bar{x} = 52.88$ and $s = 5.07$**, confirming both
+  estimates.
+
+```{python}
+#| echo: false
+d = np.array([45, 46, 48, 49, 49, 50, 50, 52, 52, 54, 57, 57, 58, 58, 60, 61])
+pd.Series({"Mean": round(d.mean(), 2), "StDev": round(d.std(ddof=1), 2)}).to_string()
+```
+
+## Exercise 2.123
+
+**Five Number Summary for Armspan.** From the printed output for armspan (cm)
+in the `PASeniors` dataset: $n = 415$, mean 170.76, StDev 13.46, minimum 119,
+$Q_1 = 162$, median 171, $Q_3 = 180$, maximum 210.
+
+- **(a) Five number summary: (119, 162, 171, 180, 210).**
+- **(b) Range = $210 - 119 = 91$ cm; IQR = $180 - 162 = 18$ cm.**
+- **(c)** The 30th percentile lies between $Q_1 = 162$ and the median 171
+  (between the 25th and 50th percentiles) — **between 162 and 171**. The 80th
+  percentile lies above $Q_3 = 180$ and below the maximum — **between 180 and
+  210** (in fact just above 180).
+
+*Data:* `data/ch01/PASeniors.csv`, from
+<https://www.lock5stat.com/datasets3e/PASeniors.csv> — the summaries reproduce
+the printed output:
+
+```{python}
+#| echo: false
+arm = pd.read_csv("data/ch01/PASeniors.csv")["Armspan"].dropna()
+pd.Series({"n": len(arm), "Mean": round(arm.mean(), 2),
+           "StDev": round(arm.std(ddof=1), 2),
+           "Five number summary": str(tuple(float(v) for v in five_num(arm)))}).to_string()
+```
+
+## Exercise 2.124
+
+**Z-scores for Armspan.** Using the same output (mean 170.76, StDev 13.46,
+minimum 119, maximum 210):
+
+- **(a)** Sample mean $\bar{x} = 170.76$ cm and sample standard deviation
+  $s = 13.46$ cm (notation: $\bar{x}$ and $s$ because these describe the sample
+  of 415 seniors).
+- **(b)** Largest value: $z = \frac{210 - 170.76}{13.46} = \mathbf{2.92}$ — the
+  longest armspan is 2.92 standard deviations above the mean. Smallest value:
+  $z = \frac{119 - 170.76}{13.46} = \mathbf{-3.85}$ — the shortest armspan is
+  3.85 standard deviations below the mean, quite unusual.
+- **(c)** Since the distribution is relatively symmetric and bell-shaped, the
+  95% rule applies: $170.76 \pm 2(13.46)$, giving the interval
+  **143.84 to 197.68 cm**.
+
+```{python}
+#| echo: false
+arm = pd.read_csv("data/ch01/PASeniors.csv")["Armspan"].dropna()
+m, s = arm.mean(), arm.std(ddof=1)
+pd.Series({"z (max = 210)": round((210 - m) / s, 2),
+           "z (min = 119)": round((119 - m) / s, 2),
+           "95% interval": f"({m - 2*s:.2f}, {m + 2*s:.2f})"}).to_string()
+```
+
+## Exercise 2.125
+
+**Percent Obese by State.** From the printed output for percent obese in the 50
+US states (`USStates` dataset): mean 31.43, StDev 3.82, minimum 23.0, maximum
+39.5. Since all 50 states are included, this is a population.
+
+- **(a)** Population mean $\mu = 31.43\%$ and population standard deviation
+  $\sigma = 3.82\%$ (notation $\mu$ and $\sigma$ because all 50 states are
+  included).
+- **(b)** Largest value: $z = \frac{39.5 - 31.43}{3.82} = \mathbf{2.11}$ — the
+  most obese state is 2.11 standard deviations above the mean. Smallest value:
+  $z = \frac{23.0 - 31.43}{3.82} = \mathbf{-2.21}$ — the least obese state is
+  2.21 standard deviations below the mean.
+- **(c)** By the 95% rule, about 95% of states have obesity percentages between
+  $31.43 \pm 2(3.82)$, i.e. **between 23.79% and 39.07%** — consistent with the
+  actual extremes of 23.0% and 39.5%.
+
+*Data:* `data/ch02/USStates.csv`, downloaded from
+<https://www.lock5stat.com/datasets3e/USStates.csv>:
+
+```{python}
+#| echo: false
+ob = pd.read_csv("data/ch02/USStates.csv")["Obese"].dropna()
+m, s = ob.mean(), ob.std(ddof=1)
+pd.Series({"n": len(ob), "Mean": round(m, 2), "StDev": round(s, 2),
+           "z (max)": round((ob.max() - m) / s, 2),
+           "z (min)": round((ob.min() - m) / s, 2),
+           "95% interval": f"({m - 2*s:.2f}, {m + 2*s:.2f})"}).to_string()
+```
+
+## Exercise 2.126
+
+**Five Number Summary for Percent Obese by State.** From the same output
+(minimum 23.0, $Q_1 = 28.6$, median 30.9, $Q_3 = 34.4$, maximum 39.5):
+
+- **(a) Five number summary: (23.0, 28.6, 30.9, 34.4, 39.5).**
+- **(b) Range = $39.5 - 23.0 = 16.5$; IQR = $34.4 - 28.6 = 5.8$.**
+- **(c)** The 15th percentile lies below $Q_1 = 28.6$ and above the minimum —
+  **between 23.0 and 28.6**. The 60th percentile lies just above the median
+  30.9 and below $Q_3 = 34.4$ — **between 30.9 and 34.4**.
+
+```{python}
+#| echo: false
+ob = pd.read_csv("data/ch02/USStates.csv")["Obese"].dropna()
+pd.Series({"Five number summary": str(tuple(round(v, 1) for v in five_num(ob))),
+           "Range": round(ob.max() - ob.min(), 1),
+           "IQR": round(five_num(ob)[3] - five_num(ob)[1], 1)}).to_string()
+```
+
+## Exercise 2.127
+
+**Public Expenditure on Education.** For public expenditure on education as a
+percent of GDP for all countries (mean $\mu = 4.8\%$, standard deviation
+$\sigma = 1.66\%$, `EducationLiteracy` dataset):
+
+- **(a) Positive.** Brazil spends 6.24%, which is above the mean of 4.8%, so
+  its z-score must be positive.
+- **(b)** $z = \frac{6.24 - 4.8}{1.66} = \mathbf{0.87}$ — Brazil is 0.87
+  standard deviations above the mean.
+- **(c)** Range $= 12.46 - 1.46 = \mathbf{11.0}$ percentage points (Micronesia's
+  12.46% minus Monaco's 1.46%).
+- **(d)** IQR $= 5.61 - 3.76 = \mathbf{1.85}$ percentage points.
+
+*Data:* `data/ch02/EducationLiteracy.csv`, downloaded from
+<https://www.lock5stat.com/datasets3e/EducationLiteracy.csv> — the dataset
+reproduces every number in the exercise:
+
+```{python}
+#| echo: false
+ed = pd.read_csv("data/ch02/EducationLiteracy.csv")["Education"].dropna()
+pd.Series({"n": len(ed), "Mean": round(ed.mean(), 2), "StDev": round(ed.std(ddof=1), 2),
+           "z (Brazil 6.24)": round((6.24 - ed.mean()) / ed.std(ddof=1), 2),
+           "Range": round(ed.max() - ed.min(), 2),
+           "IQR": round(five_num(ed)[3] - five_num(ed)[1], 2)}).to_string()
+```
+
+## Exercise 2.128
+
+**How Many Hot Dogs Can You Eat in Ten Minutes?** Winning number of hot dogs
+at Nathan's Famous contest, 2002–2019 (`HotDogs2019` data, Table 2.27):
+
+- **(a)** Computed below: **$\bar{x} = 61.56$ hot dogs, $s = 8.83$.**
+- **(b)** **10 of the 18 values are above the mean.** Splitting the series, only
+  **2 of the earlier nine values (2002–2010)** exceed the mean, while **8 of
+  the remaining nine (2011–2019)** do — winning totals climbed sharply over
+  time, so the later years sit mostly above the overall average.
+
+*Data (printed in Table 2.27):*
+
+```{python}
+#| echo: false
+hd = pd.DataFrame({"Year": np.arange(2002, 2020),
+                   "HotDogs": [50, 45, 54, 49, 54, 66, 59, 68, 54,
+                               62, 68, 69, 61, 62, 70, 72, 74, 71]})
+m = hd["HotDogs"].mean()
+pd.Series({"Mean": round(m, 2), "StDev": round(hd["HotDogs"].std(ddof=1), 2),
+           "Above mean (all 18)": int((hd["HotDogs"] > m).sum()),
+           "Above mean (2002-2010)": int((hd["HotDogs"][:9] > m).sum()),
+           "Above mean (2011-2019)": int((hd["HotDogs"][9:] > m).sum())}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Winning number of hot dogs at the Nathan's Famous contest, 2002 to 2019
+fig, ax = plt.subplots(figsize=(6, 3))
+ax.axhline(hd["HotDogs"].mean(), color="#c44e52", lw=1, ls="--")
+ax.plot(hd["Year"], hd["HotDogs"], marker="o", color="#4c72b0")
+ax.text(2002.2, hd["HotDogs"].mean() + 0.8, "mean 61.6", color="#c44e52", fontsize=9)
+ax.set_xlabel("Year")
+ax.set_ylabel("Winning hot dogs")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.129
+
+**The Hot Dog Eating Rivalry: Matched Pairs.** Head-to-head results
+(Joey Chestnut vs Takeru Kobayashi) for the five years both competed
+(Table 2.28): 2009: 68 vs 64; 2008: 59 vs 59; 2007: 66 vs 63; 2006: 52 vs 54;
+2005: 32 vs 49.
+
+- **(a) Differences (Joey − Takeru): 4, 0, 3, −2, −17.** Always subtract the
+  same way, so negative values mean Kobayashi ate more that year.
+- **(b)** For the differences, **mean $= -2.4$ and standard deviation $= 8.5$**.
+  On average Chestnut ate slightly *fewer* hot dogs in these head-to-head
+  years, but the large standard deviation (driven by the −17 in 2005) shows the
+  rivalry varied a lot from year to year.
+
+```{python}
+#| echo: false
+diff = np.array([68 - 64, 59 - 59, 66 - 63, 52 - 54, 32 - 49])
+pd.Series({"Differences": str(list(diff)), "Mean": round(diff.mean(), 1),
+           "StDev": round(diff.std(ddof=1), 1)}).to_string()
+```
+
+## Exercise 2.130
+
+**Grade Point Averages.** Histogram of the $n = 345$ grade point averages in
+the `StudentSurvey` dataset (Figure 2.29), rising to a peak at 3.3 and ranging
+from about 2.1 to 3.9:
+
+- **(a)** **10th percentile ≈ 2.5**: about 10% of the students report a GPA
+  below roughly 2.5. **75th percentile ≈ 3.4**: about 75% report a GPA below
+  roughly 3.4 (equivalently, the top quarter of students report about 3.4 or
+  higher).
+- **(b) Range ≈ $3.9 - 2.1 = 1.8$.** The computed percentiles below (2.6 and
+  3.4) confirm the estimates.
+
+```{python}
+#| echo: false
+gpa = pd.read_csv("data/ch01/StudentSurvey.csv")["GPA"].dropna()
+fig, ax = plt.subplots(figsize=(5.5, 3))
+sns.histplot(gpa, bins=np.arange(2.0, 4.05, 0.1), ax=ax, color="#4c72b0")
+ax.set_xlabel("GPA")
+ax.set_ylabel("Frequency")
+plt.tight_layout()
+plt.show()
+```
+
+```{python}
+#| echo: false
+pd.Series({"n": len(gpa), "10th percentile": round(np.percentile(gpa, 10), 2),
+           "75th percentile": round(np.percentile(gpa, 75), 2),
+           "Range": round(gpa.max() - gpa.min(), 2)}).to_string()
+```
+
+## Exercise 2.131
+
+**Laptop Computers and Sperm Count.** Scrotal temperature increase for 29 men
+with a laptop on the lap: mean 2.31 °C, standard deviation 0.96 °C.
+
+- **(a)** Assuming a symmetric, bell-shaped distribution, the 95% rule gives
+  $2.31 \pm 2(0.96) = 2.31 \pm 1.92$, so we expect about 95% of the temperature
+  increases to fall **between 0.39 °C and 4.23 °C** (about 0.4 to 4.2).
+- **(b)** For a man with an increase of 4.9 °C:
+  $z = \frac{4.9 - 2.31}{0.96} = \mathbf{2.70}$ — his temperature increase is
+  2.70 standard deviations above the mean, well beyond the usual range.
+- (Note: the back-of-book key prints different values for this exercise; the
+  computations above follow directly from the stated mean and standard
+  deviation.)
+
+## Exercise 2.132
+
+**Estimating Monthly Retail Sales.** Histogram of total US monthly retail
+sales (billions of dollars) for the 129 months starting January 2009
+(Figure 2.30), values from about 320 to 560:
+
+- The distribution is **roughly bell-shaped but mildly skewed to the right** —
+  a broad mound peaking around 450–470 with a longer, sparser right tail.
+- **Mean ≈ 430 billion dollars.** The peak sits a bit right of center, but the
+  right tail drags the balancing point to roughly 430.
+- **Standard deviation ≈ 55–60 billion dollars.** The range is about 240, and
+  the range is typically 4–6 standard deviations, suggesting 40–60; the spread
+  of the main mound around 430 is consistent with the high end of that.
+
+## Exercise 2.133
+
+**Summarizing Monthly Retail Sales.** The same 129 monthly totals are in the
+`RetailSales` dataset (variable **Sales**):
+
+- **Mean = 427.8 billion dollars; standard deviation = 61.0 billion dollars.**
+- By the 95% rule, $427.8 \pm 2(61.0)$: about 95% of monthly sales totals fall
+  **between 305.8 and 549.8 billion dollars**.
+
+*Data:* `data/ch02/RetailSales.csv`, downloaded from
+<https://www.lock5stat.com/datasets3e/RetailSales.csv>:
+
+```{python}
+#| echo: false
+rs = pd.read_csv("data/ch02/RetailSales.csv")["Sales"]
+m, s = rs.mean(), rs.std(ddof=1)
+pd.Series({"n": len(rs), "Mean": round(m, 1), "StDev": round(s, 1),
+           "95% interval": f"({m - 2*s:.1f}, {m + 2*s:.1f})"}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: US monthly retail sales, in billions of dollars, January 2009 onward
+fig, ax = plt.subplots(figsize=(5.5, 3))
+sns.histplot(rs, bins=12, ax=ax, color="#4c72b0")
+ax.set_xlabel("Sales (billions of dollars)")
+ax.set_ylabel("Frequency")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.134
+
+**Distribution of Three-Point Attempts in the NBA.** The number of three-point
+shot attempts (`FG3Attempt` in `NBAPlayers2019`) is strongly skewed to the
+right: most players attempt few or no three-pointers while a few specialists
+attempt up to almost 1000 (Figure 2.31).
+
+- **No, it is not appropriate to use the 95% rule.** The rule requires a
+  symmetric, bell-shaped distribution; these data are heavily skewed with many
+  values piled near zero, so mean ± 2 SD would not describe the data well (it
+  would even reach below 0).
+
+```{python}
+#| echo: false
+#| fig-cap: Number of three-point shot attempts in the NBA, by player, 2018-2019
+fg3 = pd.read_csv("data/ch02/NBAPlayers2019.csv")["FG3Attempt"].dropna()
+fig, ax = plt.subplots(figsize=(5.5, 3))
+sns.histplot(fg3, bins=30, ax=ax, color="#4c72b0")
+ax.set_xlabel("FG3Attempt")
+ax.set_ylabel("Frequency")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.135
+
+**Distribution of Blocked Shots in the NBA.** For **Blocks** in
+`NBAPlayers2019` ($n = 193$):
+
+- **(a)** **Mean = 37.0; standard deviation = 34.2.**
+- **(b) Five number summary: (0, 16, 28, 45, 199).**
+- **(c)** The **five number summary (part b)** is more resistant to outliers
+  and more appropriate for heavily skewed data — it depends only on positions
+  in the ordered list, not on the extreme values themselves.
+- **(d)** The graph below shows the distribution is **skewed to the right**,
+  with a long tail up to the maximum of 199 blocks.
+- **(e) No.** The 95% rule requires a symmetric, bell-shaped shape; these data
+  are heavily right-skewed, so mean ± 2 SD is not a useful summary.
+
+*Data:* `data/ch02/NBAPlayers2019.csv`, downloaded from
+<https://www.lock5stat.com/datasets3e/NBAPlayers2019.csv>:
+
+```{python}
+#| echo: false
+bl = pd.read_csv("data/ch02/NBAPlayers2019.csv")["Blocks"].dropna()
+pd.Series({"Mean": round(bl.mean(), 1), "StDev": round(bl.std(ddof=1), 1),
+           "Five number summary": str(tuple(round(v, 1) for v in five_num(bl)))}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Number of blocked shots during the season, NBA players 2018-2019
+fig, ax = plt.subplots(figsize=(5.5, 3))
+sns.histplot(bl, bins=30, ax=ax, color="#4c72b0")
+ax.set_xlabel("Blocks")
+ax.set_ylabel("Frequency")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.136
+
+**Which Accomplishment of James Harden Is Most Impressive?** Using the means
+and standard deviations in Table 2.29 (FGPct 0.463 / 0.057; Points 981 / 478;
+Assists 219 / 148; Steals 63.5 / 31.2) and Harden's values (FGPct 0.442, 2818
+points, 586 assists, 158 steals):
+
+- **z-scores:** field goal percentage
+  $z = \frac{0.442 - 0.463}{0.057} = \mathbf{-0.37}$; points
+  $z = \frac{2818 - 981}{478} = \mathbf{3.84}$; assists
+  $z = \frac{586 - 219}{148} = \mathbf{2.48}$; steals
+  $z = \frac{158 - 63.5}{31.2} = \mathbf{3.03}$.
+- **Most impressive: total points** (3.84 standard deviations above the mean —
+  the largest z-score). **Least impressive: field goal percentage**, which is
+  actually slightly *below* the league average (negative z-score).
+
+```{python}
+#| echo: false
+z = pd.Series({"FGPct": (0.442 - 0.463) / 0.057, "Points": (2818 - 981) / 478,
+               "Assists": (586 - 219) / 148, "Steals": (158 - 63.5) / 31.2}).round(2)
+z.to_string()
+```
+
+## Exercise 2.137
+
+**SAT Scores.** Stanley scored 600 on both components; Table 2.30 gives means
+and standard deviations for all 2018 students (Reading and Writing: 536 / 102;
+Math: 531 / 114).
+
+- **(a)** Reading and Writing:
+  $z = \frac{600 - 536}{102} = \mathbf{0.627}$. Math:
+  $z = \frac{600 - 531}{114} = \mathbf{0.605}$.
+- **(b) Reading and Writing** is the more unusual score: its z-score (0.627) is
+  farther from zero than the Math z-score (0.605).
+- **(c)** He performed best **relative to his peers in Reading and Writing** —
+  the larger z-score means he finished higher within that score distribution,
+  even though both raw scores are 600.
+
+```{python}
+#| echo: false
+z = pd.Series({"Reading and Writing": (600 - 536) / 102,
+               "Math": (600 - 531) / 114}).round(3)
+z.to_string()
+```
+
+## Exercise 2.138
+
+**Comparing Global Internet Connections.** Average download speed (MB/sec) and
+average hours online for nine countries in 2019 (Table 2.31):
+
+- **(a)** For internet speed: **$\bar{x} = 24.86$ MB/sec, $s = 10.92$.**
+- **(b)** For hours online: **$\bar{x} = 5.69$ hours, $s = 1.54$.**
+- **(c) Yes — a negative relationship.** Countries with faster internet tend to
+  spend slightly *fewer* hours online: Switzerland (fastest, 38.85) is well
+  below average on hours, while Brazil (slowest, 4.84) is far above it. The
+  scatterplot below shows the downward pattern (correlation about −0.7); we
+  examine this relationship further in Section 2.5.
+
+*Data (printed in Table 2.31):*
+
+```{python}
+#| echo: false
+gi = pd.DataFrame({"Country": ["Switzerland", "United States", "Germany",
+                               "Australia", "United Kingdom", "France", "Spain",
+                               "Italy", "Brazil"],
+                   "Speed": [38.85, 32.89, 24.64, 16.36, 22.37, 30.44, 36.06,
+                             17.3, 4.84],
+                   "Hours": [4.97, 6.52, 4.62, 5.07, 5.77, 4.63, 4.3, 6.07,
+                             9.29]})
+pd.Series({"Speed mean": round(gi["Speed"].mean(), 2),
+           "Speed StDev": round(gi["Speed"].std(ddof=1), 2),
+           "Hours mean": round(gi["Hours"].mean(), 2),
+           "Hours StDev": round(gi["Hours"].std(ddof=1), 2),
+           "Correlation": round(gi["Speed"].corr(gi["Hours"]), 2)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Average hours online versus average internet download speed for nine countries
+fig, ax = plt.subplots(figsize=(4.5, 3))
+ax.scatter(gi["Speed"], gi["Hours"], color="#4c72b0")
+for _, r in gi.iterrows():
+    if r["Country"] in ("Switzerland", "Brazil", "United States"):
+        ax.annotate(r["Country"], (r["Speed"], r["Hours"]),
+                    textcoords="offset points", xytext=(4, 4), fontsize=8)
+ax.set_xlabel("Internet speed (MB/sec)")
+ax.set_ylabel("Hours online")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.139
+
+**Daily Calorie Consumption.** Five number summary for daily calories, $n = 315$
+participants in the `NutritionStudy`: (445, 1334, 1667, 2106, 6662).
+
+- **(a) Range = $6662 - 445 = 6217$ calories; IQR = $2106 - 1334 = 772$
+  calories.**
+- **(b) Most likely mean: 1796.** The distribution is skewed to the right (the
+  maximum is far above $Q_3$), which pulls the mean above the median of 1667 —
+  but not nearly as far as 3605, which would require the upper half of the data
+  to be far more extreme than the summary shows. (1550 is below the median and
+  1667 ignores the skew.)
+- **(c) Most likely standard deviation: 680.** For roughly bell-shaped data the
+  IQR ≈ 1.35 SDs, so the SD should be a bit larger than $772/1.35 \approx 570$,
+  and right skew pushes it further up — 158 is far too small, while 1897 and
+  5315 would imply implausibly little or absurdly much spread relative to the
+  range.
+
+*Data:* `data/ch02/NutritionStudy.csv`, downloaded from
+<https://www.lock5stat.com/datasets3e/NutritionStudy.csv> — the Calories
+variable reproduces the five number summary:
+
+```{python}
+#| echo: false
+cal = pd.read_csv("data/ch02/NutritionStudy.csv")["Calories"].dropna()
+pd.Series({"n": len(cal), "Five number summary":
+           str(tuple(round(v, 1) for v in five_num(cal))),
+           "Mean": round(cal.mean(), 1)}).to_string()
+```
+
+## Exercise 2.140
+
+**Largest and Smallest Standard Deviation.** Using only whole numbers 1 through
+9, create a dataset with $n = 6$ and $\bar{x} = 5$ with:
+
+- **(a) Standard deviation as small as possible: 4, 5, 5, 5, 5, 6.** Keep four
+  values exactly at the mean and shift the remaining two as little as the whole
+  number requirement allows (one below, one above), giving
+  $s = \sqrt{2/5} \approx 0.63$.
+- **(b) Standard deviation as large as possible: 1, 1, 1, 9, 9, 9.** Push every
+  value as far from the mean as possible (three at each extreme, which
+  balances to mean 5), giving $s = \sqrt{96/5} \approx 4.38$.
+
+```{python}
+#| echo: false
+small = np.array([4, 5, 5, 5, 5, 6])
+big = np.array([1, 1, 1, 9, 9, 9])
+pd.Series({"Small-SD dataset": "4, 5, 5, 5, 5, 6",
+           "s (small)": round(small.std(ddof=1), 2),
+           "Large-SD dataset": "1, 1, 1, 9, 9, 9",
+           "s (large)": round(big.std(ddof=1), 2)}).to_string()
+```
+
+## Exercise 2.141
+
+*(Sketch a symmetric, bell-shaped curve on a 0-to-10 axis.)* **Mean 3 and
+standard deviation 1.** The curve centers at 3, with inflection points one
+standard deviation either side (at 2 and 4) and virtually all the area between
+0 and 6:
+
+```{python}
+#| echo: false
+#| fig-cap: Bell-shaped sketch with mean 3 and standard deviation 1
+fig, ax = plt.subplots(figsize=(4.5, 2.6))
+x = np.linspace(0, 10, 400)
+ax.plot(x, np.exp(-0.5 * ((x - 3) / 1) ** 2), color="#4c72b0")
+ax.axvline(3, color="#c44e52", ls="--", lw=1)
+ax.set_ylim(0, 1.15)
+ax.set_xlabel("Value")
+ax.set_ylabel("Relative frequency")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.142
+
+**Mean 7 and standard deviation 1.** The same shape shifted right, centered at
+7 with inflection points at 6 and 8:
+
+```{python}
+#| echo: false
+#| fig-cap: Bell-shaped sketch with mean 7 and standard deviation 1
+fig, ax = plt.subplots(figsize=(4.5, 2.6))
+x = np.linspace(0, 10, 400)
+ax.plot(x, np.exp(-0.5 * ((x - 7) / 1) ** 2), color="#4c72b0")
+ax.axvline(7, color="#c44e52", ls="--", lw=1)
+ax.set_ylim(0, 1.15)
+ax.set_xlabel("Value")
+ax.set_ylabel("Relative frequency")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.143
+
+**Mean 5 and standard deviation 2.** Centered at 5 but noticeably wider —
+inflection points at 3 and 7, with the tails reaching the ends of the 0-to-10
+axis:
+
+```{python}
+#| echo: false
+#| fig-cap: Bell-shaped sketch with mean 5 and standard deviation 2
+fig, ax = plt.subplots(figsize=(4.5, 2.6))
+x = np.linspace(0, 10, 400)
+ax.plot(x, np.exp(-0.5 * ((x - 5) / 2) ** 2), color="#4c72b0")
+ax.axvline(5, color="#c44e52", ls="--", lw=1)
+ax.set_ylim(0, 1.15)
+ax.set_xlabel("Value")
+ax.set_ylabel("Relative frequency")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.144
+
+**Mean 5 and standard deviation 0.5.** The narrowest of the four — a tall,
+thin spike centered at 5 with inflection points at 4.5 and 5.5:
+
+```{python}
+#| echo: false
+#| fig-cap: Bell-shaped sketch with mean 5 and standard deviation 0.5
+fig, ax = plt.subplots(figsize=(4.5, 2.6))
+x = np.linspace(0, 10, 400)
+ax.plot(x, np.exp(-0.5 * ((x - 5) / 0.5) ** 2), color="#4c72b0")
+ax.axvline(5, color="#c44e52", ls="--", lw=1)
+ax.set_ylim(0, 1.15)
+ax.set_xlabel("Value")
+ax.set_ylabel("Relative frequency")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.145
+
+**Rotten Tomatoes Movie Ratings.** The **RottenTomatoes** variable in the
+`HollywoodMovies` dataset (critics' ratings of Hollywood movies, 2012–2018):
+
+- **Mean = 57.58; standard deviation = 28.06.**
+- **Five number summary: (0, 33, 61, 84, 99).** The middle 50% of movies span
+  a wide 33-to-84 band, and the minimum of 0 shows some movies pleased no
+  critics at all.
+
+*Data:* `data/ch01/HollywoodMovies.csv`, from
+<https://www.lock5stat.com/datasets3e/HollywoodMovies.csv>:
+
+```{python}
+#| echo: false
+rt = pd.read_csv("data/ch01/HollywoodMovies.csv")["RottenTomatoes"].dropna()
+pd.Series({"n": len(rt), "Mean": round(rt.mean(), 2),
+           "StDev": round(rt.std(ddof=1), 2),
+           "Five number summary": str(tuple(float(v) for v in five_num(rt)))}).to_string()
+```
+
+## Exercise 2.146
+
+**Audience Movie Ratings.** The **AudienceScore** variable in the same
+`HollywoodMovies` dataset (audience ratings on the Rotten Tomatoes website):
+
+- **Mean = 62.18; standard deviation = 18.21.**
+- **Five number summary: (10, 49, 64, 77, 99).** Audiences are more generous
+  and more tightly clustered than the critics of Exercise 2.145 — a higher mean
+  (62.2 vs 57.6) and a much smaller standard deviation (18.2 vs 28.1), with no
+  score below 10.
+
+```{python}
+#| echo: false
+au = pd.read_csv("data/ch01/HollywoodMovies.csv")["AudienceScore"].dropna()
+pd.Series({"n": len(au), "Mean": round(au.mean(), 2),
+           "StDev": round(au.std(ddof=1), 2),
+           "Five number summary": str(tuple(float(v) for v in five_num(au)))}).to_string()
+```
+
+## Exercise 2.147
+
+**Summary Statistics for Homing Pigeon Distance.** Race results for the homing
+pigeon race from Exercise 1.21 (`HomingPigeons` dataset), distance in miles:
+
+- **Sample size $n = 1412$; mean $\bar{x} = 408.7$ miles; standard deviation
+  $s = 78.1$ miles** (notation: $n$, $\bar{x}$, $s$ — these describe the sample
+  of pigeons in this race).
+- **Five number summary: (137, 375, 429, 448, 577).** Quartile values may
+  differ slightly depending on the technology used.
+
+*Data:* `data/ch02/HomingPigeons.csv`, downloaded from
+<https://www.lock5stat.com/datasets3e/HomingPigeons.csv>:
+
+```{python}
+#| echo: false
+dist = pd.read_csv("data/ch02/HomingPigeons.csv")["Distance"].dropna()
+pd.Series({"n": len(dist), "Mean": round(dist.mean(), 1),
+           "StDev": round(dist.std(ddof=1), 1),
+           "Five number summary": str(tuple(round(v, 1) for v in five_num(dist)))}).to_string()
+```
+
+## Exercise 2.148
+
+**Braking Distance.** The **Braking** variable in `Cars2020` records the
+distance (feet) needed to stop from 60 mph on dry pavement for 110 new car
+models:
+
+- **(a)** **Mean = 130.8 feet; standard deviation = 6.9 feet.**
+- **(b) Yes.** Two standard deviations is $130.8 \pm 2(6.9)$, i.e. about 117.0
+  to 144.7 feet. Six models fall outside that interval: five stop unusually
+  fast (107–113 feet) and one unusually slow (146 feet).
+
+*Data:* `data/ch02/Cars2020.csv`, downloaded from
+<https://www.lock5stat.com/datasets3e/Cars2020.csv>:
+
+```{python}
+#| echo: false
+br = pd.read_csv("data/ch02/Cars2020.csv")["Braking"].dropna()
+m, s = br.mean(), br.std(ddof=1)
+out = sorted(int(v) for v in br[abs(br - m) > 2 * s])
+pd.Series({"n": len(br), "Mean": round(m, 1), "StDev": round(s, 1),
+           "2-SD interval": f"({m - 2*s:.1f}, {m + 2*s:.1f})",
+           "Beyond 2 SD": str(out)}).to_string()
+```
+
+## Exercise 2.149
+
+**Highway vs City MPG.** For the `Cars2020` dataset, compare the variability of
+**CityMPG** and **HwyMPG** (miles per gallon, 110 car models):
+
+- **(a)** Computed below: City — **range = 18, IQR = 6, $s = 3.74$**; Highway —
+  **range = 33, IQR = 11, $s = 7.19$**.
+- **(b) Highway MPG is more variable on every measure** — its range, IQR, and
+  standard deviation are all roughly double the city values. Highway driving
+  conditions vary more from car to car (aerodynamics at speed), so gas
+  efficiency on the highway spreads out more.
+
+```{python}
+#| echo: false
+#| fig-cap: City and highway gas efficiency for 110 new car models
+cars = pd.read_csv("data/ch02/Cars2020.csv")
+tab = []
+for c in ["CityMPG", "HwyMPG"]:
+    v = cars[c].dropna()
+    tab.append({"Variable": c, "Range": int(v.max() - v.min()),
+                "IQR": round(five_num(v)[3] - five_num(v)[1], 1),
+                "StDev": round(v.std(ddof=1), 2)})
+pd.DataFrame(tab).set_index("Variable").to_string()
+```
+
+```{python}
+#| echo: false
+fig, ax = plt.subplots(figsize=(4.5, 3))
+ax.boxplot([cars["CityMPG"].dropna(), cars["HwyMPG"].dropna()], widths=0.45)
+ax.set_xticklabels(["CityMPG", "HwyMPG"])
+ax.set_ylabel("Miles per gallon")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.150
+
+**Homework Hours for Pennsylvania Seniors.** Weekly homework hours (**HWHours**)
+in the `PASeniors` survey:
+
+- **(a)** **Mean = 10.3 hours; standard deviation = 10.2 hours.** The standard
+  deviation is nearly as large as the mean — a strongly right-skewed variable
+  in which most students report modest hours while a few report very many.
+- **(b) Not reasonable.** A z-score of $z = \frac{80 - 10.3}{10.2} = \mathbf{6.8}$
+  puts 80 hours almost seven standard deviations above the mean — far beyond
+  anything in the data (the maximum reported is 80 itself, next 30). With only
+  168 hours in a week and school in session, 80 hours of weekly homework
+  (11+ hours every day) is surely an exaggeration or a misunderstanding of the
+  question.
+
+*Data:* `data/ch01/PASeniors.csv`, from
+<https://www.lock5stat.com/datasets3e/PASeniors.csv>:
+
+```{python}
+#| echo: false
+hw = pd.read_csv("data/ch01/PASeniors.csv")["HWHours"].dropna()
+m, s = hw.mean(), hw.std(ddof=1)
+pd.Series({"n": len(hw), "Mean": round(m, 1), "StDev": round(s, 1),
+           "Max": int(hw.max()), "z (80 hours)": round((80 - m) / s, 2)}).to_string()
+```
+
+## Exercise 2.151
+
+**Using the Five Number Summary to Visualize Shape of a Distribution.** Draw a
+histogram or smooth curve with the given properties:
+
+- **(a) Range 100, IQR 10.** The middle 50% is squeezed into a tenth of the
+  total span, so the distribution has a tall, narrow central peak with very
+  long, sparse tails — like the sketch below (left).
+- **(b) Range 50, IQR 40.** The middle 50% fills most of the span, so the
+  distribution is broad and flat with short tails and no sharp peak — like the
+  sketch below (right).
+
+```{python}
+#| echo: false
+#| fig-cap: Boxplot sketches for a range of 100 with IQR 10, and a range of 50 with IQR 40
+fig, ax = plt.subplots(figsize=(5.5, 2.6))
+ax.bxp([{"label": "(a) range 100, IQR 10", "med": 50, "q1": 45, "q3": 55,
+         "whislo": 0, "whishi": 100, "fliers": []},
+        {"label": "(b) range 50, IQR 40", "med": 25, "q1": 5, "q3": 45,
+         "whislo": 0, "whishi": 50, "fliers": []}], vert=False, widths=0.45)
+ax.set_xlabel("Value")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.152
+
+**Rough Rule of Thumb for the Standard Deviation.** For a bell-shaped
+distribution the range is roughly 4 to 6 standard deviations, so
+$\text{SD} \approx \text{range}/5$:
+
+- **(a) Pulse rates** (`StudentSurvey`): five number summary (35, 62, 70, 78,
+  130), $s = 12.2$ bpm. Using all the data: $95/5 = 19$ — a clear
+  overestimate, because the two high outliers (120 and 130) inflate the range.
+  Excluding them (maximum becomes 96): $61/5 = 12.2$ — exactly right.
+- **(b) Exercise hours** (`StudentSurvey`): (0, 5, 8, 12, 40), $s = 5.741$.
+  $40/5 = 8$ — again an overestimate driven by the outlier at 40; excluding it
+  (maximum becomes 30) gives $30/5 = 6$, much closer to 5.741.
+- **(c) Mammal longevity** (`MammalLongevity`): (1, 8, 12, 16, 40),
+  $s = 7.24$ years. $39/5 = 7.8$ — quite close, even without adjustments (the
+  elephant's 40 is an outlier, but here it happens to matter less).
+- The rule works well for bell-shaped data but **overestimates the SD whenever
+  outliers stretch the range**.
+
+```{python}
+#| echo: false
+res = pd.Series({"(a) Pulse, all data": "95 / 5 = 19.0 (s = 12.2)",
+                 "(a) Pulse, excl 120 & 130": "61 / 5 = 12.2 (s = 12.2)",
+                 "(b) Exercise, all data": "40 / 5 = 8.0 (s = 5.741)",
+                 "(c) Mammals, all data": "39 / 5 = 7.8 (s = 7.24)"})
+res.to_string()
+```
+
+:::

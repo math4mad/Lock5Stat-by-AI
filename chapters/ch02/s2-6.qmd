@@ -1,0 +1,1237 @@
+---
+execute-dir: project
+title: "Chapter 2 · Section 2.6"
+subtitle: "Two Quantitative Variables: Linear Regression — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 2.6 of Lock⁵ turns the scatterplot-and-correlation picture of Section 2.5
+into a prediction machine: the **least-squares line** (regression line)
+$\hat{y} = a + bx$ is the line that minimizes the sum of squared errors
+$e = y - \hat{y}$ over all points. The **slope** $b$ is the workhorse
+interpretation — the predicted change in $y$ for each one-unit increase in $x$ —
+while the **intercept** $a$ is the predicted value of $y$ when $x = 0$, which is
+only meaningful if $x = 0$ (or values near it) make sense in context. Predictions
+for cases inside the range of the observed $x$-values are reasonable;
+**extrapolating** far outside that range can produce nonsense (negative weights
+for babies, doomed honeybee colonies in 2308). A **residual** measures how far a
+case sits above or below the line, and the squared correlation $r^2$ reports the
+percent of variation in the response explained by the regression. Two standing
+cautions: always **plot the data** (the line can be computed even when a linear
+model is inappropriate), and remember that outliers — especially **influential
+points** with extreme $x$-values — can drag the line toward themselves.
+The exercises below are from *Statistics: Unlocking the Power of Data*
+(Lock⁵, 3rd ed., pp. 145–152). Skill Builders 2.236–2.239 interpret given
+regression equations and residuals; 2.240–2.243 fit lines to small data tables;
+2.244–2.269 apply regression to real studies — depression scales, car
+acceleration, rising CO₂, honeybee dances, hot-dog contests, football and
+cognition, body fat, movie revenues, and more. Tabs based on Lock5 data files
+include a small executable EDA.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+sns.set_theme(style="whitegrid")
+```
+
+::: {.panel-tabset}
+
+## Exercise 2.236
+
+**Height and age.** $Hgt$ = height in inches, $Age$ = age in years of a child.
+$\widehat{Hgt} = 24.3 + 2.74(Age)$; the data point is a child 12 years old who
+is 60 inches tall.
+
+- **(a)** Predicted height: $24.3 + 2.74(12) = 57.18$ inches. Residual:
+  $60 - 57.18 = 2.82$ inches (the child is taller than predicted).
+- **(b) Slope:** each additional year of age adds a predicted $2.74$ inches of
+  height — the average yearly growth of children over the ages observed.
+- **(c) Intercept:** at age 0 the predicted height is $24.3$ inches — the
+  length of a typical newborn, so the intercept has a sensible meaning here
+  (though age 0 is at the edge of the data).
+
+## Exercise 2.237
+
+**Blood alcohol content.** $BAC$ = blood alcohol content (% of alcohol in the
+blood), $Drinks$ = number of alcoholic drinks. $\widehat{BAC} = -0.0127 +
+0.018(Drinks)$; the data point is an individual who consumed 3 drinks and had a
+BAC of 0.08.
+
+- **(a)** Predicted BAC: $-0.0127 + 0.018(3) = 0.0413$. Residual:
+  $0.08 - 0.0413 = 0.0387$ (this drinker's BAC is well above the line).
+- **(b) Slope:** each additional drink raises the predicted BAC by $0.018\%$.
+- **(c) Intercept:** with 0 drinks the line predicts $-0.0127\%$ — a *negative*
+  BAC, which is impossible, so the intercept makes no sense in context; the
+  line is only calibrated over the range of drink counts observed.
+
+## Exercise 2.238
+
+**Bench press and training.** $Weight$ = maximum weight capable of bench
+pressing (pounds), $Training$ = number of hours spent lifting weights per week.
+$\widehat{Weight} = 95 + 11.7(Training)$; the data point is an individual who
+trains 5 hours a week and can bench 150 pounds.
+
+- **(a)** Predicted max bench press: $95 + 11.7(5) = 153.5$ pounds. Residual:
+  $150 - 153.5 = -3.5$ pounds (slightly below the line).
+- **(b) Slope:** each additional hour of weekly training adds a predicted
+  $11.7$ pounds to the maximum bench press.
+- **(c) Intercept:** 0 hours of training predicts a max bench press of $95$
+  pounds — a plausible baseline for an untrained person, though 0 hours sits at
+  the edge of the data, so the interpretation should be made cautiously.
+
+## Exercise 2.239
+
+**Study time and exam grade.** $Study$ = number of hours spent studying for an
+exam, $Grade$ = grade on the exam. $\widehat{Grade} = 41.0 + 3.8(Study)$; the
+data point is a student who studied 10 hours and received an 81 on the exam.
+
+- **(a)** Predicted grade: $41.0 + 3.8(10) = 79$. Residual: $81 - 79 = 2$
+  points (the student did a bit better than predicted).
+- **(b) Slope:** each additional hour of study raises the predicted exam grade
+  by $3.8$ points.
+- **(c) Intercept:** 0 hours of study predicts a grade of $41$ — sensible as a
+  baseline (some credit for general knowledge even with no studying), though it
+  is an extrapolation if no one in the data studied 0 hours.
+
+## Exercise 2.240
+
+**Skill Builder 2 (small table).** Use technology to find the regression line
+to predict $Y$ from $X$:
+
+| X | 3 | 5 | 2 | 7 | 6 |
+|---|---|---|---|---|---|
+| Y | 1 | 2 | 1.5 | 3 | 2.5 |
+
+```{python}
+#| echo: false
+from scipy import stats
+d = pd.DataFrame({"X": [3, 5, 2, 7, 6], "Y": [1, 2, 1.5, 3, 2.5]})
+r = stats.linregress(d["X"], d["Y"])
+pd.DataFrame({"value": [r.intercept, r.slope, r.rvalue, r.rvalue**2]},
+             index=["Intercept", "Slope", "Correlation r", "R-squared"]).round(3)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Exercise 2.240 data with the least-squares line
+fig, ax = plt.subplots(figsize=(4.5, 3))
+sns.regplot(data=d, x="X", y="Y", ax=ax, ci=None, line_kws={"color": "#c44e52"})
+ax.set_xticks([2, 3, 4, 5, 6, 7])
+plt.tight_layout()
+plt.show()
+```
+
+- **Regression line:** $\hat{y} = 0.395 + 0.349x$, with $r = 0.915$ and
+  $r^2 \approx 0.84$ — a fairly strong positive linear fit.
+
+## Exercise 2.241
+
+**Skill Builder 2 (small table).**
+
+| X | 2 | 4 | 6 | 8 | 10 | 12 |
+|---|---|---|---|---|---|---|
+| Y | 50 | 58 | 55 | 61 | 69 | 68 |
+
+```{python}
+#| echo: false
+d = pd.DataFrame({"X": [2, 4, 6, 8, 10, 12],
+                  "Y": [50, 58, 55, 61, 69, 68]})
+r = stats.linregress(d["X"], d["Y"])
+pd.DataFrame({"value": [r.intercept, r.slope, r.rvalue, r.rvalue**2]},
+             index=["Intercept", "Slope", "Correlation r", "R-squared"]).round(3)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Exercise 2.241 data with the least-squares line
+fig, ax = plt.subplots(figsize=(4.5, 3))
+sns.regplot(data=d, x="X", y="Y", ax=ax, ci=None, line_kws={"color": "#c44e52"})
+plt.tight_layout()
+plt.show()
+```
+
+- **Regression line:** $\hat{y} = 47.3 + 1.84x$, with $r = 0.930$ and
+  $r^2 \approx 0.87$ — a strong positive linear trend.
+
+## Exercise 2.242
+
+**Skill Builder 2 (small table).**
+
+| X | 10 | 20 | 30 | 40 | 50 | 60 |
+|---|---|---|---|---|---|---|
+| Y | 112 | 85 | 92 | 71 | 64 | 70 |
+
+```{python}
+#| echo: false
+d = pd.DataFrame({"X": [10, 20, 30, 40, 50, 60],
+                  "Y": [112, 85, 92, 71, 64, 70]})
+r = stats.linregress(d["X"], d["Y"])
+pd.DataFrame({"value": [r.intercept, r.slope, r.rvalue, r.rvalue**2]},
+             index=["Intercept", "Slope", "Correlation r", "R-squared"]).round(3)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Exercise 2.242 data with the least-squares line
+fig, ax = plt.subplots(figsize=(4.5, 3))
+sns.regplot(data=d, x="X", y="Y", ax=ax, ci=None, line_kws={"color": "#c44e52"})
+plt.tight_layout()
+plt.show()
+```
+
+- **Regression line:** $\hat{y} = 111.7 - 0.84x$, with $r = -0.879$ and
+  $r^2 \approx 0.77$ — a moderately strong negative linear trend.
+
+## Exercise 2.243
+
+**Skill Builder 2 (small table).**
+
+| X | 15 | 20 | 25 | 30 | 35 | 40 | 45 | 50 |
+|---|---|---|---|---|---|---|---|---|
+| Y | 532 | 466 | 478 | 320 | 303 | 349 | 275 | 221 |
+
+```{python}
+#| echo: false
+d = pd.DataFrame({"X": [15, 20, 25, 30, 35, 40, 45, 50],
+                  "Y": [532, 466, 478, 320, 303, 349, 275, 221]})
+r = stats.linregress(d["X"], d["Y"])
+pd.DataFrame({"value": [r.intercept, r.slope, r.rvalue, r.rvalue**2]},
+             index=["Intercept", "Slope", "Correlation r", "R-squared"]).round(3)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Exercise 2.243 data with the least-squares line
+fig, ax = plt.subplots(figsize=(4.5, 3))
+sns.regplot(data=d, x="X", y="Y", ax=ax, ci=None, line_kws={"color": "#c44e52"})
+plt.tight_layout()
+plt.show()
+```
+
+- **Regression line:** $\hat{y} = 641.6 - 8.42x$, with $r = -0.932$ and
+  $r^2 \approx 0.87$ — a strong negative linear trend.
+
+## Exercise 2.244
+
+**Predicting One Depression Score from Another.** A study of the impact of diet
+on depression (75 participants) measured depression two ways at the start of
+the experiment: the **DASS** (self-reported symptoms) and the **CESD** (a more
+clinical assessment); higher numbers mean more symptoms on both scales.
+
+- **(a) Largest negative residual:** this case sits far *below* the line. From
+  the data: self-reported (DASS) score $= 38$, clinical (CESD) score $= 7$,
+  predicted clinical score $\approx 35$, giving a residual of about
+  $7 - 35 = -28$. (Reading Figure 2.75 in the book gives similar estimates.)
+- **(b) Largest positive residual (self-reported score of 0):** this case has
+  clinical score $= 23$, predicted clinical score $\approx 5$, so the residual
+  is about $23 - 5 = +18$.
+
+*Data:* `data/ch02/DietDepression.csv` (n = 75), downloaded from
+<https://www.lock5stat.com/datasets3e/DietDepression.csv>. The baseline scores
+reproduce the picture: $\widehat{CESD} = 5.0 + 0.79(DASS)$, $r = 0.70$:
+
+```{python}
+#| echo: false
+dd = pd.read_csv("data/ch02/DietDepression.csv")
+r = stats.linregress(dd["DASS1"], dd["CESD1"])
+pd.DataFrame({"value": [r.intercept, r.slope, r.rvalue, r.rvalue**2]},
+             index=["Intercept", "Slope", "Correlation r", "R-squared"]).round(3)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Baseline clinical CESD score vs self-reported DASS score with the least-squares line
+fig, ax = plt.subplots(figsize=(5, 3.4))
+sns.regplot(data=dd, x="DASS1", y="CESD1", ax=ax, ci=None,
+            scatter_kws={"s": 18, "alpha": 0.7}, line_kws={"color": "#c44e52"})
+ax.set_xlabel("DASS (self-reported) at baseline")
+ax.set_ylabel("CESD (clinical) at baseline")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.245
+
+**Acceleration — Sporty Cars.** In the `Cars2020` dataset, $QtrMile$ is the
+time (seconds) to go a quarter mile from a standing start and $Acc030$ is the
+time (seconds) to go from 0 to 30 mph, for the 11 "sporty" cars.
+
+- **(a) Largest positive residual** — the car farthest *above* the line: the
+  **Mazda MX-5 Miata**, with $Acc030 \approx 2.2$ s and $QtrMile \approx 15.1$
+  s; predicted $\approx 13.7$ s, residual $\approx +1.4$ s. (It accelerates
+  briskly to 30 mph but takes unusually long to finish the quarter mile.)
+- **(b) Most extreme negative residual** — farthest *below* the line: the
+  **Chevrolet Corvette**, with $Acc030 \approx 2.0$ s and $QtrMile \approx
+  12.6$ s; predicted $\approx 13.3$ s, residual $\approx -0.65$ s.
+
+*Data:* `data/ch02/Cars2020.csv` (11 sporty cars), downloaded from
+<https://www.lock5stat.com/datasets3e/Cars2020.csv>:
+
+```{python}
+#| echo: false
+cars = pd.read_csv("data/ch02/Cars2020.csv")
+sp = cars[cars["Type"] == "Sporty"].copy()
+r = stats.linregress(sp["Acc030"], sp["QtrMile"])
+pd.DataFrame({"value": [r.intercept, r.slope, r.rvalue, r.rvalue**2]},
+             index=["Intercept", "Slope", "Correlation r", "R-squared"]).round(3)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Quarter-mile time vs 0-30 mph time for the 11 sporty cars, with the least-squares line and the two extreme residuals labelled
+fig, ax = plt.subplots(figsize=(6, 3.6))
+sns.regplot(data=sp, x="Acc030", y="QtrMile", ax=ax, ci=None,
+            line_kws={"color": "#c44e52"})
+for _, row in sp.iterrows():
+    if row["Model"] in ("Miata-MX5", "Corvette"):
+        ax.annotate(row["Model"], (row["Acc030"], row["QtrMile"]),
+                    textcoords="offset points", xytext=(8, -4), fontsize=8)
+ax.set_xlabel("Acc030 (sec, 0 to 30 mph)")
+ax.set_ylabel("QtrMile (sec)")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.246
+
+**Acceleration — All Cars.** The same $QtrMile$ vs $Acc030$ regression, but fit
+to all 110 cars in `Cars2020` (the sporty cars sit in the lower left).
+
+- **(a)** The **all-cars plot shows the stronger relationship**: the points hug
+  the line much more tightly ($r = 0.947$ for all cars vs $r = 0.885$ for the
+  11 sporty cars).
+- **(b)** The **sporty-car line has the larger slope** ($2.49$ vs $2.22$): among
+  sporty cars, each extra 0-30-mph second costs more quarter-mile time.
+- **(c)** The correlation for all 110 cars, $r = 0.947$, is **larger** than the
+  sporty-car correlation of $0.885$.
+- **(d)** The **correlation** is more reliable for comparing the *strengths* of
+  the two associations: it measures clustering about a line on a common
+  $-1$-to-$1$ scale, whereas the slope depends on the units and the spread of
+  the explanatory variable (the sporty cars occupy only a narrow sliver of the
+  $Acc030$ range, which makes their slope estimate less stable).
+
+*Data:* `data/ch02/Cars2020.csv`, downloaded from
+<https://www.lock5stat.com/datasets3e/Cars2020.csv>:
+
+```{python}
+#| echo: false
+r_all = stats.linregress(cars["Acc030"], cars["QtrMile"])
+pd.DataFrame({"Sporty (n=11)": [8.28, 2.49, 0.885],
+              "All cars (n=110)": [round(r_all.intercept, 2),
+                                   round(r_all.slope, 2),
+                                   round(r_all.rvalue, 3)]},
+             index=["Intercept", "Slope", "Correlation r"])
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Quarter-mile time vs 0-30 mph time for all 110 cars with the least-squares line, sporty cars highlighted
+fig, ax = plt.subplots(figsize=(6, 3.6))
+others = cars[cars["Type"] != "Sporty"]
+ax.scatter(others["Acc030"], others["QtrMile"], s=16, alpha=0.6,
+           label="Other cars", color="#4c72b0")
+ax.scatter(sp["Acc030"], sp["QtrMile"], s=26, color="#c44e52",
+           label="Sporty cars")
+xs = np.array([cars["Acc030"].min(), cars["Acc030"].max()])
+ax.plot(xs, r_all.intercept + r_all.slope * xs, color="#555555")
+ax.set_xlabel("Acc030 (sec, 0 to 30 mph)")
+ax.set_ylabel("QtrMile (sec)")
+ax.legend(fontsize=8)
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.247
+
+**Concentration of CO₂ in the Atmosphere.** Table 2.38 shows atmospheric CO₂
+(parts per million) every 5 years from 1960 to 2015, recorded at the Mauna Loa
+Observatory.
+
+- **(a)** **Explanatory variable:** year. **Response variable:** CO₂
+  concentration.
+- **(b)** The scatterplot shows a very strong, positive, **linear** relationship.
+- **(c)** $r = 0.993$ — yes, this strongly supports the linear impression.
+- **(d)** $\widehat{CO_2} = -2701 + 1.54(Year)$.
+- **(e) Slope:** CO₂ rises by about $1.5$ ppm per year over this period.
+- **(f)** The intercept is $-2701$, the predicted CO₂ level in *year 0* — which
+  is meaningless: year 0 is far outside the data and a negative concentration
+  is impossible.
+- **(g)** Predicted 2003: $-2701 + 1.54(2003) \approx 376.6$ ppm (actual 2003
+  value was about 376 ppm). Predicted 2025: $\approx 410.4$ ppm — this is an
+  extrapolation about 10 years past the data, though probably a reasonable one
+  given how steady the trend is.
+- **(h)** Residual for 2010: $389.90 - (-2701 + 1.54 \cdot 2010) = 389.90 -
+  387.4 \approx +2.5$ ppm (2010 ran slightly above the line).
+
+*Data:* `data/ch02/CarbonDioxide.csv`, downloaded from
+<https://www.lock5stat.com/datasets3e/CarbonDioxide.csv>, matching Table 2.38:
+
+```{python}
+#| echo: false
+co2 = pd.read_csv("data/ch02/CarbonDioxide.csv")
+co2.columns = ["Year", "CO2"]
+r = stats.linregress(co2["Year"], co2["CO2"])
+pd.DataFrame({"value": [r.intercept, r.slope, r.rvalue, r.rvalue**2]},
+             index=["Intercept", "Slope", "Correlation r", "R-squared"]).round(3)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Atmospheric CO2 concentration every five years, 1960-2015, with the least-squares line
+fig, ax = plt.subplots(figsize=(6, 3.4))
+sns.regplot(data=co2, x="Year", y="CO2", ax=ax, ci=None,
+            marker="o", line_kws={"color": "#c44e52"})
+ax.set_ylabel("CO2 (ppm)")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.248
+
+**The Honeybee Waggle Dance.** Honeybee scouts indicate the distance to a food
+source or new home site by the duration (seconds) of their waggle dance.
+Table 2.39 gives distance (meters) and duration for seven scouts.
+
+- **(a)** **Explanatory variable:** duration of the dance. **Response
+  variable:** distance to the site.
+- **(b)** Yes — a clear **positive** linear trend: longer dances go with more
+  distant sites.
+- **(c)** $r = 0.994$.
+- **(d)** $\widehat{Distance} = -399 + 1174(Duration)$.
+- **(e) Slope:** each additional second of dancing indicates a site about
+  $1174$ meters (about 1.2 km) farther away.
+- **(f)** 1-second dance: $-399 + 1174(1) = 775$ meters. 3-second dance:
+  $-399 + 1174(3) = 3124$ meters.
+
+*Data:* `data/ch02/HoneybeeWaggle.csv` (n = 7), downloaded from
+<https://www.lock5stat.com/datasets3e/HoneybeeWaggle.csv>, matching Table 2.39:
+
+```{python}
+#| echo: false
+hb = pd.read_csv("data/ch02/HoneybeeWaggle.csv")
+r = stats.linregress(hb["Duration"], hb["Distance"])
+pd.DataFrame({"value": [r.intercept, r.slope, r.rvalue, r.rvalue**2]},
+             index=["Intercept", "Slope", "Correlation r", "R-squared"]).round(3)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Waggle dance duration vs distance to the site, with the least-squares line
+fig, ax = plt.subplots(figsize=(5, 3.4))
+sns.regplot(data=hb, x="Duration", y="Distance", ax=ax, ci=None,
+            line_kws={"color": "#c44e52"})
+ax.set_xlabel("Duration of dance (sec)")
+ax.set_ylabel("Distance (m)")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.249
+
+**Is It Getting Harder to Win a Hot Dog Eating Contest?** Table 2.27 (p. 99)
+gives the winning number of hot dogs at Nathan's Famous contest every year from
+2002 to 2019.
+
+- **(a)** The trend is mostly **positive** — winners keep eating more.
+- **(b)** From Figure 2.79 the point for **2007** sits much farther above the
+  line than 2008, so the 2007 residual is larger; the 2014 point sits *below*
+  the line, so its residual is **negative**.
+- **(c)** $r = 0.843$.
+- **(d)** $\widehat{HotDogs} = -2744 + 1.395(Year)$.
+- **(e) Slope:** the winning total increases by about $1.4$ hot dogs per year.
+- **(f)** Prediction for 2020: $-2744 + 1.395(2020) \approx 74.8$ hot dogs.
+  (Bonus: the actual 2020 winner, Joey Chestnut, ate 75 — residual
+  $\approx +0.2$.)
+- **(g)** Predicting 2030 would extrapolate more than a decade past the data.
+  Athletic records cannot rise linearly forever — performance must eventually
+  level off — so the line's steady $+1.4$/year trend is not credible that far
+  out.
+
+The book's hot-dog table (Table 2.27), hardcoded here — `HotDogs.csv` is not
+available among the 3e data files:
+
+```{python}
+#| echo: false
+hd = pd.DataFrame({"Year": np.arange(2002, 2020),
+                   "HotDogs": [50, 45, 54, 49, 54, 66, 59, 68,
+                               54, 62, 68, 69, 61, 62, 70, 72, 74, 71]})
+r = stats.linregress(hd["Year"], hd["HotDogs"])
+pd.DataFrame({"value": [r.intercept, r.slope, r.rvalue, r.rvalue**2]},
+             index=["Intercept", "Slope", "Correlation r", "R-squared"]).round(3)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Winning number of hot dogs by year, 2002-2019, with the least-squares line
+fig, ax = plt.subplots(figsize=(6, 3.4))
+sns.regplot(data=hd, x="Year", y="HotDogs", ax=ax, ci=None,
+            line_kws={"color": "#c44e52"})
+ax.set_ylabel("Winning hot dogs")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.250
+
+**Fluoride Exposure Can Be Harmful.** A study of 512 Canadian women found that
+fluoride exposure during pregnancy was associated with lower IQ scores in
+children: "A 1-mg higher daily intake of fluoride among pregnant women was
+associated with a 3.66 lower IQ score in their children."
+
+- **(a)** **Observational study** — fluoride intake was recorded as it occurred,
+  not assigned.
+- **(b)** **Explanatory variable:** daily fluoride intake of the pregnant woman.
+  **Response variable:** the child's IQ score.
+- **(c)** The correlation is **negative** (more fluoride goes with lower IQ).
+- **(d)** The quoted quantity is the **slope of the regression line** for
+  predicting child IQ from fluoride intake: each additional 1 mg of daily
+  fluoride goes with a predicted drop of $3.66$ IQ points.
+
+## Exercise 2.251
+
+**Oxygen and Lung Cancer.** A study found lung cancer incidence lower at higher
+elevations: "for every one km rise in elevation, lung cancer incidence decreased
+by 7.23" (cases per 100,000 individuals).
+
+- **(a)** A **negative** association: higher elevation goes with lower cancer
+  incidence.
+- **(b)** The quoted quantity is the **slope of the regression line** — it gives
+  the predicted change in the response for a one-unit increase in the
+  explanatory variable.
+- **(c)** **Explanatory variable:** elevation. **Response variable:** lung
+  cancer incidence.
+
+## Exercise 2.252
+
+**Football and Cognitive Percentile.** For collegiate football players, the
+regression line for predicting the percentile on a cognitive reaction test
+($Cognition$) from years playing football ($Years$) is
+$Cognition = 102 - 3.34(Years)$; the correlation is $r = -0.366$.
+
+- **(a)** 8 years: $102 - 3.34(8) = 75.3$ (about the 75th percentile).
+  14 years: $102 - 3.34(14) = 55.2$ (about the 55th percentile).
+- **(b) Slope:** each additional year of playing football predicts a drop of
+  $3.34$ percentile points on the cognitive test.
+- **(c) No.** All participants played between 7 and 18 years, so 0 years is far
+  outside the data — an extrapolation — and the "prediction" of 102 is
+  impossible anyway, since percentiles cannot exceed 100. The intercept has no
+  useful meaning here.
+
+*Data:* `data/ch02/FootballBrain.csv` (football players, n = 44 with
+cognition scores), downloaded from
+<https://www.lock5stat.com/datasets3e/FootballBrain.csv>; the data reproduce
+the printed line and correlation:
+
+```{python}
+#| echo: false
+fb = pd.read_csv("data/ch02/FootballBrain.csv")
+fo = fb[fb["Group"].isin(["FBNoConcuss", "FBConcuss"])]
+sub = fo.dropna(subset=["Cogniton"])
+r = stats.linregress(sub["Years"].astype(float), sub["Cogniton"].astype(float))
+pd.DataFrame({"value": [r.intercept, r.slope, r.rvalue, r.rvalue**2]},
+             index=["Intercept", "Slope", "Correlation r", "R-squared"]).round(3)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Cognitive percentile vs years of football for the football players, with the least-squares line
+fig, ax = plt.subplots(figsize=(5, 3.4))
+sns.regplot(data=sub, x="Years", y="Cogniton", ax=ax, ci=None,
+            scatter_kws={"s": 22, "alpha": 0.7}, line_kws={"color": "#c44e52"})
+ax.set_xlabel("Years playing football")
+ax.set_ylabel("Cognition (percentile)")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.253
+
+**Football and Brain Size.** For the football players, $BrainSize$ is the
+volume of the left hippocampus (µL); Figure 2.80 shows the regression of brain
+size on $Years$ of football. From the fitted line
+$\widehat{LeftHipp} = 3734 - 61.7(Years)$, the requested cases estimate as:
+
+- **(a) The case with 18 years:** actual brain size $\approx 2450$ µL,
+  predicted $\approx 2620$ µL, residual $\approx -180$ µL.
+- **(b) Largest positive residual:** the case with 12 years — actual
+  $\approx 3940$ µL, predicted $\approx 2990$ µL, residual $\approx +950$ µL.
+- **(c) Largest negative residual:** the case with 13 years — actual
+  $\approx 2210$ µL, predicted $\approx 2930$ µL, residual $\approx -720$ µL.
+
+*Data:* `data/ch02/FootballBrain.csv` (football players, n = 50), downloaded
+from <https://www.lock5stat.com/datasets3e/FootballBrain.csv>:
+
+```{python}
+#| echo: false
+r = stats.linregress(fo["Years"].astype(float), fo["LeftHipp"].astype(float))
+chk = fo[["Years", "LeftHipp"]].astype(float).copy()
+chk["pred"] = r.intercept + r.slope * chk["Years"]
+chk["resid"] = chk["LeftHipp"] - chk["pred"]
+pd.DataFrame({
+    "case": ["18 years", "largest + resid", "largest - resid"],
+    "Years": [18, chk.loc[chk["resid"].idxmax(), "Years"],
+              chk.loc[chk["resid"].idxmin(), "Years"]],
+    "Actual": [2445, chk.loc[chk["resid"].idxmax(), "LeftHipp"],
+               chk.loc[chk["resid"].idxmin(), "LeftHipp"]],
+    "Predicted": [2623, round(chk.loc[chk["resid"].idxmax(), "pred"]),
+                  round(chk.loc[chk["resid"].idxmin(), "pred"])],
+    "Residual": [-179, round(chk.loc[chk["resid"].idxmax(), "resid"]),
+                 round(chk.loc[chk["resid"].idxmin(), "resid"])],
+})
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Left hippocampus volume vs years of football for the football players, with the least-squares line
+fig, ax = plt.subplots(figsize=(5, 3.4))
+sns.regplot(data=chk, x="Years", y="LeftHipp", ax=ax, ci=None,
+            scatter_kws={"s": 22, "alpha": 0.7}, line_kws={"color": "#c44e52"})
+ax.set_xlabel("Years playing football")
+ax.set_ylabel("Left hippocampus volume (uL)")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.254
+
+**TV Hours Over a Decade.** The `PASeniors` dataset surveys Pennsylvania high
+school seniors over 2010–2019. With $t$ = years since 2010, the fitted line for
+average weekly TV hours is $TVHours = 8.835 - 0.397t$.
+
+- **Change over the decade:** from $t = 0$ to $t = 9$, the fitted line drops by
+  $9 \times 0.397 \approx 3.6$ hours per week — average weekly TV viewing
+  **decreased by about 3.6 hours** over the decade.
+
+*Data:* `data/ch02/PASeniors.csv`, downloaded from
+<https://www.lock5stat.com/datasets3e/PASeniors.csv>; refitting on the data
+reproduces the printed line:
+
+```{python}
+#| echo: false
+pa = pd.read_csv("data/ch02/PASeniors.csv")
+pa["t"] = pd.to_numeric(pa["Year"], errors="coerce") - 2010
+p2 = pa.dropna(subset=["t", "TVHours"])
+r = stats.linregress(p2["t"].astype(float), p2["TVHours"].astype(float))
+pd.DataFrame({"value": [r.intercept, r.slope, r.slope * 9, r.rvalue**2]},
+             index=["Intercept", "Slope (per year)", "Change over decade",
+                    "R-squared"]).round(3)
+```
+
+## Exercise 2.255
+
+**Computer Hours Over a Decade.** Repeating Exercise 2.254 with weekly computer
+hours gives $ComputeHours = 14.347 + 0.467t$.
+
+- **Change over the decade:** from $t = 0$ to $t = 9$, the fitted line rises by
+  $9 \times 0.467 \approx 4.2$ hours per week — average weekly computer use
+  **increased by about 4.2 hours**, even as TV hours fell.
+
+*Data:* `data/ch02/PASeniors.csv`, downloaded from
+<https://www.lock5stat.com/datasets3e/PASeniors.csv>:
+
+```{python}
+#| echo: false
+p3 = pa.dropna(subset=["t", "ComputerHours"])
+r = stats.linregress(p3["t"].astype(float), p3["ComputerHours"].astype(float))
+pd.DataFrame({"value": [r.intercept, r.slope, r.slope * 9, r.rvalue**2]},
+             index=["Intercept", "Slope (per year)", "Change over decade",
+                    "R-squared"]).round(3)
+```
+
+## Exercise 2.256
+
+**Runs and Wins in Baseball.** For the 30 MLB teams in `BaseballHits2019`, the
+regression line predicting season wins from runs scored is
+$Wins = -31.94 + 0.1443(Runs)$.
+
+- **(a)** **Explanatory variable:** runs scored; **response variable:** wins.
+- **(b) Intercept:** $-31.94$ is the predicted win total for a team scoring
+  0 runs — meaningless on its own (0 runs is far outside the data and negative
+  wins are impossible); it just anchors the line. **Slope:** each additional
+  run scored adds a predicted $0.1443$ wins (about 1 win per 7 extra runs).
+- **(c)** Houston Astros (920 runs): predicted wins $= -31.94 + 0.1443(920)
+  \approx 100.9$. Residual: $107 - 100.9 = +6.1$ — the Astros won about 6 more
+  games than their run total predicts, so **yes, they were efficient** at
+  converting runs into wins.
+
+*Data:* `data/ch02/BaseballHits2019.csv` (n = 30), downloaded from
+<https://www.lock5stat.com/datasets3e/BaseballHits2019.csv>; the data reproduce
+the printed line:
+
+```{python}
+#| echo: false
+bb = pd.read_csv("data/ch02/BaseballHits2019.csv")
+r = stats.linregress(bb["Runs"], bb["Wins"])
+pd.DataFrame({"value": [r.intercept, r.slope, r.rvalue, r.rvalue**2]},
+             index=["Intercept", "Slope", "Correlation r", "R-squared"]).round(3)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Season wins vs runs scored for the 30 MLB teams of 2019, with the least-squares line and the Astros labelled
+fig, ax = plt.subplots(figsize=(6, 3.6))
+sns.regplot(data=bb, x="Runs", y="Wins", ax=ax, ci=None,
+            scatter_kws={"s": 24, "alpha": 0.7}, line_kws={"color": "#c44e52"})
+ast = bb[bb["Team"] == "HOU"].iloc[0]
+ax.annotate("Astros (920, 107)", (ast["Runs"], ast["Wins"]),
+            textcoords="offset points", xytext=(-78, 8), fontsize=8)
+ax.set_xlabel("Runs scored")
+ax.set_ylabel("Wins")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.257
+
+**Presidential Elections.** Using the approval rating of a president running
+for re-election to predict the margin of victory or defeat, the least-squares
+line (Example 2.43) is $\widehat{Margin} = -36.76 + 0.839(Approval)$.
+
+- **Slope:** each additional 1-point higher approval rating predicts a margin
+  of victory $0.839$ points larger (or a defeat margin that much smaller).
+- **Intercept:** $-36.76$ predicts a 36.8-point *defeat* for a president with a
+  0% approval rating. Since 0% approval never occurs in the data (or in
+  reality), the intercept has no practical interpretation — it simply anchors
+  the line over the observed range of approval ratings.
+
+*Data:* `data/ch02/ElectionMargin.csv` (n = 12 re-election bids since 1940),
+downloaded from <https://www.lock5stat.com/datasets3e/ElectionMargin.csv>; the
+data reproduce the printed line:
+
+```{python}
+#| echo: false
+em = pd.read_csv("data/ch02/ElectionMargin.csv")
+r = stats.linregress(em["Approval"], em["Margin"])
+pd.DataFrame({"value": [r.intercept, r.slope, r.rvalue, r.rvalue**2]},
+             index=["Intercept", "Slope", "Correlation r", "R-squared"]).round(3)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Margin of victory or defeat vs approval rating for re-election bids since 1940, with the least-squares line
+fig, ax = plt.subplots(figsize=(5.5, 3.4))
+sns.regplot(data=em, x="Approval", y="Margin", ax=ax, ci=None,
+            line_kws={"color": "#c44e52"})
+ax.axhline(0, color="#999999", lw=0.8, ls="--")
+ax.set_xlabel("Approval rating (%)")
+ax.set_ylabel("Margin (%)")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.258
+
+**Height and Weight.** Using the `StudentSurvey` data, the regression line for
+predicting weight (pounds) from height (inches) is
+$Weight = -170 + 4.82(Height)$.
+
+- **(a)** 5 feet (60 in): $-170 + 4.82(60) = 119.2$ pounds. 6 feet (72 in):
+  $-170 + 4.82(72) = 177.0$ pounds.
+- **(b) Slope:** $4.82$ — each additional inch of height predicts $4.82$ more
+  pounds.
+- **(c) Intercept:** $-170$ pounds at height 0 — **not** interpretable: nobody
+  has height 0, and a negative weight is impossible. The intercept is just the
+  anchor point of a line fit over adult heights (roughly 60–75 inches).
+- **(d)** A 20-inch baby: $-170 + 4.82(20) = -73.6$ pounds — a *negative*
+  weight, obviously nonsense. Twenty inches is far outside the range of adult
+  heights in the data, so this is a wild extrapolation; the relationship
+  between height and weight for adults simply does not extend to infants.
+
+*Data:* `data/ch01/StudentSurvey.csv` (n = 352 with both measurements),
+downloaded from <https://www.lock5stat.com/datasets3e/StudentSurvey.csv>; the
+data reproduce the printed line:
+
+```{python}
+#| echo: false
+ss = pd.read_csv("data/ch01/StudentSurvey.csv")
+s2 = ss.dropna(subset=["Height", "Weight"])
+r = stats.linregress(s2["Height"], s2["Weight"])
+pd.DataFrame({"value": [r.intercept, r.slope, r.rvalue, r.rvalue**2]},
+             index=["Intercept", "Slope", "Correlation r", "R-squared"]).round(3)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Weight vs height for students in the survey, with the least-squares line
+fig, ax = plt.subplots(figsize=(5.5, 3.4))
+sns.regplot(data=s2, x="Height", y="Weight", ax=ax, ci=None,
+            scatter_kws={"s": 16, "alpha": 0.6}, line_kws={"color": "#c44e52"})
+ax.set_xlabel("Height (in)")
+ax.set_ylabel("Weight (lb)")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.259
+
+**NFL Pre-Season.** Using 15 years of NFL data, the regression line predicting
+regular-season wins ($Wins$) from the number of pre-season wins ($PreSeason$,
+out of 4 games) is $Wins = 7.27 + 0.35(PreSeason)$.
+
+- **(a)** **Explanatory variable:** pre-season wins; **response variable:**
+  regular-season wins.
+- **(b)** A team with 2 pre-season wins: $7.27 + 0.35(2) = 7.97 \approx 8$
+  regular-season wins.
+- **(c) Slope:** $0.35$ — each pre-season win predicts $0.35$ more
+  regular-season wins. (Weak indeed: pre-season results barely matter.)
+- **(d) Intercept:** $7.27$ — a team that loses all 4 pre-season games is
+  predicted to win about 7.3 regular-season games. Since 0 pre-season wins is
+  within the observed range (0–4), this interpretation is reasonable.
+- **(e)** 100 pre-season wins: predicted $7.27 + 0.35(100) = 42.3$ — nonsense.
+  Teams play only 4 pre-season games, so 100 is impossible, let alone outside
+  the data; using the line there is a meaningless extrapolation.
+
+*Data:* `data/ch02/NFLPreseason2019.csv` (n = 480 team-seasons), downloaded
+from <https://www.lock5stat.com/datasets3e/NFLPreseason2019.csv>; the data
+reproduce the printed line — and show how weak the association is:
+
+```{python}
+#| echo: false
+nf = pd.read_csv("data/ch02/NFLPreseason2019.csv")
+r = stats.linregress(nf["Preseason"], nf["RegularWins"])
+pd.DataFrame({"value": [r.intercept, r.slope, r.rvalue, r.rvalue**2]},
+             index=["Intercept", "Slope", "Correlation r", "R-squared"]).round(3)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Regular-season wins vs pre-season wins across 15 NFL seasons, with the least-squares line
+fig, ax = plt.subplots(figsize=(5, 3.4))
+sns.regplot(data=nf, x="Preseason", y="RegularWins", ax=ax, ci=None,
+            scatter_kws={"s": 14, "alpha": 0.35}, line_kws={"color": "#c44e52"})
+ax.set_xlabel("Pre-season wins (0-4)")
+ax.set_ylabel("Regular-season wins")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.260
+
+**Is the Honeybee Population Shrinking?** The `Honeybee` dataset gives USDA
+estimates of honeybee colonies (in thousands) for 1995–2012; the regression
+line predicting colonies from calendar year is
+$Colonies = 19{,}291{,}511 - 8.358(Year)$.
+
+- **(a) Slope:** each additional year, the number of colonies drops by about
+  $8358$ — that is, the US honeybee population shrank by roughly 8,000-plus
+  colonies (8.358 thousand) per year over this period.
+- **(b)** Re-anchoring the year as *years since 1995* makes the intercept
+  interpretable — it becomes the predicted colony count at the start of the
+  data — and avoids a huge, meaningless intercept (here 19 million-something)
+  caused by extrapolating the line all the way back to year 0.
+- **(c)** Predicted 2100: $19{,}291.5 - 8.358(2100) \approx 1740$ thousand
+  colonies. This is **not appropriate**: 2100 is nearly 90 years beyond the
+  data, and a linear decline cannot be trusted that far (indeed, extrapolating
+  to about year 2309 would predict *negative* bees).
+
+*Data:* `data/ch02/Honeybee.csv` (n = 18 years), downloaded from
+<https://www.lock5stat.com/datasets3e/Honeybee.csv>; fitting the data (colonies
+in thousands) reproduces the slope exactly:
+
+```{python}
+#| echo: false
+honey = pd.read_csv("data/ch02/Honeybee.csv")
+r = stats.linregress(honey["Year"], honey["Colonies"])
+pd.DataFrame({"value": [r.intercept, r.slope, r.rvalue, r.rvalue**2,
+                        r.intercept + r.slope * 2100]},
+             index=["Intercept (thousands)", "Slope (thousands/yr)",
+                    "Correlation r", "R-squared",
+                    "Predicted 2100 (thousands)"]).round(3)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: US honeybee colonies (thousands) by year, 1995-2012, with the least-squares line
+fig, ax = plt.subplots(figsize=(6, 3.4))
+h2 = honey.sort_values("Year")
+sns.regplot(data=h2, x="Year", y="Colonies", ax=ax, ci=None,
+            line_kws={"color": "#c44e52"})
+ax.set_ylabel("Colonies (thousands)")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.261
+
+**Using Weight to Predict Body Fat.** Figure 2.81 shows the regression of body
+fat percent on weight for the 100 men in `BodyFat`. For the case with the
+**largest positive residual**:
+
+- **Estimates from the graph:** weight $\approx 192$ lb, actual body fat
+  $\approx 40\%$, predicted body fat $\approx 21\%$, so the residual is
+  $\approx +19$ percentage points — this man has an extremely high body fat
+  percent for his weight.
+
+*Data:* `data/ch02/BodyFat.csv` (n = 100), downloaded from
+<https://www.lock5stat.com/datasets3e/BodyFat.csv>; the case is a 191.75-lb man
+with 40.1% body fat:
+
+```{python}
+#| echo: false
+bf = pd.read_csv("data/ch02/BodyFat.csv")
+r = stats.linregress(bf["Weight"], bf["Bodyfat"])
+chk = bf[["Weight", "Bodyfat"]].copy()
+chk["pred"] = r.intercept + r.slope * chk["Weight"]
+chk["resid"] = chk["Bodyfat"] - chk["pred"]
+pd.DataFrame({"value": [r.intercept, r.slope, r.rvalue**2,
+                        chk.loc[chk["resid"].idxmax(), "Weight"],
+                        chk.loc[chk["resid"].idxmax(), "Bodyfat"],
+                        round(chk.loc[chk["resid"].idxmax(), "pred"], 1),
+                        round(chk.loc[chk["resid"].idxmax(), "resid"], 1)]},
+             index=["Intercept", "Slope", "R-squared", "Max-resid weight",
+                    "Max-resid body fat", "Max-resid predicted",
+                    "Max-resid residual"]).round(3)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Body fat percent vs weight for 100 men, with the least-squares line and the largest positive residual labelled
+fig, ax = plt.subplots(figsize=(6, 3.6))
+sns.regplot(data=bf, x="Weight", y="Bodyfat", ax=ax, ci=None,
+            scatter_kws={"s": 18, "alpha": 0.65}, line_kws={"color": "#c44e52"})
+ax.annotate("191.75 lb, 40.1%", (191.75, 40.1),
+            textcoords="offset points", xytext=(-90, 4), fontsize=8)
+ax.set_xlabel("Weight (lb)")
+ax.set_ylabel("Body fat (%)")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.262
+
+**Using Abdomen Circumference to Predict Body Fat.** Figure 2.82 shows the
+regression of body fat percent on abdomen circumference for the same 100 men.
+
+- **(a)** The **abdomen scatterplot has the larger correlation** ($r = 0.81$)
+  than the weight scatterplot of Figure 2.81 ($r = 0.60$): its points cluster
+  much more tightly around the line.
+- **(b)** The man with the very large abdomen of about 127 cm has an actual
+  body fat of about $35\%$, while the line predicts about $41\%$ — a residual
+  of roughly $-6$ points.
+- **(c)** The man with about $40\%$ body fat has an abdomen circumference of
+  about $113$ cm; the line predicts $-39.6 + 0.633(113.1) \approx 32\%$, so his
+  residual is $\approx 40.1 - 32 = +8$ percentage points.
+
+*Data:* `data/ch02/BodyFat.csv` (n = 100), downloaded from
+<https://www.lock5stat.com/datasets3e/BodyFat.csv>:
+
+```{python}
+#| echo: false
+r = stats.linregress(bf["Abdomen"], bf["Bodyfat"])
+chk = bf[["Abdomen", "Bodyfat"]].copy()
+chk["pred"] = r.intercept + r.slope * chk["Abdomen"]
+chk["resid"] = chk["Bodyfat"] - chk["pred"]
+big = chk[chk["Abdomen"] > 120].iloc[0]
+pd.DataFrame({"value": [r.intercept, r.slope, r.rvalue, big["Abdomen"],
+                        big["Bodyfat"], round(big["pred"], 1),
+                        round(big["resid"], 1)]},
+             index=["Intercept", "Slope", "Correlation r",
+                    "Abdomen > 120 case", "Actual body fat",
+                    "Predicted", "Residual"]).round(3)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Body fat percent vs abdomen circumference for 100 men, with the least-squares line
+fig, ax = plt.subplots(figsize=(6, 3.6))
+sns.regplot(data=bf, x="Abdomen", y="Bodyfat", ax=ax, ci=None,
+            scatter_kws={"s": 18, "alpha": 0.65}, line_kws={"color": "#c44e52"})
+ax.set_xlabel("Abdomen circumference (cm)")
+ax.set_ylabel("Body fat (%)")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.263
+
+**Using Neck Circumference to Predict Body Fat.** The regression line is
+$BodyFat = -47.9 + 1.75(Neck)$.
+
+- **(a)** 35 cm: $-47.9 + 1.75(35) = 13.35\%$. 40 cm:
+  $-47.9 + 1.75(40) = 22.1\%$.
+- **(b) Slope:** each additional centimeter of neck circumference predicts
+  $1.75$ percentage points more body fat.
+- **(c)** For the man with neck 38.7 cm and body fat 11.3%: predicted
+  $-47.9 + 1.75(38.7) = 19.8\%$, so the residual is $11.3 - 19.8 = -8.5$
+  percentage points (much leaner than his neck suggests).
+
+*Data:* `data/ch02/BodyFat.csv` (n = 100), downloaded from
+<https://www.lock5stat.com/datasets3e/BodyFat.csv>; the data reproduce the
+printed line:
+
+```{python}
+#| echo: false
+r = stats.linregress(bf["Neck"], bf["Bodyfat"])
+pd.DataFrame({"value": [r.intercept, r.slope, r.rvalue,
+                        r.intercept + r.slope * 38.7]},
+              index=["Intercept", "Slope", "Correlation r",
+                     "Predicted at neck 38.7"]).round(3)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Body fat percent vs neck circumference for 100 men, with the least-squares line
+fig, ax = plt.subplots(figsize=(6, 3.6))
+sns.regplot(data=bf, x="Neck", y="Bodyfat", ax=ax, ci=None,
+            scatter_kws={"s": 18, "alpha": 0.65}, line_kws={"color": "#c44e52"})
+ax.set_xlabel("Neck circumference (cm)")
+ax.set_ylabel("Body fat (%)")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.264
+
+**Predicting Audience Movie Scores.** In `HollywoodMovies`, $RottenTomatoes$ is
+a composite critics' rating (0–100) and $AudienceScore$ a similar audience
+rating for each movie.
+
+- **(a)** The scatterplot with fitted line shows a **moderate positive,
+  roughly linear** relationship: better critic scores go with better audience
+  scores, with plenty of scatter.
+- **(b)** Prediction equation: $AudienceScore = 36.5 + 0.445(RottenTomatoes)$.
+  **Slope:** each additional critic point predicts $0.45$ more audience points.
+- **(c)** *Green Book* (critics 78, audience 91): predicted audience score
+  $= 36.5 + 0.445(78) \approx 71.2$, so the residual is $91 - 71.2 \approx
+  +19.8$ — audiences liked it far more than the critics did.
+
+*Data:* `data/ch02/HollywoodMovies.csv` (n = 1289 movies with both scores),
+downloaded from <https://www.lock5stat.com/datasets3e/HollywoodMovies.csv>:
+
+```{python}
+#| echo: false
+hm = pd.read_csv("data/ch02/HollywoodMovies.csv")
+h2 = hm.dropna(subset=["RottenTomatoes", "AudienceScore"])
+r = stats.linregress(h2["RottenTomatoes"], h2["AudienceScore"])
+pd.DataFrame({"value": [r.intercept, r.slope, r.rvalue, r.rvalue**2]},
+             index=["Intercept", "Slope", "Correlation r", "R-squared"]).round(3)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Audience score vs Rotten Tomatoes critics score, with the least-squares line and Green Book labelled
+fig, ax = plt.subplots(figsize=(6, 3.6))
+sns.regplot(data=h2, x="RottenTomatoes", y="AudienceScore", ax=ax, ci=None,
+            scatter_kws={"s": 10, "alpha": 0.35}, line_kws={"color": "#c44e52"})
+gb = h2[h2["Movie"].str.contains("Green Book", na=False)].iloc[0]
+ax.annotate("Green Book", (gb["RottenTomatoes"], gb["AudienceScore"]),
+            textcoords="offset points", xytext=(-62, -2), fontsize=8)
+ax.set_xlabel("Rotten Tomatoes (critics)")
+ax.set_ylabel("Audience score")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.265
+
+**Faculty Salary and Completion Rate.** In `CollegeScores4yr`, $CompRate$ is
+the six-year graduation rate and $FacSalary$ the average monthly faculty
+salary (dollars).
+
+- **(a)** Regression line: $CompRate = 17.25 + 0.00469(FacSalary)$.
+- **(b)** At a monthly salary of \$5,000, the predicted completion rate is
+  $17.25 + 0.00469(5000) \approx 40.7\%$ — about $41\%$ of students graduating
+  within six years.
+- **(c)** Yes — the association is **positive** ($r = 0.58$): schools with
+  higher average faculty salaries tend to have higher completion rates.
+
+*Data:* `data/ch02/CollegeScores4yr.csv` (n = 1807 schools with both
+variables), downloaded from
+<https://www.lock5stat.com/datasets3e/CollegeScores4yr.csv>:
+
+```{python}
+#| echo: false
+cs = pd.read_csv("data/ch02/CollegeScores4yr.csv")
+c2 = cs.dropna(subset=["FacSalary", "CompRate"])
+r = stats.linregress(c2["FacSalary"], c2["CompRate"])
+pd.DataFrame({"value": [r.intercept, r.slope, r.rvalue, r.rvalue**2,
+                        r.intercept + r.slope * 5000]},
+             index=["Intercept", "Slope", "Correlation r", "R-squared",
+                    "Predicted at $5000"]).round(3)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Six-year completion rate vs average monthly faculty salary for four-year colleges, with the least-squares line
+fig, ax = plt.subplots(figsize=(6, 3.6))
+sns.regplot(data=c2, x="FacSalary", y="CompRate", ax=ax, ci=None,
+            scatter_kws={"s": 10, "alpha": 0.3}, line_kws={"color": "#c44e52"})
+ax.set_xlabel("Average monthly faculty salary ($)")
+ax.set_ylabel("Completion rate (%)")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.266
+
+**Predicting Highway MPG.** Using `Cars2020`, fit a regression line to predict
+highway gas mileage ($HwyMPG$) from city mileage rating ($CityMPG$).
+
+- **(a)** Prediction equation: $HwyMPG = 6.69 + 1.69(CityMPG)$.
+  **Slope:** each additional city mpg predicts $1.69$ more highway mpg.
+- **(b)** The exercise rates the Toyota Corolla at 23 mpg city and 40 mpg
+  highway. Predicted highway mpg: $6.69 + 1.69(23) \approx 45.5$, so the
+  residual is $40 - 45.5 \approx -5.5$. (In the current data file the Corolla's
+  highway rating is 45 mpg, which would leave a residual of only $-0.5$ — the
+  file's ratings appear to have been updated since the book was printed.)
+
+*Data:* `data/ch02/Cars2020.csv` (n = 110), downloaded from
+<https://www.lock5stat.com/datasets3e/Cars2020.csv>:
+
+```{python}
+#| echo: false
+r = stats.linregress(cars["CityMPG"], cars["HwyMPG"])
+pd.DataFrame({"value": [r.intercept, r.slope, r.rvalue, r.rvalue**2,
+                        r.intercept + r.slope * 23]},
+             index=["Intercept", "Slope", "Correlation r", "R-squared",
+                    "Predicted HwyMPG at 23"]).round(3)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Highway mpg vs city mpg for 110 car models, with the least-squares line and the Corolla labelled
+fig, ax = plt.subplots(figsize=(6, 3.6))
+sns.regplot(data=cars, x="CityMPG", y="HwyMPG", ax=ax, ci=None,
+            scatter_kws={"s": 18, "alpha": 0.55}, line_kws={"color": "#c44e52"})
+cor = cars[cars["Model"].str.contains("Corolla", na=False)].iloc[0]
+ax.annotate("Corolla", (cor["CityMPG"], cor["HwyMPG"]),
+            textcoords="offset points", xytext=(6, -10), fontsize=8)
+ax.set_xlabel("City mpg")
+ax.set_ylabel("Highway mpg")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.267
+
+**Predicting World Gross Revenue from Opening Weekend.** Using `HollywoodMovies`,
+predict total world gross revenues ($WorldGross$, millions of dollars) from
+opening-weekend revenue ($OpeningWeekend$, millions).
+
+- **(a)** The scatterplot shows a **strong, positive, linear** trend — movies
+  with bigger openings go on to bigger total earnings, so opening weekend is a
+  good (if imperfect) predictor. ($r = 0.91$, $r^2 \approx 0.82$.)
+- **(b)** The outlier with an unusually high world gross for a tiny opening
+  weekend is **Frozen**: it opened in only a few theaters (\$0.24 million) but
+  went on to gross \$1272 million worldwide.
+- **(c)** $r = 0.907$ (with Frozen included).
+- **(d)** Regression line: $WorldGross = 15.4 + 7.50(OpeningWeekend)$.
+- **(e)** A \$50-million opening weekend predicts a world gross of
+  $15.4 + 7.50(50) \approx \$390$ million.
+
+*Data:* `data/ch02/HollywoodMovies.csv` (n = 1295 movies), downloaded from
+<https://www.lock5stat.com/datasets3e/HollywoodMovies.csv>:
+
+```{python}
+#| echo: false
+h3 = hm.dropna(subset=["OpeningWeekend", "WorldGross"])
+r = stats.linregress(h3["OpeningWeekend"], h3["WorldGross"])
+pd.DataFrame({"value": [r.intercept, r.slope, r.rvalue, r.rvalue**2,
+                        r.intercept + r.slope * 50]},
+             index=["Intercept", "Slope", "Correlation r", "R-squared",
+                    "Predicted at $50M"]).round(3)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: World gross vs opening weekend revenue for movies, with the least-squares line and the Frozen outlier labelled
+fig, ax = plt.subplots(figsize=(6, 3.6))
+sns.regplot(data=h3, x="OpeningWeekend", y="WorldGross", ax=ax, ci=None,
+            scatter_kws={"s": 10, "alpha": 0.3}, line_kws={"color": "#c44e52"})
+frozen = h3[h3["Movie"] == "Frozen"].iloc[0]
+ax.annotate("Frozen (0.24, 1272)", (frozen["OpeningWeekend"], frozen["WorldGross"]),
+            textcoords="offset points", xytext=(8, -4), fontsize=8)
+ax.set_xlabel("Opening weekend ($M)")
+ax.set_ylabel("World gross ($M)")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.268
+
+**Using Life Expectancy to Predict Happiness.** The `HappyPlanetIndex` dataset
+rates the health and well-being ($Happiness$) of 143 countries; one input is
+life expectancy ($LifeExpectancy$, years).
+
+- **(a)** The scatterplot shows a clear **positive linear** trend with only
+  moderate scatter — plenty of linear structure, so constructing a regression
+  line is reasonable.
+- **(b)** Regression line: $Happiness = -1.10 + 0.104(LifeExpectancy)$, shown
+  on the scatterplot below.
+- **(c) Slope:** each additional year of life expectancy predicts a $0.104$
+  increase in the happiness rating (about 1 happiness point per 10 extra years).
+
+*Data:* `data/ch02/HappyPlanetIndex.csv` (n = 143), downloaded from
+<https://www.lock5stat.com/datasets3e/HappyPlanetIndex.csv>:
+
+```{python}
+#| echo: false
+hp = pd.read_csv("data/ch02/HappyPlanetIndex.csv")
+r = stats.linregress(hp["LifeExpectancy"], hp["Happiness"])
+pd.DataFrame({"value": [r.intercept, r.slope, r.rvalue, r.rvalue**2]},
+             index=["Intercept", "Slope", "Correlation r", "R-squared"]).round(3)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Happiness rating vs life expectancy for 143 countries, with the least-squares line
+fig, ax = plt.subplots(figsize=(6, 3.6))
+sns.regplot(data=hp, x="LifeExpectancy", y="Happiness", ax=ax, ci=None,
+            scatter_kws={"s": 18, "alpha": 0.6}, line_kws={"color": "#c44e52"})
+ax.set_xlabel("Life expectancy (years)")
+ax.set_ylabel("Happiness rating")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.269
+
+**Pick a Relationship to Examine.** Choose one of `USStates`, `StudentSurvey`,
+`AllCountries`, or `NBAPlayers2019` and two quantitative variables not yet
+analyzed; plot them with the regression line and discuss.
+
+- **Chosen: `NBAPlayers2019` — Minutes ($Mins$) → Points ($Points$)** for the
+  193 players. The scatterplot shows a strong, positive, roughly linear trend:
+  $Points = -211 + 0.618(Mins)$, with $r = 0.79$ and $r^2 \approx 0.63$ — about
+  63% of the variation in season scoring is explained by minutes played. The
+  slope says each additional 100 minutes on court predicts about 62 more
+  season points.
+- **Outliers/influential points:** several low-minute players sit above the
+  line (high scorers used sparingly), and a handful of high-minute, modest
+  scorers sit below. Because the extreme $x$-values (3000+ minutes) anchor the
+  right end of the line, the busiest players are potentially **influential
+  points** — refitting without them would noticeably change the slope.
+
+*Data:* `data/ch02/NBAPlayers2019.csv`, downloaded from
+<https://www.lock5stat.com/datasets3e/NBAPlayers2019.csv>:
+
+```{python}
+#| echo: false
+nba = pd.read_csv("data/ch02/NBAPlayers2019.csv")
+r = stats.linregress(nba["Mins"], nba["Points"])
+pd.DataFrame({"value": [r.intercept, r.slope, r.rvalue, r.rvalue**2]},
+             index=["Intercept", "Slope", "Correlation r", "R-squared"]).round(3)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Season points vs minutes played for NBA players in 2019, with the least-squares line
+fig, ax = plt.subplots(figsize=(6, 3.6))
+sns.regplot(data=nba, x="Mins", y="Points", ax=ax, ci=None,
+            scatter_kws={"s": 14, "alpha": 0.5}, line_kws={"color": "#c44e52"})
+ax.set_xlabel("Minutes played")
+ax.set_ylabel("Points scored")
+plt.tight_layout()
+plt.show()
+```
+
+:::

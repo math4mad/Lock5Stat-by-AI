@@ -1,0 +1,1090 @@
+---
+execute-dir: project
+title: "Chapter 2 · Section 2.5"
+subtitle: "Two Quantitative Variables: Scatterplot and Correlation — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 2.5 of Lock⁵ turns to relationships between **two quantitative variables**,
+displayed in a **scatterplot**: one quantitative variable on the horizontal axis
+(usually the **explanatory** variable) and one on the vertical axis (usually the
+**response**). When describing a scatterplot we look at the **direction** of the
+association (**positive** — above-average values of one variable tend to go with
+above-average values of the other; **negative** — above-average with below-average),
+the **form** (linear or curved), the **strength** (how closely the points follow
+the form), and any **outliers**. The **correlation** $r$ summarizes the strength
+and direction of a *linear* relationship on a fixed scale from $-1$ to $+1$: values
+near $\pm 1$ mean points hugging a line, values near 0 mean little linear trend.
+Key properties: $r$ **does not change when the units of measurement change**, it is
+**strongly sensitive to outliers**, $r = 0$ means *no linear* association (a curved
+relationship can still have $r = 0$), correlation applies only to **quantitative**
+variables, and — as always — **correlation does not imply cause and effect**.
+The exercises below are from *Statistics: Unlocking the Power of Data* (Lock⁵,
+3rd ed., pp. 126–136). Skill Builders 2.186–2.203 match scatterplots to
+correlations, predict directions of association, and draw and compute their own;
+2.204–2.235 apply the ideas to real studies and Lock5 datasets, several with a
+small executable EDA below.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+sns.set_theme(style="whitegrid")
+```
+
+::: {.panel-tabset}
+
+## Exercise 2.186
+
+*(Skill Builder 1 with Figure 2.56: match $r=-1$ to one of the four scatterplots.)*
+
+- **Figure 2.56(b).** Every point lies exactly on a line that slopes *downward* —
+  a perfect negative linear relationship, which is what $r=-1$ means.
+
+## Exercise 2.187
+
+*(Skill Builder 1 with Figure 2.56: match $r=0$.)*
+
+- **Figure 2.56(c).** The points form a shapeless cloud with no upward or downward
+  drift — no linear trend, so the correlation is 0.
+
+## Exercise 2.188
+
+*(Skill Builder 1 with Figure 2.56: match $r=0.8$.)*
+
+- **Figure 2.56(d).** The points show a clear upward linear trend with visible
+  scatter around it — a strong (but not perfect) positive association.
+
+## Exercise 2.189
+
+*(Skill Builder 1 with Figure 2.56: match $r=1$.)*
+
+- **Figure 2.56(a).** Every point lies exactly on a line sloping *upward* — a
+  perfect positive linear relationship, $r=1$.
+
+## Exercise 2.190
+
+*(Skill Builder 2 with Figure 2.57: match $r=0.09$.)*
+
+- **Scatter Plot 3, Figure 2.57(c).** The points wander with no discernible
+  direction — the weakest of the four plots, so it takes the correlation closest
+  to zero.
+
+## Exercise 2.191
+
+*(Skill Builder 2 with Figure 2.57: match $r=-0.38$.)*
+
+- **Scatter Plot 1, Figure 2.57(a).** A loose, scattered cloud with only a mild
+  downward drift — a weak negative association.
+
+## Exercise 2.192
+
+*(Skill Builder 2 with Figure 2.57: match $r=0.89$.)*
+
+- **Scatter Plot 4, Figure 2.57(d).** The points climb steadily from lower left to
+  upper right, packed fairly tightly around the trend — a strong positive
+  association.
+
+## Exercise 2.193
+
+*(Skill Builder 2 with Figure 2.57: match $r=-0.81$.)*
+
+- **Scatter Plot 2, Figure 2.57(b).** The points descend from upper left to lower
+  right, hugging the downward trend closely — a strong negative association.
+
+## Exercise 2.194
+
+**Size of a house** and **cost to heat the house**. *(Skill Builder 3: positive or
+negative association?)*
+
+- **Positive.** Larger houses have more space to heat, so heating costs rise with
+  house size.
+
+## Exercise 2.195
+
+**Distance driven since the last fill-up** and **amount of gas left in the tank**.
+
+- **Negative.** The farther you drive, the more fuel you burn and the less remains
+  in the tank.
+
+## Exercise 2.196
+
+**Outside temperature** and **amount of clothes worn**.
+
+- **Negative.** On hot days people wear less; colder days call for more layers.
+
+## Exercise 2.197
+
+**Number of text messages sent** and **number received** on a cell phone.
+
+- **Positive.** Texting is a two-way activity: people who send many messages
+  generally receive many as well.
+
+## Exercise 2.198
+
+**Number of people in a square mile** and **number of trees in the square mile**.
+
+- **Negative.** Heavily populated (urban) square miles have their land covered with
+  buildings and pavement, leaving fewer trees.
+
+## Exercise 2.199
+
+**Amount of time spent studying** and **grade on the exam**.
+
+- **Positive.** More study time tends to come with better grades (though, as
+  always, association alone does not prove that studying *causes* the grade).
+
+## Exercise 2.200
+
+*(Skill Builder 4: make a scatterplot with $X$ on the horizontal axis.)*
+Data: $X = 3, 5, 2, 7, 6$ and $Y = 12, 1, 0.5, 3, 2.5$.
+
+- The plot shows a loose **downward** drift: the largest $Y$ (12) sits at a small
+  $X$ (3) and the remaining points slope gently down as $X$ grows. The association
+  is weakly negative (Exercise 2.202 computes $r=-0.241$).
+
+*Data:* printed in the exercise (Exercise 2.200 table) — hardcoded here:
+
+```{python}
+#| echo: false
+#| fig-cap: Scatterplot of the five data pairs from Exercise 2.200
+d200 = pd.DataFrame({"X": [3, 5, 2, 7, 6], "Y": [12, 1, 0.5, 3, 2.5]})
+fig, ax = plt.subplots(figsize=(4.5, 3))
+sns.scatterplot(data=d200, x="X", y="Y", s=60, color="#4c72b0", ax=ax)
+ax.set_xlim(0, 8); ax.set_ylim(0, 13)
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.201
+
+*(Skill Builder 4: make a scatterplot with $X$ on the horizontal axis.)*
+Data: $X = 15$ to $50$, $Y = 532, 466, 478, 320, 303, 349, 275, 221$.
+
+- The points fall steadily from $Y=532$ at $X=15$ to $Y=221$ at $X=50$: a **strong
+  negative linear** association (Exercise 2.203 computes $r=-0.932$).
+
+*Data:* printed in the exercise (Exercise 2.201 table) — hardcoded here:
+
+```{python}
+#| echo: false
+#| fig-cap: Scatterplot of the eight data pairs from Exercise 2.201
+d201 = pd.DataFrame({"X": [15, 20, 25, 30, 35, 40, 45, 50],
+                     "Y": [532, 466, 478, 320, 303, 349, 275, 221]})
+fig, ax = plt.subplots(figsize=(4.5, 3))
+sns.scatterplot(data=d201, x="X", y="Y", s=60, color="#4c72b0", ax=ax)
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.202
+
+*(Skill Builder 5: use technology to find the correlation for the data in
+Exercise 2.200.)*
+
+- $r = -0.241$. A weak negative linear association — consistent with the loose
+  downward drift seen in the Exercise 2.200 scatterplot.
+
+```{python}
+#| echo: false
+d200["X"].corr(d200["Y"]).round(3)
+```
+
+## Exercise 2.203
+
+*(Skill Builder 5: use technology to find the correlation for the data in
+Exercise 2.201.)*
+
+- $r = -0.932$. A very strong negative linear association — the points lie close to
+  a descending line.
+
+```{python}
+#| echo: false
+d201["X"].corr(d201["Y"]).round(3)
+```
+
+## Exercise 2.204
+
+**Light Roast or Dark Roast for Your Coffee?** The longer coffee is roasted, the
+less caffeine it has, so an extra-bold dark roast actually has less caffeine than a
+light roast.
+
+- **Explanatory variable:** the roasting — how long/darkly the coffee is roasted
+  (light roast vs dark roast). **Response variable:** the amount of caffeine in the
+  brewed coffee.
+- **Negative association.** More roasting goes with *less* caffeine, which is why
+  the extra-bold dark roast ends up with less caffeine than the light roast.
+
+## Exercise 2.205
+
+**How Much Potassium Is in Your Spinach?** "Higher amounts of iron in the soil in
+which spinach is grown has been associated with lower amounts of potassium in the
+leaves."
+
+- **(a)** The two variables are the **amount of iron in the soil** (the explanatory
+  variable) and the **amount of potassium in the spinach leaves** (the response) —
+  both quantitative.
+- **(b)** A **negative** association: higher soil iron goes with lower leaf
+  potassium.
+- **(c)** **Less than 840 mg.** High soil iron is associated with lower potassium,
+  so a cup of spinach grown in iron-rich soil should average below the 840 mg
+  baseline.
+- **(d)** **Greater than 840 mg** — low soil iron goes with *higher* potassium
+  levels. (Remember from Exercise 1.103 that this is an observational association,
+  not proof that iron causes the potassium difference.)
+
+## Exercise 2.206
+
+**Reading and the Brain.** More time spent reading was associated with higher
+connectivity, while more screen time was associated with lower connectivity.
+
+- **(a)** **(i) Hours reading and connectivity: positive** association.
+  **(ii) Hours of screen time and connectivity: negative** association.
+- **(b) No.** This was an observational study (Exercise 1.104) — nothing was
+  randomly assigned, so confounding variables (parental involvement, income, ...)
+  prevent a causal conclusion.
+
+## Exercise 2.207
+
+**Mother's Love, Hippocampus, and Resiliency.** Children with nurturing mothers
+had a substantially larger hippocampus, and larger hippocampus area goes with more
+resiliency.
+
+- **(a) Positive.** More maternal nurturing is associated with a larger
+  hippocampus.
+- **(b) Positive.** Larger hippocampus size is associated with greater resiliency.
+- **(c)** A randomized experiment would randomly assign some children (families) to
+  receive a nurturing-support intervention and others to a control group, then
+  measure hippocampus size later. Such an experiment is **not ethical** in humans:
+  deliberately withholding nurturing from children in the control group would be
+  harmful.
+- **(d) Humans: no** — the human evidence is observational, so confounding
+  variables prevent a causal conclusion. **Animals (mice): yes** — for the animal
+  studies, which were randomized experiments, the causal conclusion is warranted
+  *for the animals studied*.
+
+## Exercise 2.208
+
+**Commitment Genes and Cheating Genes.** More cheating by the biological mother
+was strongly associated with more cheating by the daughter.
+
+- **Positive association.** Mothers who mated with multiple partners tended to have
+  daughters who also mated with multiple partners. (The nest-switching design —
+  many chicks raised away from their biological mothers — is what helps separate a
+  genetic explanation from an environmental one.)
+
+## Exercise 2.209
+
+**Two Different Depression Scales.** Figure 2.58 plots the self-reported DASS score
+against the clinical CESD score for the 75 participants at the start of the
+diet/depression study.
+
+- **(a) Positive.** Participants who reported more symptoms on the self-reported
+  scale tend to score higher on the clinical assessment — good news for using the
+  quick self-report as a predictor of the clinical result.
+- **(b)** A case in each corner of the scatterplot is a participant who is:
+  - **(i) Upper left:** low on the self-reported scale but high on the clinical
+    scale — the clinical assessment finds substantial depression the patient did
+    not report.
+  - **(ii) Upper right:** high on both scales — highly depressed by both measures.
+  - **(iii) Lower left:** low on both scales — little depression on either measure.
+  - **(iv) Lower right:** high on the self-reported scale but low on the clinical
+    scale — many reported symptoms but a comparatively mild clinical assessment.
+- **(c)** *(This part is printed as a second "(a)" in the book.)* The case farthest
+  to the right has a self-reported score of about **55** and a clinical score of
+  about **28** — the largest gap in favor of self-reported symptoms anywhere in the
+  plot.
+
+## Exercise 2.210
+
+**Possible Cases for Ages of Husbands and Wives.** Scatterplot with wife's age on
+the horizontal axis and husband's age on the vertical axis.
+
+- **(a) Top left corner:** an older husband married to a young wife (a large
+  husband–wife age gap in the traditional direction).
+- **(b) Top right corner:** an older couple — both husband and wife older.
+- **(c) Bottom left corner:** a young couple — both recently come of age.
+- **(d) Bottom right corner:** a young husband married to an older wife.
+
+## Exercise 2.211
+
+**Social Jetlag.** Increased social jetlag was associated with higher BMI, higher
+cortisol, higher depression scores, fewer weekday hours of sleep, less physical
+activity, and a higher resting heart rate.
+
+- **(a)** Correlation of social jetlag with each variable:
+  - **BMI: positive**
+  - **Cortisol level: positive**
+  - **Depression score: positive**
+  - **Weekday hours of sleep: negative**
+  - **Physical activity: negative**
+  - **Heart rate: positive**
+- **(b) No.** The study is observational — social jetlag was self-reported, not
+  assigned — so confounding variables (work schedules, general health, lifestyle)
+  prevent a causal conclusion.
+
+## Exercise 2.212
+
+**Football, Brain Size, and Cognitive Scores.** Both scatterplots use years
+playing football as the explanatory variable; graph (a) shows cognitive percentile
+and graph (b) shows left hippocampal volume. The two correlations are $-0.465$ and
+$-0.366$.
+
+- **(a)** The two plots look similar, but graph (b) — hippocampal volume — has the
+  somewhat tighter linear trend, so **$r=-0.465$ goes with graph (b)** and
+  **$r=-0.366$ goes with graph (a)**.
+- **(b)** Both correlations are negative: **more years of playing football are
+  associated with both a lower cognitive percentile and a smaller left
+  hippocampus.** The associations are moderate (not near $\pm 1$) and, since the
+  data are observational, they do not by themselves prove that football *causes*
+  the differences.
+
+## Exercise 2.213
+
+**At What Age Do People Get Married?** Scatterplot of the `MarriageAges` data
+(105 marriage licenses from St. Lawrence County), wife's age on the horizontal
+axis and husband's age on the vertical.
+
+*Data:* `data/ch02/MarriageAges.csv` (n = 105), downloaded from
+<https://www.lock5stat.com/datasets3e/MarriageAges.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Ages of husbands and wives for 105 marriage licenses
+ma = pd.read_csv("data/ch02/MarriageAges.csv")
+fig, ax = plt.subplots(figsize=(5, 3.5))
+sns.scatterplot(data=ma, x="Wife", y="Husband", s=45, color="#4c72b0", ax=ax)
+ax.set_xlabel("Wife's age"); ax.set_ylabel("Husband's age")
+plt.tight_layout()
+plt.show()
+```
+
+- **(a) Yes — exactly one other.** Two women married at age 50: the first case (the
+  50-year-old woman with a 53-year-old husband from Table 2.35) and one more, whose
+  husband was **43**.
+- **(b)** The **oldest man was 75** and the **youngest man was 19**.
+- **(c)** **Two** wives were older than 65 (ages 67 and 68), and **four** were
+  still in their teens.
+
+```{python}
+#| echo: false
+w50 = ma[ma.Wife == 50]
+pd.DataFrame({"Question": ["Wives age 50 (husbands)", "Oldest man", "Youngest man",
+                           "Wives older than 65", "Wives under 20"],
+              "Answer": [", ".join(map(str, sorted(w50.Husband))), ma.Husband.max(),
+                         ma.Husband.min(), int((ma.Wife > 65).sum()),
+                         int((ma.Wife < 20).sum())]})
+```
+
+## Exercise 2.214
+
+**Correlation Between Spouse's Ages at Time of Marriage.** Find the correlation
+between the husband's age and the wife's age in `MarriageAges`, with the correct
+notation.
+
+- **$r = 0.914$.** The correct notation for a correlation computed from sample data
+  is **$r$** (as opposed to $\rho$, the correlation of an entire population).
+  Spouses' ages at marriage are very strongly, positively, linearly associated —
+  couples tend to be close in age.
+
+```{python}
+#| echo: false
+ma.Husband.corr(ma.Wife).round(3)
+```
+
+## Exercise 2.215
+
+**Distance vs Speed for Homing Pigeons.** Scatterplot of the `HomingPigeons` race
+results, with miles on the horizontal axis and speed (yd/min) on the vertical.
+
+*Data:* `data/ch02/HomingPigeons.csv` (n = 1412 pigeons), downloaded from
+<https://www.lock5stat.com/datasets3e/HomingPigeons.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Race distance and speed for 1412 homing pigeons
+hp = pd.read_csv("data/ch02/HomingPigeons.csv")
+fig, ax = plt.subplots(figsize=(5.5, 3.5))
+sns.scatterplot(data=hp, x="Distance", y="Speed", s=18, color="#4c72b0", ax=ax,
+                edgecolor=None, alpha=0.6)
+ax.set_xlabel("Distance (miles)"); ax.set_ylabel("Speed (yd/min)")
+plt.tight_layout()
+plt.show()
+```
+
+- **(a) Negative** (weakly so): longer races tend to be flown at somewhat slower
+  average speeds.
+- **(b)** The winner, with a speed of 1676 yd/min, flew a distance of **430 miles**.
+- **(c)** $r = -0.231$ — **consistent with (a)**: a negative association, though a
+  fairly weak one. (The winner is a high outlier on speed, which drags the
+  correlation toward zero.)
+
+```{python}
+#| echo: false
+pd.DataFrame({"r (Distance vs Speed)": [hp.Distance.corr(hp.Speed).round(3)],
+              "Winner's distance (miles)": [hp.loc[hp.Speed.idxmax(), "Distance"]],
+              "Winner's speed (yd/min)": [hp.Speed.max()]})
+```
+
+## Exercise 2.216
+
+**NFL Pre-Season.** Pre-season and regular-season wins for all 32 NFL teams over a
+15-year span (`NFLPreseason2019`, 480 team-seasons).
+
+*Data:* `data/ch02/NFLPreseason2019.csv` (n = 480), downloaded from
+<https://www.lock5stat.com/datasets3e/NFLPreseason2019.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Pre-season wins vs regular season wins for NFL teams, 2005-2019
+nf = pd.read_csv("data/ch02/NFLPreseason2019.csv")
+fig, ax = plt.subplots(figsize=(5, 3.5))
+sns.scatterplot(data=nf, x="Preseason", y="RegularWins", s=35, color="#4c72b0",
+                ax=ax, alpha=0.6)
+ax.set_xlabel("Pre-season wins"); ax.set_ylabel("Regular season wins")
+plt.tight_layout()
+plt.show()
+```
+
+- **(a)** A **positive** association would imply that teams that do well in the
+  pre-season also tend to do well in the regular season (pre-season success
+  indicates regular-season success). A **negative** association would imply the
+  opposite: teams that shine in August tend to struggle once the real games begin.
+- **(b)** $r = 0.118$ is **very close to zero**: there is only a very weak linear
+  relationship, so pre-season wins tell us almost nothing about regular-season
+  success.
+
+```{python}
+#| echo: false
+nf.Preseason.corr(nf.RegularWins).round(3)
+```
+
+## Exercise 2.217
+
+**What's Wrong with the Statement?** A researcher claims a strong positive
+correlation ($r=0.88$) between blood alcohol content (BAC) and the *type* of
+alcoholic drink consumed (beer, wine, or hard liquor).
+
+- **Correlation requires two quantitative variables.** Type of drink is
+  **categorical** — it has no numerical value to plot or average — so $r$ is simply
+  not defined for it. A statistician would instead compare BAC *distributions*
+  across the three drink categories (e.g., with side-by-side boxplots or group
+  means) and describe the association in those terms.
+
+## Exercise 2.218
+
+**Help for Insomniacs.** Participants were randomly assigned to receive or not
+receive cognitive behavioral therapy (CBT); "sleep improvements were strongly
+correlated with CBT."
+
+- **CBT is a categorical variable** (received CBT or did not), and correlation is
+  only defined between two quantitative variables. The correct description is an
+  **association between a categorical explanatory variable and a quantitative (or
+  binary) response** — e.g., compare the proportion with sleep improvement between
+  the CBT and no-CBT groups. (The randomized design does, however, support a
+  causal conclusion — just not a "correlation.")
+
+## Exercise 2.219
+
+**Genetic Diversity and Distance from Africa.** Genetic diversity of 52 human
+populations plotted against each population's distance from East Africa (Addis
+Ababa) over land (`GeneticDiversity`).
+
+*Data:* `data/ch02/GeneticDiversity.csv` (n = 52), downloaded from
+<https://www.lock5stat.com/datasets3e/GeneticDiversity.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Genetic diversity of 52 populations by overland distance from East Africa
+gd = pd.read_csv("data/ch02/GeneticDiversity.csv")
+fig, ax = plt.subplots(figsize=(6, 3.5))
+sns.scatterplot(data=gd, x="Distance", y="GeneticDiversity", hue="Continent",
+                s=45, ax=ax)
+ax.set_xlabel("Distance from East Africa (km)")
+ax.set_ylabel("Genetic diversity")
+ax.legend(title="Region", fontsize=7, title_fontsize=8)
+plt.tight_layout()
+plt.show()
+```
+
+- **(a)** A **strong, linear, negative** association: the farther a population
+  lives from East Africa (by land), the lower its genetic diversity — the
+  serial-founder-effect signature of humans migrating out of Africa.
+- **(b)** $r = -0.83$ (computed: $-0.835$). The values $\pm 1.22$ are impossible
+  ($|r|\le 1$ always), the positive values have the wrong sign, and $-0.14$ is far
+  too weak for the tight downward trend.
+- **(c)** Both extremes are in the **Americas**: the population with the lowest
+  genetic diversity is the **Karitiana (Brazil, America)**, and the population
+  farthest from East Africa by land is **also the Karitiana** (about 24,200 km) —
+  native Amazonian populations sit at the far bottom right of the plot.
+- **(d)** Since greater genetic diversity is thought to aid adaptation,
+  populations **closer** to East Africa (Africa itself, at the upper left) appear
+  **better suited to adapt to change**, while the farthest, least-diverse
+  populations (the Americas) appear least equipped.
+
+```{python}
+#| echo: false
+pd.DataFrame({"r": [gd.GeneticDiversity.corr(gd.Distance).round(3)],
+              "Lowest-diversity population": [gd.loc[gd.GeneticDiversity.idxmin(), "Population"]],
+              "Its continent": [gd.loc[gd.GeneticDiversity.idxmin(), "Continent"]],
+              "Farthest population": [gd.loc[gd.Distance.idxmax(), "Population"]],
+              "Its distance (km)": [round(gd.Distance.max())]})
+```
+
+## Exercise 2.220
+
+**The Happy Planet Index.** Happiness (well-being) vs ecological footprint for 143
+countries (`HappyPlanetIndex`).
+
+*Data:* `data/ch02/HappyPlanetIndex.csv` (n = 143), downloaded from
+<https://www.lock5stat.com/datasets3e/HappyPlanetIndex.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Happiness and ecological footprint for 143 countries, colored by region
+hpi = pd.read_csv("data/ch02/HappyPlanetIndex.csv")
+fig, ax = plt.subplots(figsize=(6.5, 3.8))
+sns.scatterplot(data=hpi, x="Footprint", y="Happiness", hue="Region",
+                palette="colorblind", s=40, ax=ax)
+cr = hpi[hpi.Country == "Costa Rica"].iloc[0]
+ax.annotate("Costa Rica", (cr.Footprint, cr.Happiness),
+            textcoords="offset points", xytext=(6, -12), fontsize=8)
+ax.set_xlabel("Ecological footprint"); ax.set_ylabel("Happiness")
+ax.legend(title="Region", fontsize=7, title_fontsize=8)
+plt.tight_layout()
+plt.show()
+```
+
+- **(a) Mostly positive** ($r \approx 0.64$): countries with larger ecological
+  footprints tend to have happier, healthier populations — resource use and
+  well-being rise together across most of the world.
+- **(b)** A country in the **bottom left** uses few resources *and* has low
+  well-being — for example **Tanzania (Happiness 2.4, Footprint 1.1)** or Togo:
+  impoverished, low-impact countries.
+- **(c)** Costa Rica's ecological footprint is about **2.3** — modest resource use
+  accompanying the world's highest Happiness score (8.5).
+- **(d)** For footprints **between 0 and 6, yes**: larger footprints are strongly
+  associated with more happiness ($r \approx 0.62$ within that range). For
+  footprints **between 6 and 10, no** — among the highest-impact countries the
+  association essentially vanishes ($r \approx 0.04$): beyond a certain level of
+  consumption, more resource use buys no additional happiness.
+- **(e)** A country in the **upper left** achieves high happiness and health with a
+  small ecological footprint — exactly the sustainable well-being Marks advocates
+  (Costa Rica is the exemplar).
+- **(f)** **Region 1 (Latin America)** stands out: its countries cluster high on
+  happiness relative to their footprints — many sit in the upper left half of the
+  graph, achieving well-being at modest resource cost.
+- **(g)** For countries in the **bottom left**, efforts should focus on raising
+  happiness (health, nutrition, well-being) *without* expanding the footprint. For
+  countries in the **top right**, efforts should focus on *reducing* the
+  ecological footprint while maintaining the happiness they already have.
+
+```{python}
+#| echo: false
+lo, hi = hpi[hpi.Footprint <= 6], hpi[hpi.Footprint > 6]
+pd.DataFrame({"Group": ["All countries", "Footprint 0-6", "Footprint 6-10"],
+              "n": [len(hpi), len(lo), len(hi)],
+              "r (Happiness vs Footprint)": [round(hpi.Happiness.corr(hpi.Footprint), 3),
+                                             round(lo.Happiness.corr(lo.Footprint), 3),
+                                             round(hi.Happiness.corr(hi.Footprint), 3)]})
+```
+
+## Exercise 2.221
+
+**Pumpkin Beer Ratings by Spouse.** Figure 2.62 plots the wife's rating against the
+husband's rating for the pumpkin beers the Locks tasted (`PumpkinBeer`).
+
+*Data:* `data/ch02/PumpkinBeer.csv` (n = 18 beers, 2011–2019), downloaded from
+<https://www.lock5stat.com/datasets3e/PumpkinBeer.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Wife rating vs husband rating of 18 pumpkin beers
+pb = pd.read_csv("data/ch02/PumpkinBeer.csv")
+fig, ax = plt.subplots(figsize=(4.5, 3.5))
+sns.scatterplot(data=pb, x="HusbandRating", y="WifeRating", s=60,
+                color="#4c72b0", ax=ax)
+ax.set_xlabel("Husband rating"); ax.set_ylabel("Wife rating")
+plt.tight_layout()
+plt.show()
+```
+
+- **(a) Upper right:** a beer **both spouses loved** — high rating from each.
+- **(b) Bottom left:** a beer **both spouses disliked** — low ratings all around.
+- **(c) Bottom right:** a beer the **husband liked but the wife did not** —
+  disagreement in his favor.
+- **(d) Top left:** a beer the **wife liked but the husband did not** —
+  disagreement in her favor.
+
+## Exercise 2.222
+
+**Pumpkin Beer Ratings by Year.** Average of the two spouses' ratings for each
+beer, plotted by year (Figure 2.63).
+
+- **(a)** The couple rated the most pumpkin beers in **2011** (9 beers, vs 2–3 in
+  every other year of the dataset).
+- **(b)** Averaging the beers' average ratings within each year, **2019** has the
+  highest overall average (about **8.25**, vs 5.5–6.7 in the other years).
+- **(c)** **2011** had the highest range of average ratings: from 2.5 (Harvest
+  Moon / La Parcela) up to 9.5 (Pumkin Ale) — a range of **7** points.
+- **(d)** The highest-average beer was tasted in **2011**: Pumkin Ale (average
+  9.5).
+
+```{python}
+#| echo: false
+pd.DataFrame({"Year": sorted(pb.Year.unique()),
+              "Beers": pb.Year.value_counts().sort_index().values,
+              "Avg of averages": pb.groupby("Year").Average.mean().round(2).values,
+              "Range of averages": pb.groupby("Year").Average.apply(lambda s: s.max() - s.min()).round(2).values})
+```
+
+## Exercise 2.223
+
+**Pumpkin Beer Correlation: Wife and Husband Ratings.**
+
+- **(a)** $r = 0.348$ — a **positive but fairly weak** linear association: the
+  spouses agree somewhat, but they often disagree sharply about individual beers
+  (e.g., Pumpkick: wife 9, husband 2).
+- **(b)** The wife's highest-rated beer is **Pumkin Ale (Carolina Beer Company),
+  rated 10, tasted in 2011**.
+- **(c)** The husband rated two beers highest (10 each), both from **2019**:
+  **Master of Pumpkins** and **Trick or Treat: Chocolate Pumpkin Porter**.
+
+```{python}
+#| echo: false
+pd.DataFrame({"r (Wife vs Husband)": [pb.WifeRating.corr(pb.HusbandRating).round(3)]})
+```
+
+```{python}
+#| echo: false
+pd.concat([pb.nlargest(1, "WifeRating"), pb.nlargest(2, "HusbandRating")])[
+    ["Name", "Brewer", "Year", "WifeRating", "HusbandRating"]].drop_duplicates()
+```
+
+## Exercise 2.224
+
+**Pumpkin Beer Correlation: Average Rating and Year.**
+
+- **(a)** $r = 0.088$ — essentially **no linear trend**: the average ratings
+  neither clearly increase nor clearly decrease over 2011–2019 (at most a very
+  slight upward tilt, driven by the strong 2019 vintage).
+- **(b)** The low outlier is **Harvest Moon (Blue Moon), 2011, average 2.5** —
+  note that La Parcela (Jolly Pumpkin, 2011) ties it at 2.5, so the single low
+  point in Figure 2.63 is really two overlapping beers.
+- **(c) The correlation would decrease.** Removing the low point(s) at the early
+  end of the series tilts what little upward trend remained downward:
+  $r$ drops from $0.088$ to about $-0.016$.
+
+```{python}
+#| echo: false
+#| fig-cap: Average pumpkin beer rating by year, with the low outlier highlighted
+fig, ax = plt.subplots(figsize=(5.5, 3.2))
+sns.scatterplot(data=pb, x="Year", y="Average", s=60, color="#4c72b0", ax=ax)
+outl = pb[pb.Average == pb.Average.min()]
+ax.annotate("low outlier(s)", (outl.Year.iloc[0], outl.Average.iloc[0]),
+            textcoords="offset points", xytext=(8, 6), fontsize=8)
+ax.set_xlabel("Year"); ax.set_ylabel("Average rating")
+plt.tight_layout()
+plt.show()
+```
+
+```{python}
+#| echo: false
+pb_no = pb[pb.Average > pb.Average.min()]
+pd.DataFrame({"r (all beers)": [pb.Average.corr(pb.Year).round(3)],
+              "r without low outlier(s)": [pb_no.Average.corr(pb_no.Year).round(3)]})
+```
+
+## Exercise 2.225
+
+**Is Your Body Language Closed or Open?** People rated as more closed-postured
+"had higher levels of stress hormones and said they felt less powerful than those
+who had a more open pose."
+
+- **(a)** Three variables, all **quantitative** (given the numerical scales assumed
+  in the exercise): the **body-language score** (low = closed, high = open), the
+  **stress-hormone level**, and the **feeling-of-power score** (low = less
+  powerful, high = more powerful).
+- **(b) Negative.** More open body language goes with *lower* stress hormones, so
+  body-language score and hormone level are negatively related. If the
+  body-language scale were **reversed** (higher = more closed), the *sign of the
+  association would flip to positive* — higher reversed score, higher hormones —
+  even though the underlying relationship is unchanged.
+- **(c) Positive.** More open body language goes with *feeling more powerful*.
+  - If **both** scales were reversed, the relationship would **still be positive**
+    (reversing both variables leaves the sign of the association unchanged).
+  - If **only one** scale were reversed, the sign would **flip to negative**.
+
+## Exercise 2.226
+
+**SAT Scores: Math vs Verbal.** The `StudentSurvey` dataset includes MathSAT and
+VerbalSAT scores for 362 students.
+
+*Data:* `data/ch01/StudentSurvey.csv` (n = 362), downloaded from
+<https://www.lock5stat.com/datasets3e/StudentSurvey.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: MathSAT vs VerbalSAT scores for 362 students
+ss = pd.read_csv("data/ch01/StudentSurvey.csv")
+fig, ax = plt.subplots(figsize=(5, 3.5))
+sns.scatterplot(data=ss, x="VerbalSAT", y="MathSAT", s=25, color="#4c72b0",
+                ax=ax, alpha=0.7)
+ax.set_xlabel("Verbal SAT"); ax.set_ylabel("Math SAT")
+plt.tight_layout()
+plt.show()
+```
+
+- **(a)** A **positive** relationship would imply students who score high on one
+  part of the SAT tend to score high on the other (skills travel together). A
+  **negative** relationship would imply students strong in math tend to be weak in
+  verbal (and vice versa).
+- **(b)** A student in each corner of Figure 2.64:
+  - **Top left:** high verbal, low math — the verbal whiz.
+  - **Top right:** high on both — strong all-around test taker.
+  - **Bottom left:** low on both — struggling on both parts.
+  - **Bottom right:** high math, low verbal — the math specialist.
+- **(c)** The relationship is **moderate, not strong**: there is a clear upward
+  trend, but plenty of scatter. SAT subscores are related — a student's two scores
+  are far from independent — but knowing one score leaves a lot of uncertainty
+  about the other.
+- **(d)** $r = 0.445$ — which is exactly the correlation in the data: positive,
+  moderate, and far from the extreme options $\pm 0.9$.
+
+```{python}
+#| echo: false
+ss.MathSAT.corr(ss.VerbalSAT).round(3)
+```
+
+## Exercise 2.227
+
+**Exercising or Watching TV?** Hours per week of exercise and of television
+watching in the `StudentSurvey` dataset.
+
+*Data:* `data/ch01/StudentSurvey.csv` (n = 362), downloaded from
+<https://www.lock5stat.com/datasets3e/StudentSurvey.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Weekly hours of exercise vs TV watching for 362 students
+fig, ax = plt.subplots(figsize=(5, 3.5))
+sns.scatterplot(data=ss, x="TV", y="Exercise", s=25, color="#4c72b0",
+                ax=ax, alpha=0.7)
+ax.set_xlabel("TV hours per week"); ax.set_ylabel("Exercise hours per week")
+plt.tight_layout()
+plt.show()
+```
+
+- **(a)** A **positive** relationship would imply heavy exercisers are also heavy
+  TV watchers (a general "do a lot of everything" lifestyle). A **negative**
+  relationship would imply the two activities compete for the same free time:
+  students who exercise a lot watch little TV, and vice versa.
+- **(b)** A student in each corner of Figure 2.65:
+  - **Top left:** exercises a lot, watches little TV.
+  - **Top right:** exercises a lot *and* watches a lot of TV.
+  - **Bottom left:** does neither much — little exercise, little TV.
+  - **Bottom right:** watches a lot of TV, hardly exercises at all.
+- **(c)** The **outlier on the right** is the student who watches about **40 hours
+  of TV a week** (nearly six hours a day!) while exercising only about **5 hours**.
+  The **outlier on the top** is the student who exercises about **40 hours a week**
+  while watching only about **2 hours** of TV.
+- **(d)** $r = 0.01$ is essentially **zero**: there is no linear relationship
+  between exercise and TV hours in this sample — knowing one tells you nothing
+  about the other.
+
+```{python}
+#| echo: false
+pd.DataFrame({"r (Exercise vs TV)": [ss.Exercise.corr(ss.TV).round(3)],
+              "TV outlier (TV, Exercise)": [(int(ss.TV.max()), float(ss.loc[ss.TV.idxmax(), 'Exercise']))],
+              "Exercise outlier (TV, Exercise)": [(float(ss.loc[ss.Exercise.idxmax(), 'TV']), int(ss.Exercise.max()))]})
+```
+
+## Exercise 2.228
+
+**Females Rating Males on OKCupid.** Figure 2.66 plots, for each female age, the
+age of men that women of that age find most attractive, with the $Y=X$ line for
+reference.
+
+- **(a)** Women find men **about their own age** most attractive only in the
+  **mid-to-late 30s (roughly 35–38)**, where the curve crosses the $Y=X$ line.
+- **(b)** **Older men.** Women in their early 20s peak above the line — a
+  20-year-old woman's most-attractive male age is about **23**.
+- **(c)** **Younger men (slightly).** From about age 40 onward the curve dips below
+  the $Y=X$ line: a 45-year-old woman's most-attractive male age is a couple of
+  years under 45.
+- **(d)** **0.9.** The most-attractive male age rises steadily and almost linearly
+  with the woman's age across the whole range — a strong positive association.
+
+## Exercise 2.229
+
+**Males Rating Females on OKCupid.** Figure 2.67 plots, for each male age, the age
+of women that men of that age find most attractive.
+
+- **(a)** Only at about **age 20–21**, where the dots begin right on the $Y=X$
+  line; beyond that the dots immediately flatten below it.
+- **(b)** **Women in their early 20s (about 20–24).** The curve is nearly flat:
+  men of *every* age from 20 to 50 report finding women in that narrow age band
+  most attractive.
+- **(c)** **0.** The plot shows no upward or downward trend at all — the most
+  attractive female age barely changes as the man's age increases — so the
+  correlation is closest to zero.
+
+## Exercise 2.230
+
+**Comparing Global Internet Connections.** Internet speed (Mbps) and hours online
+per day for nine countries, from Table 2.36 (`GlobalInternet2019`).
+
+*Data:* printed in the exercise (Table 2.36) — hardcoded here:
+
+```{python}
+#| echo: false
+#| fig-cap: Internet speed and hours online per day for nine countries
+gi = pd.DataFrame(
+    {"Country": ["Switzerland", "United States", "Germany", "Australia",
+                 "United Kingdom", "France", "Spain", "Italy", "Brazil"],
+     "Speed": [38.85, 32.89, 24.64, 16.36, 22.37, 30.44, 36.06, 17.3, 4.84],
+     "Hours": [4.97, 6.52, 4.62, 5.07, 5.77, 4.63, 4.3, 6.07, 9.29]})
+fig, ax = plt.subplots(figsize=(5.5, 3.8))
+sns.scatterplot(data=gi, x="Speed", y="Hours", s=60, color="#4c72b0", ax=ax)
+for _, row in gi.iterrows():
+    ax.annotate(row.Country, (row.Speed, row.Hours),
+                textcoords="offset points", xytext=(4, 4), fontsize=7)
+ax.set_xlabel("Internet speed (Mbps)"); ax.set_ylabel("Hours online per day")
+plt.tight_layout()
+plt.show()
+```
+
+- **(a)** A **positive** association would mean countries with faster average
+  internet have people who spend *more* time online. This could make sense: fast,
+  cheap broadband infrastructure goes hand in hand with an online-centered economy
+  and culture, so better connectivity accompanies heavier use.
+- **(b)** A **negative** association would mean countries with faster internet have
+  people who spend *less* time online. That could also make sense: fast connections
+  let people finish their online tasks quickly, and in slow-connection countries
+  people may linger longer (or the association may reflect some other factor).
+- **(c)** The scatterplot shows a **negative** relationship: slower countries tend
+  to log more hours. **Brazil** is the clear outlier — by far the slowest speed
+  (4.84 Mbps) yet the *most* hours online (9.29/day), placing it far left and far
+  above the rest. (The United States is mildly unusual — fast internet with
+  near-highest hours — but Brazil is the dominant outlier.)
+- **(d)** After removing Brazil, the remaining eight countries still show a
+  **negative** relationship, but a much weaker one.
+- **(e)** $r = -0.704$ for all nine countries; without Brazil, $r = -0.289$. **Yes
+  — the correlation is strongly affected by the outlier**: a single country changes
+  $r$ by more than 0.4.
+- **(f) No.** These are observational data on nine countries. Confounding variables
+  (wealth, infrastructure, work culture, climate and leisure habits) could account
+  for the association, so we cannot conclude that a slower connection *causes*
+  people to spend more time online.
+
+```{python}
+#| echo: false
+gi_all = gi.Speed.corr(gi.Hours)
+gi_nb = gi[gi.Country != "Brazil"].Speed.corr(gi[gi.Country != "Brazil"].Hours)
+pd.DataFrame({"r (all 9 countries)": [round(gi_all, 3)],
+              "r (without Brazil)": [round(gi_nb, 3)]})
+```
+
+## Exercise 2.231
+
+**Iris Petals.** Petal length and petal width for 150 iris flowers in Fisher's
+iris data (`FisherIris`).
+
+*Data:* `data/ch02/FisherIris.csv` (n = 150), downloaded from
+<https://www.lock5stat.com/datasets3e/FisherIris.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Petal width vs petal length for 150 iris flowers
+fi = pd.read_csv("data/ch02/FisherIris.csv")
+fig, ax = plt.subplots(figsize=(5.5, 3.5))
+sns.scatterplot(data=fi, x="PetalLength", y="PetalWidth", s=30,
+                color="#4c72b0", ax=ax, alpha=0.7)
+ax.set_xlabel("Petal length (mm)"); ax.set_ylabel("Petal width (mm)")
+plt.tight_layout()
+plt.show()
+```
+
+- **(a) Positive.** Irises with longer petals tend to have wider petals — petal
+  dimensions grow together (allometry: body parts scale with one another).
+- **(b) Strong.** The main cloud rises tightly along a line from about
+  (30 mm, 10 mm) to (70 mm, 25 mm).
+- **(c)** About **0.9** (the full Fisher iris data give $r \approx 0.96$).
+- **(d)** **No clear outliers** — every point follows the overall positive pattern.
+  What stands out instead is a *separate cluster*, not stray points.
+- **(e)** A petal of length 30 mm has a width of about **10 mm**.
+- **(f)** The plot clearly shows **two groups**: a tight cluster in the bottom left
+  (petal lengths of only about 10–20 mm) separated by a gap from the main cloud.
+  These are different iris types — the bottom-left cluster is *Iris setosa*, whose
+  petals are dramatically smaller than those of versicolor and virginica. The
+  scatterplot makes the species difference obvious without knowing the labels.
+
+```{python}
+#| echo: false
+fi.PetalLength.corr(fi.PetalWidth).round(3)
+```
+
+## Exercise 2.232
+
+**Create a Scatterplot.** Draw scatterplots satisfying: (a) $n=10$, $r=1$;
+(b) $n=8$, $r=-1$; (c) $n=5$, $r=0$.
+
+- **(a)** Ten points exactly on an *upward*-sloping line — e.g., $(1,1)$ to
+  $(10,10)$.
+- **(b)** Eight points exactly on a *downward*-sloping line — e.g., $(1,8)$ to
+  $(8,1)$.
+- **(c)** Five points arranged with no linear trend — e.g., $(1,2), (2,5), (3,3),
+  (4,6), (5,4)$, symmetric around a flat middle.
+
+*Data:* constructed to satisfy each condition:
+
+```{python}
+#| echo: false
+#| fig-cap: Scatterplots with r = 1, r = -1, and r = 0
+a = pd.DataFrame({"x": np.arange(1, 11), "y": np.arange(1, 11, dtype=float)})
+b = pd.DataFrame({"x": np.arange(1, 9), "y": np.arange(8, 0, -1, dtype=float)})
+c = pd.DataFrame({"x": [1, 2, 3, 4, 5], "y": [2.0, 5.0, 3.0, 6.0, 4.0]})
+fig, axes = plt.subplots(1, 3, figsize=(7, 2.8))
+for axi, d, t in zip(axes, [a, b, c], ["(a) r = 1", "(b) r = -1", "(c) r = 0"]):
+    sns.scatterplot(data=d, x="x", y="y", s=45, color="#4c72b0", ax=axi)
+    axi.set_title(f"{t} (check: {d.x.corr(d.y):.2f})", fontsize=9)
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.233
+
+**Offensive Rebounds vs Defensive Rebounds.** The `NBAPlayers2019` dataset for the
+2018–19 NBA season.
+
+*Data:* `data/ch02/NBAPlayers2019.csv` (n = 193), downloaded from
+<https://www.lock5stat.com/datasets3e/NBAPlayers2019.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Offensive vs defensive rebounds for NBA players, 2018-19 season
+nba = pd.read_csv("data/ch02/NBAPlayers2019.csv")
+fig, ax = plt.subplots(figsize=(5.5, 3.5))
+sns.scatterplot(data=nba, x="OffRebound", y="DefRebound", s=30,
+                color="#4c72b0", ax=ax, alpha=0.7)
+top2 = nba.nlargest(2, "OffRebound")
+for _, row in top2.iterrows():
+    ax.annotate(row.Player, (row.OffRebound, row.DefRebound),
+                textcoords="offset points", xytext=(5, -3), fontsize=7)
+ax.set_xlabel("Offensive rebounds"); ax.set_ylabel("Defensive rebounds")
+plt.tight_layout()
+plt.show()
+```
+
+- **(a)** See the scatterplot above (offensive rebounds on the horizontal axis).
+- **(b) Positive** and **moderately strong** ($r = 0.751$): players who collect
+  more offensive rebounds also tend to collect more defensive rebounds — the same
+  big, active players near the rim grab both kinds.
+- **(c)** The two outliers at the right with high numbers of offensive rebounds are
+  **Andre Drummond (423)** and **Steven Adams (391)**.
+- **(d)** $r = 0.751$.
+
+```{python}
+#| echo: false
+pd.DataFrame({"r (OffRebound vs DefRebound)": [nba.OffRebound.corr(nba.DefRebound).round(3)]})
+```
+
+```{python}
+#| echo: false
+nba.nlargest(2, "OffRebound")[["Player", "Team", "OffRebound", "DefRebound"]]
+```
+
+## Exercise 2.234
+
+**Do Movies with Larger Budgets Get Higher Audience Ratings?** Budget and
+AudienceScore in the `HollywoodMovies` dataset.
+
+*Data:* `data/ch01/HollywoodMovies.csv` (n = 1295), downloaded from
+<https://www.lock5stat.com/datasets3e/HollywoodMovies.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Audience score vs budget for 1295 Hollywood movies
+hm = pd.read_csv("data/ch01/HollywoodMovies.csv")
+fig, ax = plt.subplots(figsize=(5.5, 3.5))
+sns.scatterplot(data=hm, x="Budget", y="AudienceScore", s=18, color="#4c72b0",
+                ax=ax, alpha=0.5)
+big = hm.nlargest(1, "Budget").iloc[0]
+low = hm.nsmallest(1, "AudienceScore").iloc[0]
+ax.annotate(f"{big.Movie} (${big.Budget:.0f}M)", (big.Budget, big.AudienceScore),
+            textcoords="offset points", xytext=(-90, 8), fontsize=7)
+ax.annotate(f"{low.Movie} (score {low.AudienceScore:.0f})",
+            (low.Budget, low.AudienceScore),
+            textcoords="offset points", xytext=(8, -4), fontsize=7)
+ax.set_xlabel("Budget (million dollars)"); ax.set_ylabel("Audience score")
+plt.tight_layout()
+plt.show()
+```
+
+- **(a)** See the scatterplot above (budget on the horizontal axis, audience score
+  on the vertical).
+- **(b)** The very-large-budget outlier is **Avengers: Age of Ultron**, with a
+  budget of about **$365 million** and an audience rating of **83**.
+- **(c)** The lowest audience rating (10) belongs to **Just Getting Started**, made
+  on a budget of about **$22 million**.
+- **(d)** $r = 0.132$ — **very weak**: bigger budgets are barely associated with
+  higher audience ratings. Money may buy spectacle, but audiences do not
+  noticeably like expensive movies more.
+
+```{python}
+#| echo: false
+pd.DataFrame({"r (Budget vs AudienceScore)": [hm.Budget.corr(hm.AudienceScore).round(3)]})
+```
+
+## Exercise 2.235
+
+**Pick a Relationship to Examine.** Dataset: **USStates**; variables: percent of
+residents who are **physically active** and percent who are **obese** — two
+quantitative variables not analyzed elsewhere in this section.
+
+*Data:* `data/ch02/USStates.csv` (n = 50), downloaded from
+<https://www.lock5stat.com/datasets3e/USStates.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Percent obese vs percent physically active for the 50 US states
+us = pd.read_csv("data/ch02/USStates.csv")
+fig, ax = plt.subplots(figsize=(5.5, 3.8))
+sns.scatterplot(data=us, x="PhysicalActivity", y="Obese", s=45,
+                color="#4c72b0", ax=ax)
+for name in ["Colorado", "Mississippi", "West Virginia", "Massachusetts"]:
+    row = us[us.State == name].iloc[0]
+    ax.annotate(name, (row.PhysicalActivity, row.Obese),
+                textcoords="offset points", xytext=(5, -2), fontsize=7)
+ax.set_xlabel("Percent physically active"); ax.set_ylabel("Percent obese")
+plt.tight_layout()
+plt.show()
+```
+
+- **What we see:** a clear **negative linear** relationship — states where a
+  larger share of the population meets physical-activity guidelines have lower
+  obesity rates. The association is **strong**: $r = -0.722$ (matching what the
+  scatterplot shows).
+- **Notable cases:** **Colorado** sits at the favorable end (23.0% obese with
+  58.7% active), while **Mississippi** and **West Virginia** anchor the other
+  corner (39.5% obese with under 50% active) — the two are candidates for
+  outliers on the scatterplot, lying at the extreme of both variables.
+- **Correlation vs plot:** the correlation agrees with the visual impression —
+  strong, negative, and roughly linear.
+- As always, this is an association between states, not proof that inactivity
+  *causes* obesity: states differ in income, food environment, climate, and more.
+
+```{python}
+#| echo: false
+us.PhysicalActivity.corr(us.Obese).round(3)
+```
+
+:::

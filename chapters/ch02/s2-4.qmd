@@ -1,0 +1,936 @@
+---
+execute-dir: project
+title: "Chapter 2 · Section 2.4"
+subtitle: "Boxplots and Quantitative/Categorical Relationships — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 2.4 of Lock⁵ turns to the third question of data description: **how does a
+quantitative variable behave across the groups defined by a categorical variable?**
+For a single quantitative variable the **five-number summary** (minimum, first
+quartile Q1, median, third quartile Q3, maximum) is displayed graphically as a
+**boxplot**: the box spans the middle 50% of the data (its height is the
+**interquartile range**, IQR = Q3 − Q1), the line inside the box marks the median,
+and the whiskers reach to the most extreme values that are not flagged as
+**outliers** by the 1.5 × IQR rule — any point below Q1 − 1.5 × IQR or above
+Q3 + 1.5 × IQR is plotted as a separate dot. Boxplots reveal center, spread, skewness,
+and outliers at a glance, and drawing them **side by side** for the groups of a
+categorical variable (backed up by comparative means, medians, and standard
+deviations) is the standard first look at a quantitative/categorical relationship.
+The exercises below are from *Statistics: Unlocking the Power of Data*
+(Lock⁵, 3rd ed., pp. 110–117). Skill Builders 2.153–2.162 match five-number
+summaries to boxplots, read shapes and outliers off boxplots, and build boxplots
+from five-number summaries; 2.163–2.172 interpret boxplots and comparative output,
+including a unit built on the `HollywoodMovies` data; 2.173–2.181 examine
+quantitative/categorical relationships in real datasets (`USStates`,
+`BaseballHits2019`, `NutritionStudy`, `HoneybeeCircuits`, `SplitBill`,
+`CollegeScores`, `HomingPigeons`); and 2.182–2.185 ask you to draw and explore
+boxplots yourself. Tabs based on Lock5 data files include a small executable EDA.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+sns.set_theme(style="whitegrid")
+```
+
+```{python}
+#| include: false
+def five_box(ax, specs, colors="#4c72b0"):
+    # Draw horizontal boxplots from precomputed five-number summaries:
+    # specs = [(label, min, Q1, median, Q3, max, [fliers]), ...]
+    stats = [{"label": lbl, "med": med, "q1": q1, "q3": q3,
+              "whislo": lo, "whishi": hi, "fliers": fl}
+             for lbl, lo, q1, med, q3, hi, fl in specs]
+    ax.bxp(stats, vert=False, patch_artist=True,
+           boxprops=dict(facecolor=colors, alpha=0.55),
+           medianprops=dict(color="black"))
+    ax.set_xlabel("")
+```
+
+::: {.panel-tabset}
+
+## Exercise 2.153
+
+**Match each five-number summary with one of the boxplots (Q, R, S, T) in
+Figure 2.38.**
+*(a) (2, 12, 14, 17, 25)  (b) (5, 15, 18, 20, 23)  (c) (10, 12, 13, 18, 25)
+(d) (12, 12, 15, 20, 24)*
+
+- **(a) → S.** The box spans 12 to 17 with median 14 near its middle, and the
+  values 2 and 25 fall far from the box — the plot that shows both a low and a
+  high outlier, with whiskers pulled in to about 6 and 22.
+- **(b) → R.** Box 15–20 with median 18 right of center and two low outliers
+  near 5 (the minimum 5 lies well below Q1 − 1.5 × IQR = 15 − 7.5 = 7.5).
+- **(c) → Q.** Box 12–18 with the median 13 hugging the *left* edge of the box,
+  whiskers reaching 10 and 25, no outliers.
+- **(d) → T.** The minimum equals Q1 (both 12), so the box begins exactly at the
+  smallest value and there is *no lower whisker*; median 15, Q3 20, max 24.
+
+```{python}
+#| echo: false
+#| fig-cap: Schematic boxplots of the four five-number summaries, drawn on the same scale
+fig, ax = plt.subplots(figsize=(6, 2.8))
+five_box(ax, [
+    ("(a)", 2, 12, 14, 17, 25, []),
+    ("(b)", 5, 15, 18, 20, 23, []),
+    ("(c)", 10, 12, 13, 18, 25, []),
+    ("(d)", 12, 12, 15, 20, 24, []),
+])
+ax.set_xlabel("Value")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.154
+
+**Match each five-number summary with one of the boxplots (X, Y, Z, W) in
+Figure 2.39.**
+*(a) (1, 18, 20, 22, 25)  (b) (1, 10, 15, 20, 25)  (c) (1, 3, 5, 10, 25)
+(d) (1, 1, 10, 15, 25)*
+
+- **(a) → W.** Box sits at the right (18–22, median 20), and the minimum 1 is
+  far below Q1 − 1.5 × IQR = 18 − 6 = 12, appearing as a single low outlier.
+- **(b) → X.** Box 10–20 with median 15 in the middle, whiskers spanning 1 to 25,
+  no outliers.
+- **(c) → Y.** Box 3–10 with median 5 left of center and a single *high* outlier
+  at 25 (above Q3 + 1.5 × IQR = 10 + 10.5 = 20.5).
+- **(d) → Z.** Minimum = Q1 = 1, so the box starts right at the minimum with no
+  lower whisker; box 1–15, median 10, upper whisker to 25.
+
+```{python}
+#| echo: false
+#| fig-cap: Schematic boxplots of the four five-number summaries for Exercise 2.154
+fig, ax = plt.subplots(figsize=(6, 2.8))
+five_box(ax, [
+    ("(a)", 1, 18, 20, 22, 25, []),
+    ("(b)", 1, 10, 15, 20, 25, []),
+    ("(c)", 1, 3, 5, 10, 25, []),
+    ("(d)", 1, 1, 10, 15, 25, []),
+])
+ax.set_xlabel("Value")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.155
+
+**Skill Builder 2 — read the boxplot (axis 500 to 600, three asterisks at the far
+left): shape, outliers, rough mean.**
+
+- **(a) Skewed to the left.** The left whisker (down to about 518) is much longer
+  than the right, the median (~585) sits at the right of the box (~559–591), and
+  the extreme values are all on the low side.
+- **(b) Yes — three low outliers**, the asterisks near 505–515. No high outliers.
+- **(c)** The mean is pulled down by the long left tail, so it is smaller than the
+  median; a rough approximation is **about 570–575** (median ≈ 585).
+
+## Exercise 2.156
+
+**Skill Builder 2 — read the boxplot (axis 20 to 140): shape, outliers, rough mean.**
+
+- **(a) Skewed to the right.** The right whisker (out to about 136) is far longer
+  than the left, and the median (~39) sits toward the left of the box (~30–79).
+- **(b) No outliers** — no asterisks appear.
+- **(c)** The long right tail pulls the mean above the median; a rough
+  approximation is **about 55**.
+
+## Exercise 2.157
+
+**Skill Builder 2 — read the boxplot (axis 125 to 145): shape, outliers, rough mean.**
+
+- **(a) Approximately symmetric.** The median (~135) sits near the middle of the
+  box (~130–139) and the two whiskers (about 125 to 144) are similar lengths.
+- **(b) No outliers.**
+- **(c)** For symmetric data the mean and median agree: **about 135**.
+
+## Exercise 2.158
+
+**Skill Builder 2 — read the boxplot (axis 700 to 1600, asterisks at both ends):
+shape, outliers, rough mean.**
+
+- **(a) Approximately symmetric** — the box (~1080–1250) has its median (~1160)
+  near the center and the two whiskers are comparable — but with **outliers in
+  both tails**, which a perfectly symmetric distribution would not have.
+- **(b) Yes — three low outliers** (near 730–770) **and two high outliers**
+  (near 1510–1550).
+- **(c)** The outliers on the two sides roughly balance, so the mean is close to
+  the median: **about 1150**.
+
+## Exercise 2.159
+
+**Skill Builder 3 — five-number summary (210, 260, 270, 300, 320); n = 500;
+tails: 210, 215, 217, 221, 225, …, 318, 319, 319, 319, 320, 320. Identify outliers
+by the IQR method and draw the boxplot.**
+
+- **No outliers.** IQR = 300 − 260 = 40, so the fences are 260 − 60 = 200 and
+  300 + 60 = 360. The smallest tail value (210) is above the lower fence and the
+  largest (320) is below the upper fence — nothing is flagged.
+- Boxplot: box 260–300 with median 270, whiskers reaching the extremes 210 and 320.
+
+```{python}
+#| echo: false
+#| fig-cap: Boxplot for Exercise 2.159, drawn from the five-number summary
+fig, ax = plt.subplots(figsize=(6, 1.8))
+five_box(ax, [("2.159", 210, 260, 270, 300, 320, [])])
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.160
+
+**Skill Builder 3 — five-number summary (15, 42, 52, 56, 71); n = 120;
+tails: 15, 20, 28, 30, 31, …, 64, 65, 65, 66, 71.**
+
+- **Outliers: 15 and 20, both low.** IQR = 56 − 42 = 14, so the fences are
+  42 − 21 = 21 and 56 + 21 = 77. The tail values 15 and 20 fall below 21; every
+  high tail value (up to 71) is inside the upper fence.
+- Boxplot: box 42–56 with median 52, lower whisker to 28 (the smallest
+  non-outlier), upper whisker to 71, and dots at 15 and 20.
+
+```{python}
+#| echo: false
+#| fig-cap: Boxplot for Exercise 2.160 with two low outliers
+fig, ax = plt.subplots(figsize=(6, 1.8))
+five_box(ax, [("2.160", 28, 42, 52, 56, 71, [15, 20])])
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.161
+
+**Skill Builder 3 — five-number summary (42, 72, 78, 80, 99); n = 120;
+tails: 42, 63, 65, 67, 68, …, 88, 89, 95, 96, 99.**
+
+- **Outliers: 42 on the low end; 95, 96, and 99 on the high end.**
+  IQR = 80 − 72 = 8, so the fences are 72 − 12 = 60 and 80 + 12 = 92.
+  The value 42 is below 60, while 95, 96, and 99 exceed 92; the remaining tail
+  values (63–89) are all inside the fences.
+- Boxplot: box 72–80 with median 78, whiskers to 63 and 89, dots at 42, 95, 96, 99.
+
+```{python}
+#| echo: false
+#| fig-cap: Boxplot for Exercise 2.161 with one low and three high outliers
+fig, ax = plt.subplots(figsize=(6, 1.8))
+five_box(ax, [("2.161", 63, 72, 78, 80, 89, [42, 95, 96, 99])])
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.162
+
+**Skill Builder 3 — five-number summary (5, 10, 12, 16, 30); n = 40;
+tails: 5, 5, 6, 6, 6, …, 22, 22, 23, 28, 30.**
+
+- **Outliers: 28 and 30, both high.** IQR = 16 − 10 = 6, so the fences are
+  10 − 9 = 1 and 16 + 9 = 25. The low tail (5 and up) is entirely above the lower
+  fence, while 28 and 30 exceed the upper fence.
+- Boxplot: box 10–16 with median 12, whiskers to 5 and 23, dots at 28 and 30.
+
+```{python}
+#| echo: false
+#| fig-cap: Boxplot for Exercise 2.162 with two high outliers
+fig, ax = plt.subplots(figsize=(6, 1.8))
+five_box(ax, [("2.162", 5, 10, 12, 16, 23, [28, 30])])
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.163
+
+**Literacy Rate.** Figure 2.40 gives a boxplot of the literacy rate of the
+countries of the world.
+
+- **(a) Skewed to the left.** The left whisker is very long (down to about 50)
+  and there is a cluster of low outliers (near 18, 26, and 37), while the box is
+  compressed at the top of the scale near 80–96.
+- **(b)** The middle half of the literacy rates lie between approximately
+  **80 and 95**.
+- **(c)** Five-number summary, read off the plot: approximately
+  **(50, 80, 92, 96, 99)**.
+- **(d) Lower.** The countries missing from the World Bank data are likely to be
+  poorer, less-developed nations — precisely those with low literacy rates. If
+  they were included, the low end would stretch further down and the median would
+  drop below the ≈ 92 shown.
+
+## Exercise 2.164
+
+**Young Blood Helps Old Brains.** Old mice were randomly assigned to receive
+plasma transfusions from young or old mice, and treadmill runtime (minutes) was
+measured. Figure 2.41 shows side-by-side boxplots.
+
+- **(a)** The median runtime for mice receiving **old blood is about 30 minutes**.
+- **(b)** The old-blood distribution is skewed to the right (long upper tail), so
+  we expect the **mean to be larger than the median** — the data give mean 34.7
+  vs median 29.
+- **(c)** Mice receiving **young blood** clearly ran longer — median about
+  55 minutes versus about 30.
+- **(d) Yes.** Runtime is associated with transfusion type: mice given young
+  plasma tend to run substantially longer than mice given old plasma.
+- **(e) Almost none.** The boxplots in Figure 2.41 flag no outliers in either
+  group; recomputing the fences from the data, the old-blood group has one
+  borderline high value (68 minutes, just above its upper fence of 67.5) and the
+  young-blood group has none.
+
+*Data:* `data/ch02/YoungBlood.csv` (n = 30), downloaded from
+<https://www.lock5stat.com/datasets3e/YoungBlood.csv>:
+
+```{python}
+#| echo: false
+yb = pd.read_csv("data/ch02/YoungBlood.csv")
+yb.groupby("Plasma")["Runtime"].agg(["count", "mean", "median", "min", "max"]).round(1)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Treadmill runtime in minutes for old mice receiving young or old plasma
+fig, ax = plt.subplots(figsize=(5.5, 3))
+sns.boxplot(data=yb, x="Runtime", y="Plasma", order=["Young", "Old"],
+            ax=ax, color="#4c72b0", width=0.5)
+ax.set_xlabel("Runtime (minutes)")
+ax.set_ylabel("Plasma")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.165
+
+**Football and Brain Size.** A study of n = 25 per group compared total
+hippocampus volume (µL) for healthy controls, football players with no concussion
+history, and football players with a history of concussions (Figure 2.42).
+
+- **(a)** The explanatory variable — group (control / football no concussion /
+  football with concussion) — is **categorical**; the response, hippocampus
+  volume, is **quantitative**.
+- **(b)** The **control group** has the largest volumes (median ≈ 7500) and the
+  **football players with concussions** the smallest (median ≈ 5700).
+- **(c)** Yes — a single **high outlier in the football-with-concussion group**,
+  at about 7300 µL.
+- **(d)** The third quartile for the no-concussion players is about
+  **7000 µL** (upper edge of that box).
+- **(e) Yes.** Median volume declines steadily from controls to non-concussed
+  players to concussed players, so hippocampus size is associated with football
+  experience and concussion history.
+- **(f) No.** This is an observational study — nobody was assigned to play
+  football or to get concussions — so confounding variables (self-selection into
+  football, head impacts outside concussions, fitness, demographics) prevent a
+  causal conclusion.
+
+## Exercise 2.166
+
+**Ronda Rousey Fight Times.** Five-number summary of her first 12 UFC fight
+times, in seconds: (14, 25, 44, 64, 289). Only three fights lasted more than a
+minute: 289, 267, and 66 seconds.
+
+- **(a)** IQR = 64 − 25 = 39, so the upper fence is 64 + 1.5 × 39 = 122.5.
+  **289 and 267 are high outliers** (both exceed 122.5); **66 is not** (66 < 122.5),
+  it is simply the largest non-outlier.
+- **(b) No low outliers.** The lower fence is 25 − 58.5 = −33.5, and no fight time
+  can fall below it (minimum 14).
+- **(c)** Boxplot: box 25–64 with median 44, lower whisker to 14, upper whisker
+  to 66, and dots at 267 and 289.
+- **(d)** The distribution is extremely skewed to the right, so the **mean is
+  greater than the median** — the two huge outliers pull the mean far above 44.
+
+```{python}
+#| echo: false
+#| fig-cap: Boxplot of Ronda Rousey's first 12 UFC fight times in seconds
+fig, ax = plt.subplots(figsize=(6.5, 1.9))
+five_box(ax, [("Fight times (sec)", 14, 25, 44, 64, 66, [267, 289])])
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.167
+
+**Association or Not?** Side-by-side boxplots of a quantitative variable for
+groups 1 and 2 are shown for datasets A, B, and C (Figure 2.43).
+
+- **(a) Dataset C** shows the strongest association: the two boxes are completely
+  separated (group 1 centered near 3, group 2 near 7), so knowing the group tells
+  you almost exactly where a case falls.
+- **(b) Dataset A** shows no evidence of an association: the two boxes and medians
+  are essentially identical. (Dataset B is nearly as flat — its groups overlap
+  heavily too — but A's groups are the most alike.)
+
+## Exercise 2.168
+
+**Draw Side-by-Side Boxplots.** Side-by-side boxplots that show (a) a clear
+association and (b) no association between a categorical and a quantitative
+variable.
+
+- **(a)** Put the two boxes in different locations with little or no overlap —
+  for example group 1 centered near 30 and group 2 near 50.
+- **(b)** Make the two boxes virtually identical — same center, same spread — so
+  the group label tells you nothing about the value.
+
+```{python}
+#| echo: false
+#| fig-cap: Side-by-side boxplots showing a clear association versus no association
+rng = np.random.default_rng(24)
+fig, axes = plt.subplots(1, 2, figsize=(7, 3), sharey=True)
+df_assoc = pd.DataFrame({"Group": ["G1", "G2"],
+                         "Value": [rng.normal(30, 5, 40), rng.normal(50, 5, 40)]})
+sns.boxplot(data=df_assoc.explode("Value"), x="Group", y="Value", ax=axes[0],
+            color="#4c72b0", width=0.45)
+axes[0].set_title("(a) Clear association", fontsize=10)
+df_none = pd.DataFrame({"Group": ["G1", "G2"],
+                        "Value": [rng.normal(40, 8, 40), rng.normal(40, 8, 40)]})
+sns.boxplot(data=df_none.explode("Value"), x="Group", y="Value", ax=axes[1],
+            color="#4c72b0", width=0.45)
+axes[1].set_title("(b) No association", fontsize=10)
+for a in axes:
+    a.set_xlabel("Group")
+    a.set_ylabel("Value")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.169
+
+**How Profitable Are Hollywood Movies?** `Profitability` measures the percent of
+the budget recovered in revenue; below 100 means the movie failed to cover its
+budget. Figure 2.44 boxplots profitability for all 1056 movies with available
+values.
+
+- **(a) Strongly skewed to the right**, with a huge number of high outliers
+  stretching from about 1000 all the way past 10,000 (the largest,
+  *The Devil Inside*, had a tiny budget and relatively high gross revenue).
+- **(b)** The range is roughly **10,000**: the smallest profitability is about 0–2
+  and the largest outlier is about 10,200. (The data give max − min =
+  10176 − 2 ≈ 10,174.)
+- **(c)** The median is hard to read on the compressed scale but is about
+  **250–300** (the data give 269): half the movies recovered less than about
+  2.7 times their budget — and half recovered more.
+- **(d)** The **mean is greater than the median** — the many extreme high
+  outliers pull the mean far to the right of the median.
+
+*Data:* `data/ch02/HollywoodMovies.csv` (n = 1295 rows; 1056 with profitability
+values), downloaded from <https://www.lock5stat.com/datasets3e/HollywoodMovies.csv>:
+
+```{python}
+#| echo: false
+hm = pd.read_csv("data/ch02/HollywoodMovies.csv")
+prof = hm["Profitability"].dropna()
+print(prof.agg(["count", "min", "median", "max"]).round(0).to_string())
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Profitability of Hollywood movies, 2012 to 2018
+fig, ax = plt.subplots(figsize=(6.5, 2.6))
+sns.boxplot(x=prof, ax=ax, color="#4c72b0", width=0.4)
+ax.set_xlabel("Profitability (percent of budget recovered)")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.170
+
+**Audience Scores on Rotten Tomatoes.** Five-number summary of `AudienceScore`:
+(10, 49, 64, 77, 99). Any outliers by the IQR method? How low would an average
+score have to be to qualify as a low outlier?
+
+- **No outliers.** IQR = 77 − 49 = 28, so the fences are 49 − 42 = 7 and
+  77 + 42 = 119. The minimum (10) is above the lower fence and the maximum (99)
+  is below the upper fence — nothing is flagged.
+- An average audience score would have to fall **below 7** on the 0–100 scale to
+  qualify as a low outlier — an almost universally panned movie.
+
+```{python}
+#| echo: false
+hm["AudienceScore"].quantile([0, 0.25, 0.5, 0.75, 1.0]).to_frame("AudienceScore").T
+```
+
+## Exercise 2.171
+
+**Do Movie Budgets Differ Based on the Genre of the Movie?** Side-by-side
+boxplots of `Budget` (millions of dollars) by `Genre` for 2018 movies —
+Action, Comedy, Drama, and Horror (Figure 2.45).
+
+- **(a) Action** movies clearly have the largest budgets (median about \$90
+  million, reaching \$300 million); **Horror** movies have the smallest
+  (median about \$10–25 million).
+- **(b) Action** has by far the biggest spread (IQR from roughly 35 to 150);
+  **Horror** has the smallest spread, with all its budgets packed below about
+  \$50 million.
+- **(c) Yes.** The budget distributions differ markedly from genre to genre —
+  action budgets sit far above the others — so knowing a movie's genre conveys
+  real information about its budget; the two variables are associated.
+
+```{python}
+#| echo: false
+#| fig-cap: Movie budgets in millions of dollars by genre for 2018 movies
+h18 = hm[(hm["Year"] == 2018) & hm["Genre"].isin(["Action", "Comedy", "Drama", "Horror"])]
+fig, ax = plt.subplots(figsize=(6.5, 3.2))
+sns.boxplot(data=h18, x="Budget", y="Genre",
+            order=["Action", "Comedy", "Drama", "Horror"],
+            ax=ax, color="#4c72b0", width=0.5)
+ax.set_xlabel("Budget (millions of dollars)")
+ax.set_ylabel("Genre")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.172
+
+**Do Audience Ratings Differ Based on the Genre of the Movie?** Computer output
+gives summary statistics for `AudienceScore` by `Genre` for 2018 movies:
+
+| Genre | N | Mean | StDev | Minimum | Q1 | Median | Q3 | Maximum |
+|---|---|---|---|---|---|---|---|---|
+| Action | 30 | 60.10 | 15.97 | 34 | 45.75 | 60.00 | 72.50 | 91 |
+| Comedy | 22 | 55.64 | 19.98 | 25 | 39.50 | 54.00 | 73.25 | 91 |
+| Drama | 52 | 69.42 | 15.94 | 35 | 56.75 | 75.00 | 81.00 | 97 |
+| Horror | 16 | 43.56 | 18.81 | 18 | 29.00 | 38.50 | 62.50 | 83 |
+
+- **(a)** Highest mean: **Drama (69.42)**; lowest mean: **Horror (43.56)**.
+- **(b)** Highest median: **Drama (75.00)**; lowest median: **Horror (38.50)**.
+- **(c)** The lowest score is in **Horror: 18**; the highest score is in
+  **Drama: 97**.
+- **(d)** **Drama** has the largest number of movies (n = 52).
+- **(e)** Difference in means: $\bar{x}_C - \bar{x}_H = 55.64 - 43.56 = \mathbf{12.08}$
+  points — comedies average about 12 points higher than horror movies.
+
+```{python}
+#| echo: false
+h18.groupby("Genre")["AudienceScore"].agg(["count", "mean", "std"]).round(2)
+```
+
+## Exercise 2.173
+
+**Physical Activity by Region of the Country in the US.** `USStates` records the
+percent of each state's people who engage in at least 150 minutes of physical
+activity per week, and the state's region (Midwest, Northeast, South, West) —
+Figure 2.46 shows side-by-side boxplots.
+
+- **(a)** The **South** tends to have the lowest activity (median ≈ 45%), the
+  **West** the highest (median ≈ 55%).
+- **(b) Yes:** high outliers in the **Midwest** (≈ 55) and **Northeast** (≈ 56),
+  and one **low outlier in the West** (≈ 46 — Nevada, unusually inactive for its
+  region).
+- **(c) Yes.** The West clearly leads and the South clearly lags, so the amount
+  of physical activity is associated with region of the country.
+
+*Data:* `data/ch02/USStates.csv` (n = 50), downloaded from
+<https://www.lock5stat.com/datasets3e/USStates.csv>:
+
+```{python}
+#| echo: false
+us = pd.read_csv("data/ch02/USStates.csv")
+us.groupby("Region")["PhysicalActivity"].agg(["count", "mean", "median"]).round(1)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Percent of state residents with at least 150 minutes of weekly physical activity, by region
+fig, ax = plt.subplots(figsize=(6.5, 3.2))
+sns.boxplot(data=us, x="PhysicalActivity", y="Region", order=["MW", "NE", "S", "W"],
+            ax=ax, color="#4c72b0", width=0.5)
+ax.set_xlabel("Physical activity (percent of population)")
+ax.set_ylabel("Region")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.174
+
+**Hits in Baseball.** Are total team hits different between the American League
+and National League? Figure 2.47 shows side-by-side boxplots of team hits
+(`BaseballHits2019`).
+
+- **(a)** Median hits: AL ≈ 1380 and NL ≈ 1380 — the two medians are nearly
+  identical (the data give 1379 vs 1378), so there is **not much difference in
+  median hits** between the leagues.
+- **(b)** The **AL is more variable** (standard deviation ≈ 86 vs ≈ 67), with both
+  a higher maximum (1554 vs 1502) and a lower minimum (1299 vs 1281); the NL
+  teams are packed more tightly. The AL average is also slightly higher
+  (mean 1410 vs 1392), pulled up by a few high-hitting teams.
+
+*Data:* `data/ch02/BaseballHits2019.csv` (n = 30 teams), downloaded from
+<https://www.lock5stat.com/datasets3e/BaseballHits2019.csv>:
+
+```{python}
+#| echo: false
+bb = pd.read_csv("data/ch02/BaseballHits2019.csv")
+bb.groupby("League")["Hits"].agg(["count", "mean", "median", "std", "min", "max"]).round(1)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Team hits in the 2019 season by league
+fig, ax = plt.subplots(figsize=(5, 3))
+sns.boxplot(data=bb, x="League", y="Hits", order=["AL", "NL"],
+            ax=ax, color="#4c72b0", width=0.45)
+ax.set_xlabel("League")
+ax.set_ylabel("Hits")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.175
+
+**Concentration of Retinol by Vitamin Use.** Figure 2.48 shows plasma retinol
+concentrations for n = 315 individuals grouped by vitamin use (No, Occasional,
+Regular), from the `NutritionStudy` dataset.
+
+- **Yes — a weak positive association.** Regular vitamin users have somewhat
+  higher plasma retinol (mean ≈ 613) than occasional (≈ 597) or non-users
+  (≈ 596), and the median for regular users (≈ 588) sits above the other two
+  (≈ 561). But the distributions overlap substantially and all groups show the
+  same right-skewed shape with high outliers, so the association is real but
+  modest — vitamin use explains only a small part of the variation in retinol.
+
+*Data:* `data/ch02/NutritionStudy.csv` (n = 315), downloaded from
+<https://www.lock5stat.com/datasets3e/NutritionStudy.csv>:
+
+```{python}
+#| echo: false
+ns = pd.read_csv("data/ch02/NutritionStudy.csv")
+ns.groupby("VitaminUse")["RetinolPlasma"].agg(["count", "mean", "median"]).round(1)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Plasma retinol concentration by vitamin use
+fig, ax = plt.subplots(figsize=(6, 3.2))
+sns.boxplot(data=ns, x="RetinolPlasma", y="VitaminUse",
+            order=["No", "Occasional", "Regular"],
+            ax=ax, color="#4c72b0", width=0.5)
+ax.set_xlabel("Plasma retinol")
+ax.set_ylabel("Vitamin use")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.176
+
+**How Do Honeybees Communicate Quality?** Scouts waggle-dance to describe
+candidate homes; scientists counted circuits for the 41 scouts describing a
+high-quality option and the 37 describing a low-quality option
+(`HoneybeeCircuits`).
+
+- **(a) Yes.** Scouts describing the **high-quality** site perform far more
+  circuits (median ≈ 80) than those describing the **low-quality** site (median
+  of 0 — most barely dance at all): the dance length advertises site quality.
+- **(b)** *High:* five-number summary (0, 7.5, 80, 122.5, 440), IQR = 115, upper
+  fence = 122.5 + 172.5 = **295** → the values **330 and 440 are high outliers**.
+  *Low:* (0, 0, 0, 42.5, 185), IQR = 42.5, upper fence = 42.5 + 63.75 =
+  **106.25** → **140, 175, and 185 are high outliers**. Neither group has any low
+  outliers (all values ≥ 0 and the lower fences are negative).
+- **(c)** $\bar{x}_H - \bar{x}_L = 90.5 - 30.0 = \mathbf{60.5}$ circuits.
+- **(d)** z-scores for the largest values: high group
+  $(440 - 90.5)/94.6 \approx \mathbf{3.69}$; low group
+  $(185 - 30.0)/49.4 \approx \mathbf{3.14}$. The **high-quality group's maximum is
+  more extreme relative to its group**.
+- **(e) No** — the 95% rule is for roughly bell-shaped data, and both
+  distributions are strongly right-skewed (piled up at 0 with long right tails),
+  so about 95% of the data does *not* fall within two standard deviations of the
+  mean here.
+
+*Data:* `data/ch02/HoneybeeCircuits.csv` (n = 78), downloaded from
+<https://www.lock5stat.com/datasets3e/HoneybeeCircuits.csv>:
+
+```{python}
+#| echo: false
+hc = pd.read_csv("data/ch02/HoneybeeCircuits.csv")
+rows = []
+for q, g in hc.groupby("Quality"):
+    s = g["Circuits"]
+    q1, q3 = s.quantile(0.25), s.quantile(0.75)
+    hi = q3 + 1.5 * (q3 - q1)
+    rows.append({"Quality": q, "n": len(s), "mean": round(s.mean(), 1),
+                 "sd": round(s.std(), 1), "upper fence": round(hi, 1),
+                 "high outliers": sorted(s[s > hi].tolist())})
+pd.DataFrame(rows)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Number of waggle-dance circuits by quality of the described site
+fig, ax = plt.subplots(figsize=(6, 2.6))
+sns.stripplot(data=hc, x="Circuits", y="Quality", order=["Low", "High"],
+              ax=ax, color="#4c72b0", alpha=0.6, size=4)
+ax.set_xlabel("Circuits in waggle dance")
+ax.set_ylabel("Site quality")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.177
+
+**Split the Bill?** 48 Israeli college students ate in groups of six; before
+ordering, half the groups were told they would pay individually and half that
+they would split the bill equally. Cost of each person's order (ILS) is in
+`SplitBill`.
+
+- **(a) Numerical summary:** students told to **split** the bill spent
+  substantially more on average — mean 50.92 ILS vs 37.29 ILS for those paying
+  individually, a difference of about **13.6 ILS** (medians 46.5 vs 39.5). When
+  the cost is shared, each person bears only a fraction of any extra item, so
+  everyone orders more.
+- **(b) Graphical display:** the side-by-side boxplots below show the entire
+  split-bill distribution shifted upward relative to the individual-payers, with
+  similar spread in the two groups.
+
+*Data:* `data/ch01/SplitBill.csv` (n = 48), downloaded from
+<https://www.lock5stat.com/datasets3e/SplitBill.csv>:
+
+```{python}
+#| echo: false
+sb = pd.read_csv("data/ch01/SplitBill.csv")
+sb.groupby("Payment")["Cost"].agg(["count", "mean", "median", "std"]).round(2)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Cost of each person's order in ILS by payment arrangement
+fig, ax = plt.subplots(figsize=(5, 3))
+sns.boxplot(data=sb, x="Payment", y="Cost", order=["Individual", "Split"],
+            ax=ax, color="#4c72b0", width=0.45)
+ax.set_xlabel("Payment arrangement")
+ax.set_ylabel("Cost per person (ILS)")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.178
+
+**Restaurant Bill by Sex.** The same `SplitBill` experiment also recorded the
+sex of each subject.
+
+- **(a) Numerical summary:** costs are almost identical for the two sexes —
+  females average 44.46 ILS (median 41.5) and males 43.75 ILS (median 45.0), a
+  difference of under 1 ILS.
+- **(b) Graphical display:** the two boxplots below overlap almost completely,
+  with similar centers and spreads — **sex shows essentially no association with
+  how much a subject ordered** in this experiment.
+
+```{python}
+#| echo: false
+sb.groupby("Sex")["Cost"].agg(["count", "mean", "median", "std"]).round(2)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Cost of each person's order in ILS by sex
+fig, ax = plt.subplots(figsize=(4.5, 3))
+sns.boxplot(data=sb, x="Sex", y="Cost", order=["F", "M"],
+            ax=ax, color="#4c72b0", width=0.45)
+ax.set_xlabel("Sex")
+ax.set_ylabel("Cost per person (ILS)")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.179
+
+**Completion Rates at US Colleges — Graphical.** `CollegeScores` records
+`CompRate`, the percent of students completing their program within 150% of the
+expected time, for 6141 US post-secondary schools, along with the `Control`
+variable (Private, Public, for-Profit).
+
+- The side-by-side boxplots show clear differences: **for-profit schools have the
+  highest center** (median ≈ 67%), **private schools come next** (≈ 57%), and
+  **public schools are lowest** (≈ 36%). All three distributions are
+  left-skewed with a few low outliers, and public schools show the greatest
+  spread relative to their center — completion rates at public colleges stretch
+  from near 0 up to 100, while private colleges are packed into the upper half.
+
+*Data:* `data/ch01/CollegeScores.csv` (n = 6141), downloaded from
+<https://www.lock5stat.com/datasets3e/CollegeScores.csv>:
+
+```{python}
+#| echo: false
+cs = pd.read_csv("data/ch01/CollegeScores.csv")
+cs.groupby("Control")["CompRate"].agg(["count", "mean", "median"]).round(1)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Completion rates of US colleges by control type
+fig, ax = plt.subplots(figsize=(6, 3.2))
+sns.boxplot(data=cs, x="CompRate", y="Control", order=["Private", "Public", "Profit"],
+            ax=ax, color="#4c72b0", width=0.5)
+ax.set_xlabel("Completion rate (percent)")
+ax.set_ylabel("Control")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.180
+
+**Who Is Faster: Hens or Cocks?** A homing pigeon race records each bird's sex
+(H = hen, C = cock) and speed in yards per minute (`HomingPigeons`).
+
+- **(a) Hens:** outliers only on the **high** side — many very fast hens — no low
+  outliers.
+- **(b) Cocks:** likewise, outliers only on the **high** side.
+- **(c)** Speeds are **generally similar between the sexes**: the medians are
+  nearly equal (hens 578 vs cocks 570, a difference of under 1.5%), both
+  distributions are strongly right-skewed with the same shape, and neither sex
+  appears clearly faster. The many high outliers in both groups are the very
+  fastest birds.
+
+*Data:* `data/ch02/HomingPigeons.csv` (n = 1412 birds), downloaded from
+<https://www.lock5stat.com/datasets3e/HomingPigeons.csv>:
+
+```{python}
+#| echo: false
+hp = pd.read_csv("data/ch02/HomingPigeons.csv")
+hp.groupby("Sex")["Speed"].agg(["count", "mean", "median"]).round(1)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Race speed in yards per minute for hens and cocks
+fig, ax = plt.subplots(figsize=(5, 3))
+sns.boxplot(data=hp, x="Speed", y="Sex", order=["H", "C"],
+            ax=ax, color="#4c72b0", width=0.45)
+ax.set_xlabel("Speed (yards per minute)")
+ax.set_ylabel("Sex")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.181
+
+**Completion Rates at US Colleges — Numerical.** Redo Exercise 2.179 with
+numerical summaries of `CompRate` by `Control`.
+
+- **For-profit** schools have the highest center (mean 64.2, median 66.7), close
+  to **private** schools (mean 55.4, median 56.6), while **public** schools lag
+  well behind (mean 41.8, median 36.0). Spread is similar for private and public
+  (sd ≈ 23) and slightly smaller for for-profit (sd ≈ 21); every group is
+  left-skewed (mean < median within each control type's comparison to the
+  midpoint of its range). Comparing medians is the safer comparison here given
+  the skew.
+
+```{python}
+#| echo: false
+cs.groupby("Control")["CompRate"].describe().round(1)
+```
+
+## Exercise 2.182
+
+**Draw These Side-by-Side Boxplots.** One dataset has median 25, IQR 20, range
+30; the other has median 75, IQR 20, range 30. Draw them on the same scale.
+
+- One convenient choice: dataset A = (10, 15, 25, 35, 40) — median 25, IQR 20,
+  range 30; dataset B = (60, 65, 75, 85, 90) — median 75, IQR 20, range 30.
+  The two distributions have **identical spread and shape but differ in
+  location**: B is simply A shifted up by 50.
+
+```{python}
+#| echo: false
+#| fig-cap: Same spread, different location — side-by-side boxplots for Exercise 2.182
+fig, ax = plt.subplots(figsize=(6, 2.4))
+five_box(ax, [("A", 10, 15, 25, 35, 40, []), ("B", 60, 65, 75, 85, 90, [])])
+ax.set_xlabel("Value")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.183
+
+**Draw These Side-by-Side Boxplots.** Dataset 1 has median 50, IQR 20, range 40;
+dataset 2 has median 50, IQR 50, range 100; dataset 3 has median 50, IQR 50,
+range 60. Draw them on the same scale.
+
+- One convenient choice: dataset 1 = (30, 40, 50, 60, 70); dataset 2 =
+  (0, 25, 50, 75, 100); dataset 3 = (20, 25, 50, 75, 80). All three share the
+  **same center (median 50)** but differ in spread: dataset 2 is the most spread
+  out (range 100), dataset 1 the least (range 40), and dataset 3 matches
+  dataset 2's IQR but with shorter tails (range 60).
+
+```{python}
+#| echo: false
+#| fig-cap: Same center, different spread — side-by-side boxplots for Exercise 2.183
+fig, ax = plt.subplots(figsize=(6.5, 2.6))
+five_box(ax, [("1", 30, 40, 50, 60, 70, []),
+              ("2", 0, 25, 50, 75, 100, []),
+              ("3", 20, 25, 50, 75, 80, [])])
+ax.set_xlabel("Value")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.184
+
+**Examine a Relationship in StudentSurvey.** Choose any categorical and any
+quantitative variable from `StudentSurvey` and examine their relationship with
+side-by-side boxplots and comparative statistics.
+
+- **Variables chosen: `Sex` (categorical) and `Height` (quantitative),** in
+  inches, for 362 students.
+- **What the boxplots show:** the entire male distribution sits above the female
+  one — median 71 inches vs 65 inches, with boxes that barely overlap. Means:
+  70.8 (men) vs 65.7 (women); standard deviations are similar (3.1 vs 3.3), so
+  the groups differ mainly in center, not spread. Sex is clearly associated with
+  height in this sample.
+
+*Data:* `data/ch01/StudentSurvey.csv` (n = 362), downloaded from
+<https://www.lock5stat.com/datasets3e/StudentSurvey.csv>:
+
+```{python}
+#| echo: false
+ss = pd.read_csv("data/ch01/StudentSurvey.csv")
+ss.groupby("Sex")["Height"].agg(["count", "mean", "median", "std"]).round(1)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Student height in inches by sex
+fig, ax = plt.subplots(figsize=(4.5, 3))
+sns.boxplot(data=ss, x="Sex", y="Height", order=["F", "M"],
+            ax=ax, color="#4c72b0", width=0.45)
+ax.set_xlabel("Sex")
+ax.set_ylabel("Height (inches)")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.185
+
+**Examine a Relationship in USStates.** Exercise 2.173 examined region vs
+physical activity; pick a *different* categorical/quantitative pair from
+`USStates` and examine it with side-by-side boxplots and comparative statistics.
+
+- **Variables chosen: `Region` (categorical) and `Smokers`,** the percent of each
+  state's adults who smoke.
+- **What the boxplots show:** **Southern states smoke the most** (mean ≈ 19.9%,
+  median ≈ 20.1%) and **Midwestern states next** (mean ≈ 18.5%), while
+  **Northeastern (≈ 15.2%) and Western (≈ 15.3%) states smoke least** — the two
+  coastal regions have nearly identical, clearly lower distributions. Spread is
+  similar across regions (sd ≈ 2–3), so the regions differ mainly in center.
+  Region is associated with smoking rates.
+
+*Data:* `data/ch02/USStates.csv` (n = 50), downloaded from
+<https://www.lock5stat.com/datasets3e/USStates.csv>:
+
+```{python}
+#| echo: false
+us.groupby("Region")["Smokers"].agg(["count", "mean", "median", "std"]).round(1)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Percent of adult smokers by region of the country
+fig, ax = plt.subplots(figsize=(6.5, 3.2))
+sns.boxplot(data=us, x="Smokers", y="Region", order=["MW", "NE", "S", "W"],
+            ax=ax, color="#4c72b0", width=0.5)
+ax.set_xlabel("Smokers (percent of adults)")
+ax.set_ylabel("Region")
+plt.tight_layout()
+plt.show()
+```
+
+:::

@@ -1,0 +1,896 @@
+---
+execute-dir: project
+title: "Chapter 2 · Section 2.2"
+subtitle: "One Quantitative Variable: Shape and Center — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 2.2 of Lock⁵ turns to a single **quantitative** variable and asks two
+questions: what **shape** does its distribution have, and where is its **center**?
+A dotplot or histogram reveals the shape — **symmetric**, **skewed to the left**
+(long tail of small values) or **skewed to the right** (long tail of large values) —
+as well as how many peaks (modes) it has. The two workhorse measures of center are
+the **mean** $\bar{x}$ (the balance point: add up the values and divide by $n$) and
+the **median** $m$ (the value that splits the ordered data in half). Skewness and
+**outliers** pull the mean toward the tail while leaving the median almost unmoved:
+for a symmetric distribution mean ≈ median, for right-skewed data the mean is
+larger, and for left-skewed data the mean is smaller. Because the median is
+**resistant** to extremes it is the preferred center for skewed data (paired with
+the IQR), while the mean (paired with the standard deviation) uses every value;
+for bell-shaped data roughly 95% of values fall within two standard deviations of
+the mean, $\bar{x} \pm 2s$. The exercises below are from *Statistics: Unlocking
+the Power of Data* (Lock⁵, 3rd ed., pp. 81–86). Skill Builders 2.54–2.60 read
+shapes off the eight histograms of Figure 2.12; 2.61–2.64 draw dotplots with
+prescribed shapes; 2.65–2.68 compute means, medians, and outliers; 2.69–2.72 drill
+notation. Exercises 2.73–2.93 apply the ideas to real studies, and the tabs based
+on Lock5 data files include a small executable EDA.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+sns.set_theme(style="whitegrid")
+```
+
+::: {.panel-tabset}
+
+## Exercise 2.54
+
+**Which histograms are skewed to the left?** *(Refers to histograms A–H in
+Figure 2.12 on page 82.)*
+
+- **A and H.** Histogram **A** peaks at the right edge (near 1.5–2.0) with a long
+  tail stretching left toward 0; histogram **H** rises gradually from −7 to a peak
+  near −1.5. In both, the long tail of small values points left — the signature of
+  left skew.
+
+## Exercise 2.55
+
+**Which histograms are skewed to the right?**
+
+- **F and G.** Histogram **F** peaks at 0–2 and trails off gradually all the way to
+  14; histogram **G** has a sharp peak near 2.5–3 with a longer, thinner tail
+  extending to the right. The long tail of large values points right in each.
+
+## Exercise 2.56
+
+**Which histograms are approximately symmetric?**
+
+- **B, C, D, and E.** **B** and **C** are symmetric with a single central peak;
+  **D** is bimodal but the two modes are balanced mirror images; **E** is
+  symmetric with a wide, flat top. Note that symmetric does not require
+  bell-shaped — D and E are symmetric without being bell-shaped.
+
+## Exercise 2.57
+
+**Which histograms are approximately symmetric and bell-shaped?**
+
+- **B and C.** Each has a single central peak with tails falling off steadily and
+  roughly equally on both sides — the classic mound shape. D (two modes) and E
+  (flat-topped) are symmetric but not bell-shaped.
+
+## Exercise 2.58
+
+**For each of the four histograms A, B, C, and D, state whether the mean is likely
+to be larger than the median, smaller than the median, or approximately equal to
+the median.**
+
+- **A: mean smaller than the median.** The long left tail pulls the mean down
+  while the median stays with the bulk of the data.
+- **B: approximately equal.** Symmetric and bell-shaped — no tail is longer.
+- **C: approximately equal.** Also symmetric and bell-shaped.
+- **D: approximately equal.** Bimodal, but symmetric, so the two sides balance and
+  neither measure of center gets pulled.
+
+## Exercise 2.59
+
+**For each of the four histograms E, F, G, and H, state whether the mean is likely
+to be larger than the median, smaller than the median, or approximately equal to
+the median.**
+
+- **E: approximately equal.** The histogram is symmetric.
+- **F: mean larger.** The long right tail drags the mean above the median.
+- **G: mean larger.** Mild right skew produces a smaller but real upward pull.
+- **H: mean smaller.** The long left tail drags the mean below the median.
+
+## Exercise 2.60
+
+**Which of the distributions is likely to have the largest mean? The smallest
+mean?**
+
+- **Largest mean: C.** Its values are centered near 75–100 (spanning about −50 to
+  200), far above the centers of all the others — A and B sit near 0–1, D near
+  10–13, G near 2–3.
+- **Smallest mean: H.** Every value in H is negative (between −7 and −1), so its
+  mean (about −3) is below every other distribution's, including E's (about −1).
+
+## Exercise 2.61
+
+**Draw any dotplot to show a dataset that is clearly skewed to the left.**
+
+- Cluster the dots densely at the high end and let a long, thin tail of dots trail
+  off toward the small values. One illustrative dataset of 85 values:
+
+```{python}
+#| echo: false
+#| fig-cap: Illustrative dotplot of data clearly skewed to the left
+rng = np.random.default_rng(11)
+
+def _dotplot(vals, ax, color="#4c72b0", s=18):
+    u, c = np.unique(vals, return_counts=True)
+    for v, n in zip(u, c):
+        ax.scatter([v] * n, np.arange(1, n + 1), s=s, color=color)
+    ax.set_yticks([])
+
+left = np.clip(np.round(15 - rng.exponential(2.6, 85)), 0, 15)
+fig, ax = plt.subplots(figsize=(5, 2.2))
+_dotplot(left, ax)
+ax.set_xlabel("Value")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.62
+
+**Draw any dotplot to show a dataset that is approximately symmetric and
+bell-shaped.**
+
+- Stack the dots into a single central mound with matching tails on both sides:
+
+```{python}
+#| echo: false
+#| fig-cap: Illustrative dotplot of data that is approximately symmetric and bell-shaped
+bell = np.round(rng.normal(10, 2, 90))
+fig, ax = plt.subplots(figsize=(5, 2.2))
+_dotplot(bell, ax)
+ax.set_xlabel("Value")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.63
+
+**Draw any dotplot to show a dataset that is approximately symmetric but not
+bell-shaped.**
+
+- Symmetry only requires the two sides to balance — the shape need not be a single
+  mound. A **bimodal** dotplot with two equal peaks works, as does a flat-topped
+  one:
+
+```{python}
+#| echo: false
+#| fig-cap: Illustrative dotplot of data that is symmetric and bimodal but not bell-shaped
+bimodal = np.round(np.concatenate([rng.normal(5, 1.2, 45), rng.normal(13, 1.2, 45)]))
+fig, ax = plt.subplots(figsize=(5, 2.2))
+_dotplot(bimodal, ax)
+ax.set_xlabel("Value")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.64
+
+**Draw any dotplot to show a dataset that is clearly skewed to the right.**
+
+- Pile the dots up at the small end and let a long tail of stragglers run out
+  toward the large values:
+
+```{python}
+#| echo: false
+#| fig-cap: Illustrative dotplot of data clearly skewed to the right
+right = np.round(rng.exponential(2.5, 85))
+fig, ax = plt.subplots(figsize=(5, 2.2))
+_dotplot(right, ax)
+ax.set_xlabel("Value")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.65
+
+**Data: 8, 12, 3, 18, 15.** *(a)* Find the mean $\bar{x}$. *(b)* Find the median
+$m$. *(c)* Indicate whether there appear to be any outliers.
+
+```{python}
+#| echo: false
+d65 = np.array([8, 12, 3, 18, 15])
+pd.DataFrame({"Value": [d65.mean(), np.median(d65)]},
+             index=["Mean", "Median"]).round(2)
+```
+
+- **(a)** $\bar{x} = 56/5 = 11.2$.
+- **(b)** Ordered: 3, 8, **12**, 15, 18, so $m = 12$.
+- **(c)** No outliers — the five values all sit reasonably close together.
+
+## Exercise 2.66
+
+**Data: 41, 53, 38, 32, 115, 47, 50.**
+
+```{python}
+#| echo: false
+d66 = np.array([41, 53, 38, 32, 115, 47, 50])
+pd.DataFrame({"Value": [d66.mean(), np.median(d66)]},
+             index=["Mean", "Median"]).round(2)
+```
+
+- **(a)** $\bar{x} = 376/7 \approx 53.71$.
+- **(b)** Ordered: 32, 38, 41, **47**, 50, 53, 115, so $m = 47$.
+- **(c)** **115 is an outlier** — it sits 62 units above the next-largest value
+  (53), far outside the pattern of the rest of the data.
+
+## Exercise 2.67
+
+**Data: 15, 22, 12, 28, 58, 18, 25, 18.**
+
+```{python}
+#| echo: false
+d67 = np.array([15, 22, 12, 28, 58, 18, 25, 18])
+pd.DataFrame({"Value": [d67.mean(), np.median(d67)]},
+             index=["Mean", "Median"]).round(2)
+```
+
+- **(a)** $\bar{x} = 196/8 = 24.5$.
+- **(b)** Ordered: 12, 15, 18, 18, **22**, 25, 28, 58, so $m = (18 + 22)/2 = 20$.
+- **(c)** **58 is a possible outlier** — it is 30 units above the next-largest
+  value (28), while the other seven values span only 16 units.
+
+## Exercise 2.68
+
+**Data: 110, 112, 118, 119, 122, 125, 129, 135, 138, 140.**
+
+```{python}
+#| echo: false
+d68 = np.array([110, 112, 118, 119, 122, 125, 129, 135, 138, 140])
+pd.DataFrame({"Value": [d68.mean(), np.median(d68)]},
+             index=["Mean", "Median"]).round(2)
+```
+
+- **(a)** $\bar{x} = 1248/10 = 124.8$.
+- **(b)** Ordered middle pair: 122 and 125, so $m = (122 + 125)/2 = 123.5$.
+- **(c)** No outliers — the values climb smoothly from 110 to 140 with no gap that
+  separates one value from the pack.
+
+## Exercise 2.69
+
+**Give the correct notation for the mean:** the average number of calories eaten
+in one day is 2386 calories for a **sample** of 100 participants.
+
+- $\bar{x} = 2386$ calories. The 100 participants are a sample, so the mean is a
+  statistic and takes the sample notation $\bar{x}$.
+
+## Exercise 2.70
+
+**Give the correct notation for the mean:** the average number of text messages
+sent in a day was 67, in a **sample** of US smartphone users ages 18–24.
+
+- $\bar{x} = 67$ texts. Again a sample mean (survey of some users, not all), so
+  the notation is $\bar{x}$.
+
+## Exercise 2.71
+
+**Give the correct notation for the mean:** the average number of yards per punt
+for **all** punts in the National Football League is 41.5 yards.
+
+- $\mu = 41.5$ yards. Every punt in the league is included, so this is a
+  population mean and takes the Greek-letter notation $\mu$.
+
+## Exercise 2.72
+
+**Give the correct notation for the mean:** the average number of television sets
+owned per household for **all** households in the US is 2.6.
+
+- $\mu = 2.6$ television sets. The value describes the entire population of US
+  households, so the correct notation is $\mu$.
+
+## Exercise 2.73
+
+**Arsenic in Toenails.** Arsenic is toxic to humans, and people can be exposed to
+it through contaminated drinking water, food, dust, and soil. Scientists measured
+the level of arsenic (in mg/kg) in toenail clippings of eight people who lived
+near a former arsenic mine in Great Britain:
+
+0.8  1.9  2.7  3.4  3.9  7.1  11.9  26.0
+
+**(a)** Do you expect the mean or the median of these toenail arsenic levels to be
+larger? Why? **(b)** Calculate the mean and the median.
+
+- **(a) The mean.** The values pile up between 0.8 and 3.9 with a long right tail
+  (11.9 and especially 26.0), so the skewed right distribution pulls the mean
+  above the median.
+- **(b)**
+
+```{python}
+#| echo: false
+ars = np.array([0.8, 1.9, 2.7, 3.4, 3.9, 7.1, 11.9, 26.0])
+pd.DataFrame({"Value": [ars.mean(), np.median(ars)]},
+             index=["Mean", "Median"]).round(3)
+```
+
+The mean (7.21) is nearly double the median (3.65) — the 26.0 alone contributes
+more to the sum than the bottom four values combined:
+
+```{python}
+#| echo: false
+#| fig-cap: Toenail arsenic levels with the mean and median marked
+u, c = np.unique(ars, return_counts=True)
+fig, ax = plt.subplots(figsize=(6, 2.2))
+for v, n in zip(u, c):
+    ax.scatter([v] * n, np.arange(1, n + 1), s=28, color="#4c72b0")
+ax.axvline(ars.mean(), color="#c44e52", label=f"mean = {ars.mean():.2f}")
+ax.axvline(np.median(ars), color="#55a868", label=f"median = {np.median(ars):.2f}")
+ax.set_yticks([])
+ax.set_xlabel("Arsenic level in mg per kg")
+ax.legend(fontsize=8)
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.74
+
+**Fiber in the Diet.** The number of grams of fiber eaten in one day for a sample
+of ten people:
+
+10  11  11  14  15  17  21  24  28  115
+
+**(a)** Find the mean and the median. **(b)** The value 115 appears to be an
+obvious outlier — compute the mean and the median for the nine numbers with the
+outlier excluded. **(c)** Comment on the effect of the outlier on the mean and on
+the median.
+
+```{python}
+#| echo: false
+fib = np.array([10, 11, 11, 14, 15, 17, 21, 24, 28, 115])
+fib9 = fib[fib != 115]
+pd.DataFrame({"Mean": [fib.mean(), fib9.mean()],
+              "Median": [np.median(fib), np.median(fib9)]},
+             index=["With outlier (n = 10)", "Without 115 (n = 9)"]).round(2)
+```
+
+- **(a)** $\bar{x} = 266/10 = 26.6$ grams and $m = (15 + 17)/2 = 16$ grams.
+- **(b)** Without the outlier: $\bar{x} = 151/9 \approx 16.78$ grams and
+  $m = 15$ grams (the middle of the nine ordered values).
+- **(c)** Removing 115 **drops the mean by almost 10 grams** (26.6 → 16.78) but
+  moves the median by only 1 gram (16 → 15). The outlier dominates the mean
+  because every value enters it, while the median — which only needs the middle
+  position — barely notices: the median is resistant, the mean is not.
+
+## Exercise 2.75
+
+**Online Cat Videos.** In Exercise 1.69 we met a study of watching cat videos and
+mood. Participants were asked how many cats they currently own, and the authors
+report **2.39** as the measure of center for this right-skewed distribution.
+
+**(a)** Is this measure of center the mean number of cats or the median number of
+cats? **(b)** Would we expect the mean number of cats to be greater than or less
+than the median?
+
+- **(a) The mean.** Number of cats is a count, so every value is a whole number.
+  A median of whole-number data can only be a whole number or halfway between two
+  of them (such as 2 or 2.5) — it can never be 2.39. A mean, computed by dividing
+  a sum by $n$, can be any value, so 2.39 must be the mean.
+- **(b)** The distribution is right-skewed (many people own 0–2 cats, a few own
+  many), so we expect the **mean to be greater than the median** — the median
+  would be below 2.39.
+
+## Exercise 2.76
+
+**Insect Weights.** Consider a dataset giving the adult weight of species of
+insects. Most species weigh less than 5 grams, but a few weigh a great deal,
+including the largest insect known: the Giant Weta from New Zealand, which can
+weigh as much as 71 grams. Describe the shape of the distribution of weights of
+insects. Is it symmetric or skewed? If skewed, which way? Which will be larger,
+the mean or the median?
+
+- **Strongly skewed to the right.** The great majority of species cluster below 5
+  grams — values cannot go below zero — while a handful of very heavy species
+  (ending with the 71-gram Giant Weta) stretch the tail far to the right.
+- **The mean will be larger than the median**: the enormous right-tail values
+  pull the mean up while leaving the median with the typical insects.
+
+## Exercise 2.77
+
+**Population of States in the US.** The dataset *USStates* has a great deal of
+information about the 50 states, including population. Figure 2.13 shows a
+histogram of the population, in millions, of the 50 states. **(a)** Do these
+values represent a population or a sample? **(b)** Describe the shape of the
+distribution: approximately symmetric, skewed right, skewed left, or none of
+these? Any outliers? **(c)** Estimate the median population. **(d)** Estimate the
+mean population.
+
+- **(a) A population** — the data include *all* 50 states (there is no sampling of
+  states).
+- **(b) Skewed to the right, with outliers.** Most states are small (frequencies
+  decline steadily from the 0–2 million bar) while a few enormous states stretch
+  the tail out to 40 million. California (about 39.5 million) and Texas are clear
+  outliers.
+- **(c)** Half of the 50 states have fewer people, half more; the median sits in
+  that dense low region, around **4–5 million**.
+- **(d)** The mean is pulled above the median by the big states, to roughly
+  **6–7 million**.
+
+*Data:* `data/ch02/USStates.csv` (n = 50), downloaded from
+<https://www.lock5stat.com/datasets3e/USStates.csv>:
+
+```{python}
+#| echo: false
+us = pd.read_csv("data/ch02/USStates.csv")
+fig, ax = plt.subplots(figsize=(6.5, 3.2))
+sns.histplot(us["Population"], bins=np.arange(0, 42, 2), ax=ax, color="#4c72b0")
+ax.axvline(us["Population"].mean(), color="#c44e52",
+           label=f"mean = {us['Population'].mean():.2f}")
+ax.axvline(us["Population"].median(), color="#55a868",
+           label=f"median = {us['Population'].median():.2f}")
+ax.set_xlabel("Population in millions")
+ax.legend(fontsize=8)
+plt.tight_layout()
+plt.show()
+```
+
+The actual values land right in the estimated ranges: median 4.57 million, mean
+6.50 million — and the gap between them is exactly what the right skew predicts.
+
+## Exercise 2.78
+
+**Is Language Biased toward Happiness?** A recent study rated the top 10,222
+English words on how positive they feel (1 = least happy, 5 = neutral, 9 = most
+happy). The rating distributions for all four media sources had approximately the
+shape in Figure 2.14. **(a)** Describe the shape. **(b)** Which of 3.5, 5, 6.5,
+7, 7.5, 8 is closest to the median? **(c)** Will the mean be smaller or larger
+than that median?
+
+- **(a) Skewed to the left.** The ratings peak near 7–8 and drop off sharply on
+  the right, while a long tail of lower ratings stretches back toward 2.
+- **(b) 7.5.** The median sits just left of the peak region, where the curve
+  crosses 50% of the area — clearly between 7 and 8 rather than at 6.5.
+- **(c) Smaller.** With the long left tail, the mean gets dragged below the
+  median (the mirror image of the right-skewed cases).
+
+## Exercise 2.79
+
+**Life Expectancy.** Life expectancy for all the countries in the world ranges
+from a low of 52.2 years (Sierra Leone) to a high of 84.7 years (Hong Kong).
+Life expectancies are clustered at the high end, with about half of all countries
+between about 74 and the maximum of 84.7; a few countries, such as Sierra Leone,
+have a very low life expectancy. The full dataset is in *AllCountries*.
+**(a)** What is the shape of the distribution? **(b)** Estimate the median.
+**(c)** Will the mean be larger or smaller than the median?
+
+- **(a) Skewed to the left.** The values cluster between 74 and 84.7 with a long
+  tail of a few low-life-expectancy countries reaching down to 52.2.
+- **(b)** Since about half the countries fall between 74 and 84.7, the median is
+  about **74 years**.
+- **(c) Smaller.** The low-end tail pulls the mean below the median.
+
+*Data:* `data/ch02/AllCountries.csv` (n = 217 countries), downloaded from
+<https://www.lock5stat.com/datasets3e/AllCountries.csv>:
+
+```{python}
+#| echo: false
+ac = pd.read_csv("data/ch02/AllCountries.csv")
+le = ac["LifeExpectancy"].dropna()
+fig, ax = plt.subplots(figsize=(6.5, 3.2))
+sns.histplot(le, bins=np.arange(50, 88, 2.5), ax=ax, color="#4c72b0")
+ax.axvline(le.mean(), color="#c44e52", label=f"mean = {le.mean():.1f}")
+ax.axvline(le.median(), color="#55a868", label=f"median = {le.median():.1f}")
+ax.set_xlabel("Life expectancy in years")
+ax.legend(fontsize=8)
+plt.tight_layout()
+plt.show()
+```
+
+The dataset confirms the estimates: median 74.3 years, mean 72.5 years — the
+mean, as expected for left-skewed data, is smaller.
+
+## Exercise 2.80
+
+**Making Friends Online.** A survey conducted in March 2015 asked 1060 teens to
+estimate, on average, the number of friends they had made online. While 43% had
+not made any friends online, a small number of the teens had made many friends
+online. **(a)** Do you expect the distribution of number of friends made online
+to be symmetric, skewed to the right, or skewed to the left? **(b)** Two measures
+of center for this distribution are 1 friend and 5.3 friends. Which is most
+likely the mean and which the median? Explain.
+
+- **(a) Skewed to the right.** The count cannot go below zero, 43% of the teens
+  are pinned at exactly 0, most of the rest made only a few friends, and a small
+  group made very many — a textbook long right tail.
+- **(b) Median = 1 friend, mean = 5.3 friends.** The median only needs the middle
+  of the ordered data: with 43% at zero, the median lands among the low counts at
+  1. The mean, in contrast, is dragged upward by the few teens with huge numbers
+  of online friends — more than five times the median. Whenever the mean is much
+  larger than the median, right skew is the reason.
+
+## Exercise 2.81
+
+**How Far and How Fast Do Homing Pigeons Fly?** For the 2019 Midwest Classic
+homing pigeon race we have the speed (in yards per minute) and the distance (in
+miles) covered from the release point to the home loft for each of the 1412
+pigeons that finished. Figure 2.15 shows histograms of both variables. The
+numbers **409, 429, 575, and 632** are the means and medians of the two
+variables. Match each number with the variable and the measure of center.
+
+- **Distance (miles) is skewed to the left** — the histogram peaks around
+  400–500 miles with a long tail of short distances down toward 100 — so its
+  **mean (409) is smaller than its median (429)**.
+- **Speed (yd/min) is skewed to the right** — most pigeons clustered near
+  550–700 with a long tail of slower birds out to 1500 — so its **mean (632) is
+  larger than its median (575)**.
+
+*Data:* `data/ch02/HomingPigeons.csv` (n = 1412 finishing pigeons), from
+<https://www.lock5stat.com/datasets3e/HomingPigeons.csv>:
+
+```{python}
+#| echo: false
+hp = pd.read_csv("data/ch02/HomingPigeons.csv")
+hp[["Distance", "Speed"]].agg(["mean", "median"]).round(1)
+```
+
+The dataset reproduces all four printed numbers — and the direction of each
+mean-vs-median gap matches the direction of the corresponding tail:
+
+```{python}
+#| echo: false
+#| fig-cap: Race distance and speed for the 1412 finishing homing pigeons with mean and median marked
+fig, axes = plt.subplots(1, 2, figsize=(7, 2.8))
+for var, ax in zip(["Distance", "Speed"], axes):
+    sns.histplot(hp[var], bins=24, ax=ax, color="#4c72b0")
+    ax.axvline(hp[var].mean(), color="#c44e52", lw=1.5)
+    ax.axvline(hp[var].median(), color="#55a868", lw=1.5)
+    ax.set_xlabel(var)
+axes[0].set_ylabel("Frequency")
+axes[1].set_ylabel("")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.82
+
+**Subtle Language Changes Impact Conflict Resolution.** A study in Israel
+examined whether phrasing statements in noun form (such as "I support the
+division of Jerusalem") rather than verb form (such as "I support dividing
+Jerusalem") might reduce anger. In the study, 129 Jewish Israeli college students
+were **randomly assigned** to hear statements in either noun or verb form, and
+indicated on a 1–6 scale how much anger they felt. The mean score for those
+hearing statements in noun form was **3.21**; for verb form it was **3.67**.
+**(a)** Give notation for the two means. **(b)** Find the difference in means
+(noun minus verb) and give its notation. **(c)** Is this an experiment or an
+observational study?
+
+- **(a)** $\bar{x}_N = 3.21$ (noun form) and $\bar{x}_V = 3.67$ (verb form).
+- **(b)** $\bar{x}_N - \bar{x}_V = 3.21 - 3.67 = -0.46$: hearing statements in
+  noun form goes with anger scores 0.46 points lower, on average, on the 1–6
+  scale.
+- **(c) An experiment** — the form of the statements (noun vs verb) was actively
+  imposed and **randomly assigned** by the researchers.
+
+## Exercise 2.83
+
+**Donating Blood to Grandma?** Several studies in mice indicate that young blood
+may reverse brain aging. Old mice were **randomly assigned** to receive blood
+plasma either from a young mouse or from another old mouse, and one study
+measured exercise endurance via maximum treadmill runtime (minutes) in a
+90-minute window (Table 2.23; the data are also in *YoungBlood*):
+
+| Group | Minutes on treadmill |
+|---|---|
+| Young (n = 17) | 27 28 31 35 39 40 45 46 55 56 59 68 76 90 90 90 90 |
+| Old (n = 13) | 19 21 22 25 28 29 29 31 36 42 50 51 68 |
+
+**(a)** Calculate $\bar{x}_Y$. **(b)** Calculate $\bar{x}_O$. **(c)** Find the
+difference $\bar{x}_Y - \bar{x}_O$ and interpret it. **(d)** Experiment or
+observational study? **(e)** If the difference is significant, can we conclude
+that young blood increases exercise endurance in old mice?
+
+```{python}
+#| echo: false
+young = np.array([27, 28, 31, 35, 39, 40, 45, 46, 55, 56, 59, 68, 76, 90, 90, 90, 90])
+old = np.array([19, 21, 22, 25, 28, 29, 29, 31, 36, 42, 50, 51, 68])
+pd.DataFrame({"n": [len(young), len(old)],
+              "Mean minutes": [young.mean(), old.mean()],
+              "Median minutes": [np.median(young), np.median(old)]},
+             index=["Young blood", "Old blood"]).round(2)
+```
+
+- **(a)** $\bar{x}_Y = 965/17 \approx 56.77$ minutes.
+- **(b)** $\bar{x}_O = 451/13 \approx 34.69$ minutes.
+- **(c)** $\bar{x}_Y - \bar{x}_O = 56.77 - 34.69 \approx 22.07$ minutes: mice
+  receiving young blood ran, on average, about **22 minutes longer** on the
+  treadmill within the 90-minute window.
+- **(d) An experiment** — the plasma treatment was **randomly assigned**.
+- **(e) Yes, for these mice.** Randomization balances everything else between the
+  two groups, so a significant difference would support the causal conclusion
+  that young blood increases exercise endurance in old mice. Whether it extends
+  to humans is exactly what the just-beginning human studies will have to test.
+
+```{python}
+#| echo: false
+#| fig-cap: Treadmill minutes for mice receiving young or old blood plasma
+yb = pd.DataFrame({"Minutes": np.concatenate([young, old]),
+                   "Group": ["Young blood"] * len(young) + ["Old blood"] * len(old)})
+fig, ax = plt.subplots(figsize=(6, 2.4))
+sns.stripplot(data=yb, x="Minutes", y="Group", ax=ax, hue="Group",
+              palette=["#c44e52", "#4c72b0"], size=5, alpha=0.75, legend=False)
+ax.set_ylabel("")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.84
+
+**Price Differentiating.** E-commerce websites alter results depending on the
+device or browser used. At Home Depot, the average price of 20 items when
+searching from a smartphone was **$230**, while the average price when searching
+from a desktop was **$120**. **(a)** Give notation for the two mean prices.
+**(b)** Find the difference in means and give its notation.
+
+- **(a)** $\bar{x}_{phone} = \$230$ and $\bar{x}_{desktop} = \$120$.
+- **(b)** $\bar{x}_{phone} - \bar{x}_{desktop} = 230 - 120 = \$110$: the same 20
+  items cost \$110 more, on average, when searched from a smartphone.
+
+## Exercise 2.85
+
+**Does It Pay to Get a College Degree?** US 2009 earnings data give the median
+weekly earnings of high school graduates with no college degree as **$626** and
+of college graduates with a bachelor's degree as **$1025**. Give correct notation
+for and find the difference in medians.
+
+- With subscripts identifying the groups, the medians are
+  $m_{HS} = \$626$ and $m_{BA} = \$1025$.
+- Difference: $m_{BA} - m_{HS} = 1025 - 626 = \$399$ per week. (Subtracting in
+  the other order gives $m_{HS} - m_{BA} = -\$399$ — the order must be stated
+  along with the answer.) Bachelor's degree holders earned \$399 more per week,
+  at the middle of each distribution.
+
+## Exercise 2.86
+
+**What Is the Average Household Size in Canada?** The 2016 Canadian Census shows
+that the average household size in Canada is **2.4** people per household. Give
+the correct notation for this value.
+
+- $\mu = 2.4$ people. The census covers **all** Canadian households, so this is a
+  population mean and takes the Greek-letter notation $\mu$ (a parameter), not
+  the sample notation $\bar{x}$.
+
+## Exercise 2.87
+
+**Create a Dataset.** Give any set of five numbers satisfying the condition that:
+**(a)** the mean is substantially less than the median; **(b)** the mean is
+substantially more than the median; **(c)** the mean and the median are equal.
+
+- The lever is skewness: a **low outlier** drags the mean below the median, a
+  **high outlier** drags it above, and a **symmetric** set leaves them equal.
+
+```{python}
+#| echo: false
+sets = {"Mean less than median": [-100, 3, 4, 5, 8],
+        "Mean more than median": [1, 2, 3, 4, 100],
+        "Mean equals median": [2, 4, 6, 8, 10]}
+pd.DataFrame({k: {"Data": str(v), "Mean": np.mean(v), "Median": np.median(v)}
+              for k, v in sets.items()}).T
+```
+
+- **(a)** −100, 3, 4, 5, 8: mean −16 vs median 4.
+- **(b)** 1, 2, 3, 4, 100: mean 22 vs median 3.
+- **(c)** 2, 4, 6, 8, 10: mean = median = 6. (Any symmetric set works.)
+
+## Exercise 2.88
+
+**Describe a Variable.** Describe one quantitative variable that you believe will
+give data that are skewed to the right, and explain your reasoning. Do not use a
+variable already discussed.
+
+- **Example: household income** (or: number of social media followers, length of
+  hospital stays). Incomes cannot drop below zero, most households earn modest
+  to moderate amounts, and a small number of very high earners stretch the tail
+  out to the right — many values bunched low, a few extremely large ones, hence
+  right skew.
+
+## Exercise 2.89
+
+**Distribution of Birth Rate.** The *BirthRate* variable in the *AllCountries*
+dataset gives the birth rate per 1000 people for all the countries in the world.
+Use technology to create a histogram, and describe the shape: relatively
+symmetric, mildly skewed, or strongly skewed?
+
+*Data:* `data/ch02/AllCountries.csv` (n = 217 countries), from
+<https://www.lock5stat.com/datasets3e/AllCountries.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Birth rate per 1000 people for 217 countries with mean and median marked
+br = ac["BirthRate"].dropna()
+fig, ax = plt.subplots(figsize=(6.5, 3.2))
+sns.histplot(br, bins=np.arange(6, 50, 2), ax=ax, color="#4c72b0")
+ax.axvline(br.mean(), color="#c44e52", label=f"mean = {br.mean():.1f}")
+ax.axvline(br.median(), color="#55a868", label=f"median = {br.median():.1f}")
+ax.set_xlabel("Births per 1000 people")
+ax.legend(fontsize=8)
+plt.tight_layout()
+plt.show()
+```
+
+- **Strongly skewed to the right.** Most countries cluster between about 8 and
+  25 births per 1000, and a long tail of high-birth-rate countries (up to about
+  48) stretches far to the right. The mean (20.1) sits well above the median
+  (17.9), confirming the strong right skew.
+
+## Exercise 2.90
+
+**Distribution of Death Rate.** Repeat Exercise 2.89 using the *DeathRate*
+variable (deaths per 1000 people).
+
+*Data:* `data/ch02/AllCountries.csv` (n = 217 countries), from
+<https://www.lock5stat.com/datasets3e/AllCountries.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Death rate per 1000 people for 217 countries with mean and median marked
+dr = ac["DeathRate"].dropna()
+fig, ax = plt.subplots(figsize=(6.5, 3.2))
+sns.histplot(dr, bins=np.arange(1, 16.5, 1), ax=ax, color="#4c72b0")
+ax.axvline(dr.mean(), color="#c44e52", label=f"mean = {dr.mean():.1f}")
+ax.axvline(dr.median(), color="#55a868", label=f"median = {dr.median():.1f}")
+ax.set_xlabel("Deaths per 1000 people")
+ax.legend(fontsize=8)
+plt.tight_layout()
+plt.show()
+```
+
+- **Relatively symmetric, at most mildly skewed to the right.** Death rates
+  spread fairly evenly between about 2 and 15 with the bulk between 6 and 10;
+  the mean (7.7) is only slightly above the median (7.2). Compared with the
+  strongly skewed birth rates, this distribution is nearly symmetric — a nice
+  reminder that two variables in the same dataset can have very different
+  shapes.
+
+## Exercise 2.91
+
+**Enrollments at Two-year Colleges.** The dataset *CollegeScores2yr* has
+information on the number of students enrolled at each US college where the
+primary degree is an Associate's degree. **(a)** Create a plot of the
+*Enrollment* variable. What is the most striking feature of the shape? **(b)**
+Find the mean and median. **(c)** Explain the connection between (a) and (b).
+
+*Data:* `data/ch02/CollegeScores2yr.csv` (n = 1141 colleges with enrollment
+reported), downloaded from
+<https://www.lock5stat.com/datasets3e/CollegeScores2yr.csv>:
+
+```{python}
+#| echo: false
+c2 = pd.read_csv("data/ch02/CollegeScores2yr.csv")
+enr2 = c2["Enrollment"].dropna()
+pd.DataFrame({"Value": [enr2.mean(), enr2.median(), enr2.max()]},
+             index=["Mean enrollment", "Median enrollment",
+                    "Largest college"]).round(0).astype(int)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Enrollment at 1141 two-year colleges with mean and median marked
+fig, ax = plt.subplots(figsize=(6.5, 3.2))
+sns.histplot(enr2, bins=60, ax=ax, color="#4c72b0")
+ax.axvline(enr2.mean(), color="#c44e52", label=f"mean = {enr2.mean():.0f}")
+ax.axvline(enr2.median(), color="#55a868", label=f"median = {enr2.median():.0f}")
+ax.set_xlabel("Enrollment")
+ax.legend(fontsize=8)
+plt.tight_layout()
+plt.show()
+```
+
+- **(a)** The most striking feature is the **extreme right skew with a handful of
+  enormous outliers**: the median college enrolls under 2000 students, but a few
+  huge community college systems top 50,000 (Lone Star College System at 59,107,
+  Houston Community College, Miami Dade College).
+- **(b)** Mean ≈ **4050** students; median ≈ **1748** students.
+- **(c)** The strong right skew is exactly why the mean is more than double the
+  median: the few giant campuses contribute enormously to the sum (and hence the
+  mean) but do not move the median at all.
+
+## Exercise 2.92
+
+**Enrollments at Four-year Colleges.** Repeat Exercise 2.91 using the
+*Enrollment* variable in the *CollegeScores4yr* dataset (colleges where the
+primary degree is a Bachelor's degree).
+
+*Data:* `data/ch02/CollegeScores4yr.csv` (n = 2012 colleges with enrollment
+reported), downloaded from
+<https://www.lock5stat.com/datasets3e/CollegeScores4yr.csv>:
+
+```{python}
+#| echo: false
+c4 = pd.read_csv("data/ch02/CollegeScores4yr.csv")
+enr4 = c4["Enrollment"].dropna()
+pd.DataFrame({"Value": [enr4.mean(), enr4.median(), enr4.max()]},
+             index=["Mean enrollment", "Median enrollment",
+                    "Largest college"]).round(0).astype(int)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Enrollment at 2012 four-year colleges with mean and median marked
+fig, ax = plt.subplots(figsize=(6.5, 3.2))
+sns.histplot(enr4, bins=60, ax=ax, color="#4c72b0")
+ax.axvline(enr4.mean(), color="#c44e52", label=f"mean = {enr4.mean():.0f}")
+ax.axvline(enr4.median(), color="#55a868", label=f"median = {enr4.median():.0f}")
+ax.set_xlabel("Enrollment")
+ax.legend(fontsize=8)
+plt.tight_layout()
+plt.show()
+```
+
+- **(a)** Again the story is **extreme right skew with huge outliers**: most
+  four-year colleges enroll well under 5000 students, while online mega-
+  universities reach enormous sizes (University of Phoenix–Arizona at 77,269,
+  Western Governors University, Southern New Hampshire University).
+- **(b)** Mean ≈ **4485** students; median ≈ **1722** students.
+- **(c)** As in Exercise 2.91, the long tail of giant institutions pulls the mean
+  (4485) far above the median (1722) — the mean is more than 2.5 times the
+  median, while the median describes the typical four-year college much better.
+
+## Exercise 2.93
+
+**Number of Children.** Table 2.24 shows the number of women (per 1000) between
+ages 15 and 50 who have been married, grouped by number of children; Table 2.25
+gives the same information for women who have never been married.
+
+| Number of children | Ever married | Never married |
+|---|---|---|
+| 0 | 162 | 752 |
+| 1 | 213 | 117 |
+| 2 | 344 | 72 |
+| 3 | 182 | 35 |
+| 4 | 69 | 15 |
+| 5+ | 32 | 10 |
+
+**(a)** Without doing any calculations, which of the two samples appears to have
+the highest mean number of children? Which distribution appears to have the mean
+most different from the median? Why? **(b)** Find the median for each dataset.
+
+```{python}
+#| echo: false
+#| fig-cap: Number of children per 1000 women who have or have never been married
+kids = pd.DataFrame({"Children": [0, 1, 2, 3, 4, 5],
+                     "Ever married": [162, 213, 344, 182, 69, 32],
+                     "Never married": [752, 117, 72, 35, 15, 10]})
+fig, ax = plt.subplots(figsize=(6.5, 3))
+kids.plot.bar(x="Children", y=["Ever married", "Never married"], ax=ax,
+              rot=0, color=["#4c72b0", "#c44e52"], width=0.8)
+ax.set_xlabel("Number of children")
+ax.set_ylabel("Women per 1000")
+plt.tight_layout()
+plt.show()
+```
+
+- **(a) Highest mean: the ever-married sample.** Its counts center on 2–3
+  children, while the never-married counts pile up overwhelmingly at zero.
+  **Mean most different from median: the never-married sample.** That
+  distribution is extremely right-skewed — 752 of 1000 women have no children,
+  with a long thin tail out to 5 — so the few large values pull the mean well
+  above the median, which stays at zero. The ever-married distribution is much
+  more nearly symmetric, so its mean and median nearly coincide. (Treating
+  "5+" as 5:)
+
+```{python}
+#| echo: false
+stats = {}
+for grp in ["Ever married", "Never married"]:
+    rep = np.repeat(kids["Children"].to_numpy(), kids[grp].to_numpy())
+    stats[grp] = {"Mean children": np.average(kids["Children"],
+                                              weights=kids[grp]),
+                  "Median children": np.median(rep)}
+pd.DataFrame(stats).T.round(2)
+```
+
+- **(b)** **Ever married: median = 2 children** (the 500th of the 1000 women
+  falls in the two-children group). **Never married: median = 0 children** (752
+  of the 1000 have none, so the median lands inside the zero group).
+
+:::

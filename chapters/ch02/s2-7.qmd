@@ -1,0 +1,1053 @@
+---
+execute-dir: project
+title: "Chapter 2 · Section 2.7"
+subtitle: "Data Visualization and Multiple Variables — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 2.7 of Lock⁵ is about what a picture gains when it carries **more than two
+variables**. A scatterplot can be **augmented** with color or marker *shape* for a
+categorical third variable, or with *bubble size* for a quantitative third variable;
+the data can be split into **panels** (small multiples) or given separate regression
+lines within groups; spaghetti plots, time-series windows, maps, heat maps, dot maps,
+mountain charts, scatterplot matrices, and 3-D scatterplots handle time, geography,
+and many variables at once. Adding a third variable can even **reverse** what the
+two-variable picture seemed to say — **Simpson's Paradox**, which this section
+illustrates with an augmented scatterplot (Exercise 2.270) and a famous kidney-stone
+study (Exercise 2.300). The exercises also train a critical eye: a different time
+window (Exercise 2.274) or a comparison of group means instead of within-group trends
+(Exercise 2.310) can make the same data tell a different story.
+Exercises 2.270–2.318 mix figure reading, exploration of online visualizations, and
+hands-on work with Lock5 datasets. Tabs based on Lock5 data files include a small
+executable EDA.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+sns.set_theme(style="whitegrid")
+```
+
+::: {.panel-tabset}
+
+## Exercise 2.270
+
+**Considering Direction of Association.** *(Figures 2.92–2.93 show a scatterplot of
+Variable1 vs Variable2, alone, with a regression line, and then split by a third
+variable Variable3 with groups A–D.)*
+
+- **(a)** Two variables, both **quantitative**: Variable1 spans about 13–29 and
+  Variable2 about 65–160.
+- **(b)** In Figure 2.92(a) the association appears **positive** — Variable2 tends to
+  rise as Variable1 rises.
+- **(c)** The **response variable is Variable2** (plotted on the vertical axis, so the
+  regression line predicts it from Variable1). The line shows a **positive**
+  association.
+- **(d)** Variable3 is **categorical**, with **four categories** (groups A, B, C, D).
+- **(e)** Within *each* group — A, B, C, and D — the association between Variable1 and
+  Variable2 appears **negative**.
+- **(f)** All four regression lines in Figure 2.93(b) slope **downward** (negative)
+  within their groups.
+- **(g)** The direction of association **reverses**: ignoring Variable3 the trend is
+  positive (Figure 2.92), yet within every one of the four groups the trend is
+  negative. The groups occupy different parts of the plot (A low on both axes, D high
+  on both), and that between-group structure creates the overall positive trend. This
+  is Simpson's Paradox for quantitative variables.
+
+## Exercise 2.271
+
+**Visualizing the Happy Planet Index.** *(Figure 2.94 plots Happiness vs Footprint,
+colored by Region: 1 = Latin America, 2 = Western nations, 3 = Middle East,
+4 = Sub-Saharan Africa, 5 = South Asia, 6 = East Asia, 7 = former Communist
+countries.)*
+
+- **(a)** Happiness and Footprint are **quantitative**; Region is **categorical**
+  (7 categories).
+- **(b)** The two regions with the greatest happiness are **region 1 (Latin America)**
+  and **region 2 (Western nations)** — their dots sit highest on the vertical axis.
+  The greatest ecological footprint belongs to **region 2 (Western nations)**, far to
+  the right of everyone else. (Group means: Happiness 6.9 for region 1 and 7.6 for
+  region 2; Footprint 6.0 for region 2 vs ≤ 3.0 for all others.)
+- **(c)** The lowest happiness belongs to **region 4 (Sub-Saharan Africa)**, and the
+  ecological footprint there tends to be very **low** (mean about 1.4).
+- **(d)** Ignoring region, the relationship between happiness and footprint is
+  **positive** (correlation about 0.64).
+- **(e)** Within region 2 alone the relationship is still **positive** (correlation
+  about 0.51).
+- **(f)** Costa Rica, the happiest country, sits in the **top left**: maximum
+  happiness (8.5) with a small footprint (2.3).
+- **(g)** For region 4 the binding constraint is well-being: focus on **Happiness and
+  try to increase it** (the footprint is already tiny). For region 2 happiness is
+  already high, so focus on the **Footprint and try to decrease it** — moving those
+  countries toward the top left means shrinking their ecological impact, not raising
+  their happiness.
+
+*Data:* `data/ch02/HappyPlanetIndex.csv` (n = 143), downloaded from
+<https://www.lock5stat.com/datasets3e/HappyPlanetIndex.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Happiness score versus ecological footprint, colored by world region
+hp = pd.read_csv("data/ch02/HappyPlanetIndex.csv")
+fig, ax = plt.subplots(figsize=(7, 4))
+sns.scatterplot(data=hp, x="Footprint", y="Happiness", hue="Region",
+                palette="tab10", s=18, alpha=0.85, ax=ax)
+ax.set_xlabel("Ecological footprint")
+ax.set_ylabel("Happiness score")
+ax.legend(title="Region", fontsize=8)
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.272
+
+**Height, Weight, and Body Fat.** *(Figure 2.95 shows a bubble plot of height, weight,
+and body fat percentage for 100 men, from the dataset BodyFat; bubble size indicates
+body fat percentage.)*
+
+- **(a)** Three variables, all **quantitative**: height, weight, and body fat
+  percentage.
+- **(b)** Ignoring bubble size, height and weight show a **positive** relationship
+  (correlation about 0.57).
+- **(c)** The bubbles tend to be **larger on the top half** of the plot: heavier men
+  tend to have higher body fat percentages (correlation between weight and body fat
+  about 0.6).
+- **(d)** The man weighing about 140 lb has the **larger** body fat percentage. In the
+  data the ≈ 66-inch, 127-lb man has 4.0% body fat, while the ≈ 66-inch, 143-lb man
+  has 11.8%.
+- **(e)** Between the two ≈ 125-lb men, the **shorter** one (66 in) has the larger body
+  fat percentage: 17.0% at 65.75 inches vs 4.0% at 66.75 inches.
+- **(f)** The heaviest man (263 lb) has 34.5% body fat — **relatively large** (one of
+  the biggest bubbles on the plot).
+- **(g)** The tallest man (77.75 in) has a body fat percentage that is **pretty
+  average** (17.4%), and the third-tallest (76 in) has one that is **relatively
+  small** (7.8%). Being tall does not by itself go with high body fat in this sample.
+- **(h)** Incorporate sex by using **color (or shape) of the bubbles** for males and
+  females — or by drawing separate side-by-side panels, one for each sex.
+
+*Data:* `data/ch02/BodyFat.csv` (n = 100), downloaded from
+<https://www.lock5stat.com/datasets3e/BodyFat.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Height and weight of 100 men, with bubble size showing body fat percentage
+bf = pd.read_csv("data/ch02/BodyFat.csv")
+fig, ax = plt.subplots(figsize=(6.5, 4))
+ax.scatter(bf.Height, bf.Weight, s=bf.Bodyfat * 28, alpha=0.5,
+           color="#4c72b0", edgecolor="white")
+ax.set_xlabel("Height (inches)")
+ax.set_ylabel("Weight (pounds)")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.273
+
+**Visualizing Football and Brain Size.** *(Years playing football and hippocampus size
+were recorded for football players with at least one concussion, football players with
+no concussion diagnosis, and a control group that never played football; Figure 2.96
+plots all three variables.)*
+
+- **(a)** Years playing football — **quantitative**; hippocampus size —
+  **quantitative**; group (Control / FBConcuss / FBNoConcuss) — **categorical**.
+- **(b)** The blue control dots are stacked on the left because **none of them ever
+  played football**: every control case has Years = 0.
+- **(c)** Overall there appears to be a **negative** association: people who played
+  football for more years tend to have smaller hippocampi.
+- **(d)** The **concussion group (FBConcuss)** has the lower regression line: at the
+  same number of years of football, players with a concussion diagnosis have smaller
+  hippocampi than players without one (group means: about 5735 vs 6459).
+- **(e)** The **non-concussion group** has the steeper slope: about −115 mm³ of
+  hippocampus per year played, versus about −55 mm³ per year for the concussion group
+  (computed from the data).
+
+*Data:* `data/ch02/FootballBrain.csv` (n = 75), downloaded from
+<https://www.lock5stat.com/datasets3e/FootballBrain.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Hippocampus size versus years playing football, by group, with regression lines for the two football groups
+fb = pd.read_csv("data/ch02/FootballBrain.csv")
+palette = {"Control": "#55a868", "FBNoConcuss": "#4c72b0", "FBConcuss": "#c44e52"}
+fig, ax = plt.subplots(figsize=(6.5, 4))
+sns.scatterplot(data=fb, x="Years", y="Hipp", hue="Group", palette=palette,
+                s=22, alpha=0.75, ax=ax)
+for g in ["FBNoConcuss", "FBConcuss"]:
+    sns.regplot(data=fb[fb.Group == g], x="Years", y="Hipp", scatter=False,
+                ax=ax, color=palette[g], truncate=True, line_kws={"lw": 2})
+ax.set_xlabel("Years playing football")
+ax.set_ylabel("Hippocampus size")
+ax.legend(title="Group", fontsize=8)
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.274
+
+**Carbon Dioxide Levels Over Time.** *(Figure 2.97 shows atmospheric CO2 over
+1959–2015 and, in a very different window, over the last 400,000 years.)*
+
+- **(a)** From Figure 2.97(a), the CO2 concentration in 1960 is about **315–317 ppm**
+  and in 2015 about **400 ppm**.
+- **(b)** During 1959–2015 the concentration is **increasing** — steadily and without
+  interruption.
+- **(c)** Over the 400,000-year window the concentration is **oscillating up and
+  down**: repeated ice-age cycles between roughly 180 and 280 ppm.
+- **(d)** The 1959–2015 stretch is a **nearly vertical spike at the far right edge**
+  of Figure 2.97(b) — a thin sliver of time in which CO2 shoots up past every level
+  seen in the previous 400,000 years.
+- **(e)** The highest concentration before 1950 is about **280–300 ppm**, reached at
+  the warm interglacial peaks.
+- **(f)** The 3-minute animated video referenced in the exercise animates this same
+  story: centuries of oscillation followed by the recent sharp climb.
+
+*Data:* `data/ch02/CarbonDioxide.csv` (CO2 in ppm, every 5 years, 1960–2015),
+downloaded from <https://www.lock5stat.com/datasets3e/CarbonDioxide.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Atmospheric CO2 concentration, 1960 to 2015
+cd = pd.read_csv("data/ch02/CarbonDioxide.csv")
+fig, ax = plt.subplots(figsize=(6.5, 3.5))
+ax.plot(cd.Year, cd["C02"], marker="o", ms=3, color="#4c72b0")
+ax.set_xlabel("Year")
+ax.set_ylabel("CO2 (ppm)")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.275
+
+**Forty-Yard Dash at the NFL Combine.** *(Figure 2.98 is a spaghetti plot of the
+average 40-yard dash time by season, 1990–2016, for wide receivers (WR) and defensive
+cornerbacks (DC).)*
+
+- **(a)** Both strands wander a lot from year to year, but their general trend is
+  **downward** — from about 4.52–4.56 seconds in the 1990s to about 4.45–4.50 seconds
+  in the 2010s. The players are getting **faster**, not slower.
+- **(b)** In 2016 the **DC** strand ends slightly lower (about 4.46 s vs about 4.48 s
+  for WR), so defensive cornerbacks had the faster average 40 time that year.
+- **(c)** No — the two strands **cross repeatedly** over the 27 seasons. Neither
+  position is consistently faster than the other; the common assumption that receivers
+  are always the speedsters does not hold up in these averages.
+
+## Exercise 2.276
+
+**Golden State Warriors: One Game.** *(Figure 2.99(a) plots the point differential —
+Warriors minus Nuggets — minute by minute for the November 6, 2015 game, won 119–104.)*
+
+- **(a) No.** The differential starts at about 0 and never drops below it: the Warriors
+  were never losing. The circles on the 0-line mark the moments when the game was
+  **tied** — the closest the Nuggets ever got.
+- **(b)** The largest lead (about 30 points) comes **late in the 2nd quarter** (the
+  36–24 minutes-remaining band), just before halftime.
+
+## Exercise 2.277
+
+**Golden State Warriors: First Half of Season.** *(Figure 2.99(b) shows the game state
+every minute of the first 41 games: orange above 0 = winning, purple below 0 = losing,
+darker = farther from 0.)*
+
+- **(a)** Counting the purple dots at the 24-minute mark: about **ten of the 41 games**
+  were losing at halftime.
+- **(b)** At the 0-minute mark only **two** purple dots remain: the Warriors lost just
+  2 of their first 41 games — and, as the annotation notes, both losses were by more
+  than 13 points (the two very dark dots).
+
+## Exercise 2.278
+
+**Marriage Age vs Number of Children.** *(Gapminder scatterplot of Age at 1st marriage
+(women) vs Babies per woman, animated over time.)*
+
+- **(a)** Overall there is a **negative** association: countries where women marry
+  later tend to have fewer babies per woman.
+- **(b)** In Russia, 1941–1943 (World War II), **both variables plunge**: the mean
+  number of babies per woman drops steeply, and the age at 1st marriage also falls
+  sharply as wartime upheaval rushes marriages forward while births collapse.
+- **(c)** In Libya, 1973–2005, the classic development pattern plays out: the number
+  of babies per woman **falls dramatically** (from about 7–8 toward 3), while the age
+  at 1st marriage **rises substantially** as women marry later and later.
+
+## Exercise 2.279
+
+**Income Distribution by Country.** *(Gapminder mountain chart: a smoothed histogram
+of world income for each year, with the area under the curve colored by region.)*
+
+- **(a)** In 1970, the majority of people living in extreme poverty (under \$2/day)
+  came from **Asia** — the huge low-income humps of China and the rest of South and
+  East Asia dominate the bottom of the distribution.
+- **(b)** By 2019, the majority of people in extreme poverty came from **Africa**,
+  whose colored area now sits lowest on the income axis.
+- **(c)** In 1970 the worldwide income distribution is strongly **bimodal**: a very
+  large, low-income peak (the developing world) plus a much smaller, separate peak of
+  wealthy countries. By 2019 the two humps have merged into one broad distribution
+  centered on **middle incomes** — the poor peak has shrunk and moved right, and a
+  global middle class has swelled.
+
+## Exercise 2.280
+
+**A Day in the Life.** *(Nathan Yau's dynamic visualization of how 1000
+representative Americans spend each minute of the day.)*
+
+- **(a)** At 6 am the vast majority of Americans are **sleeping**.
+- **(b)** At 10 am the most common activity is **work** (paid employment).
+- **(c) More at 7 pm**: eating and drinking keeps building through the evening, and
+  the 7 pm dinner peak is larger than the 6 pm level.
+- **(d)** One striking fact: leisure — especially **television** — dominates almost
+  the entire block from roughly 8 pm to 11 pm, dwarfing every other waking activity
+  at those hours.
+
+## Exercise 2.281
+
+**US Obesity Levels by State and over Time.** *(Figure 2.100 shows maps of US states
+colored by percent obese in 1990, 2000, and 2010.)*
+
+- **(a)** Ignoring the No Data category, the legend shows **six** categories:
+  under 10%, 10–14%, 15–19%, 20–24%, 25–29%, and 30% or more.
+- **(b)** In 1990 the highest category needed is **15–19%**; in 2000 it is
+  **20–24%**; by 2010 states need the **30% or more** category — the map's palette
+  marches steadily darker (and redder) as the years pass.
+
+## Exercise 2.282
+
+**US Obesity Levels by State over Many Years.** *(Using the full sequence of maps at
+stateofobesity.org.)*
+
+- **(a)** The 15–19% category is needed in **1990 — the first year the site records** —
+  where a handful of (mostly Midwestern and Appalachian) states already appear in that
+  band. After that, each new category arrives in roughly this order: the 20–24%
+  category first appears around the **late 1990s**, 25–29% in the **early 2000s**,
+  30–34% around **2005–2008**, and the 35%+ category in the **mid-2010s**.
+- **(b)** Personal answer — for almost any state the story is the same: a state in the
+  10–14% (or 15–19%) band in 1990 has climbed two to three full categories and now sits
+  in the 30%+ bands. (For readers outside the US: most European countries currently
+  have obesity rates in the 20–25% range, which is roughly where **Kansas or Colorado**
+  sat around 2010.)
+
+## Exercise 2.283
+
+**Spaghetti Plots of US Obesity Levels by State over Many Years.** *(The site's
+spaghetti plot tracks each state's obesity rate from 1990 onward.)*
+
+- **(a)** **Essentially every state**: rates at least doubled almost everywhere. Even
+  the states that were heaviest in 1990 (17–18%) roughly doubled into the mid-30s, and
+  the lighter states multiplied their rates two- to three-fold.
+- **(b)** There is far **more variability between states in 2018**: in 1990 all the
+  strands sit inside a narrow band (roughly 10–18%), while in 2018 they spread from
+  about 23% up to about 40%.
+- **(c)** In 1990 the heaviest state tops out around **17–18%** (a Midwestern/
+  Appalachian state such as **Michigan**). In 2018 the lightest strand belongs to
+  **Colorado**, at about **23%** — still above the *highest* rate of any state in 1990.
+
+## Exercise 2.284
+
+**What Do You Call a Sweetened Carbonated Beverage?** *(Katz's heat map of soda/pop/
+coke usage across the US.)*
+
+- The map's pattern: **pop** dominates the Upper Midwest; **coke** is the generic term
+  through much of the South; **soda** takes the Northeast, the Southwest, and the West
+  Coast, with southern Florida also saying soda.
+- Personal answer (US reader): specify your location and the term the map shows there —
+  for example, in upstate New York or most of California the map says **soda**, while
+  in Chicago or Ohio it says **pop**. (Non-US reader: pick any US city, name it, and
+  read the color of its county off the map.)
+
+## Exercise 2.285
+
+**The Dude Map.** *(A heat map of how common dude, bro, buddy, fella, and pal are
+across the US.)*
+
+- **(a)** **Bro** is most common through the **middle of the country** — the Midwest
+  and Great Plains.
+- **(b)** **Buddy** is most common in the **Northeast**, especially New England and the
+  mid-Atlantic. (The West Coast, by contrast, is dude country.)
+
+## Exercise 2.286
+
+**Cotton Pricing.** *(A data visualization of cotton consumption and price from
+1880, at vintagevisualizations.com.)*
+
+- **(a)** Zoom into the 1880 slice: per-capita spending on cotton goods varies
+  enormously from state to state — the tallest bar (most spending per head) and the
+  shortest (least) should be read directly off the graph, with the smallest values
+  belonging to the sparsely settled Western states.
+- **(b)** Cotton was most expensive in the **early-to-mid 1860s**: the Civil War cut
+  off supply, and the price line spikes to a level never approached in any other year
+  from 1825 to 1880.
+
+## Exercise 2.287
+
+**A Map of All Americans!** *(The Census Dot Map shows race and location for every
+person counted in the 2010 Census — over 300 million dots.)*
+
+- **(a)** The **East** half of the country is far more heavily populated: east of the
+  Mississippi the dots are nearly continuous, while the West is a sea of empty space
+  dotted with dense urban islands.
+- **(b)** Personal answer — zooming to almost any US metro area shows noticeable
+  racial/ethnic patterning: cities are dense and diverse, many metro areas display
+  sharp segregation with abrupt boundaries between predominantly one-group
+  neighborhoods and another, and rural areas tend to be more homogeneous. (For readers
+  outside the US: pick any large US city and describe the same pattern, naming the
+  city you chose.)
+
+## Exercise 2.288
+
+**Names over Time.** *(A spaghetti plot of the popularity of the top 10 baby girl
+names for each year, 1880–2014.)*
+
+- The top baby girl name in **2014** was **Emma**; in **1880** it was **Mary**. Mary's
+  strand dominated the late 1800s and then faded, while names like Emma fall out of
+  favor and later return — the plot is a story of names rising, falling, and
+  recycling.
+
+## Exercise 2.289
+
+**Petal Length and Petal Width.** *(Fisher's iris data: 150 irises of three types,
+with petal width, petal length, sepal width, and sepal length in millimeters.)*
+
+- **(a)** The scatterplot shows a **tight, completely separate cluster** of small
+  petals at the lower left, apart from a larger cloud of bigger petals — so at least
+  two different types of iris must be present.
+- **(b)** With Type included, three types appear. **Setosa** has the smallest petals
+  (the isolated cluster), and **Virginica** has the largest petals, with Versicolor in
+  between.
+
+*Data:* `data/ch02/FisherIris.csv` (n = 150), downloaded from
+<https://www.lock5stat.com/datasets3e/FisherIris.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Petal length versus petal width for 150 irises, colored by type
+fi = pd.read_csv("data/ch02/FisherIris.csv")
+fig, ax = plt.subplots(figsize=(6, 4))
+sns.scatterplot(data=fi, x="PetalWidth", y="PetalLength", hue="Type",
+                s=22, alpha=0.8, ax=ax)
+ax.set_xlabel("Petal width (mm)")
+ax.set_ylabel("Petal length (mm)")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.290
+
+**A Scatterplot Matrix.** *(Figure 2.102 shows scatterplots for every pair of
+quantitative variables, colored by Type.)*
+
+- **(a)** The **petal length vs petal width** scatterplot separates Versicolor and
+  Virginica much more clearly: their points interlock almost completely in the sepal
+  length vs sepal width panel, but form distinct (if partly overlapping) bands in the
+  petal panel.
+- **(b)** Considering only Setosa, sepal width and petal length show a **weak positive
+  association** — a slight upward drift (correlation about 0.18), far from the strong
+  positive relationships seen within the other two types.
+
+*Data:* `data/ch02/FisherIris.csv` (n = 150):
+
+```{python}
+#| echo: false
+#| fig-cap: Scatterplot matrix of the four iris measurements, colored by type
+sns.pairplot(fi, hue="Type",
+             vars=["PetalWidth", "PetalLength", "SepalWidth", "SepalLength"],
+             height=1.35, aspect=1.05, plot_kws={"s": 12})
+plt.show()
+```
+
+## Exercise 2.291
+
+**A 3-Dimensional Scatterplot.** *(Figure 2.103 plots petal length, petal width, and
+sepal length together.)*
+
+- **Sepal length is on the vertical axis.** The dots highest up are the **Virginica**
+  irises (mean sepal length about 66 mm, versus 59 mm for Versicolor and 50 mm for
+  Setosa); the Setosa dots sit lowest.
+
+*Data:* `data/ch02/FisherIris.csv` (n = 150):
+
+```{python}
+#| echo: false
+#| fig-cap: Petal length, petal width, and sepal length in a 3-dimensional scatterplot
+from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+colors3d = {"Setosa": "#4c72b0", "Versicolor": "#dd8452", "Virginica": "#55a868"}
+fig = plt.figure(figsize=(6.5, 4))
+ax = fig.add_subplot(111, projection="3d")
+for t, d in fi.groupby("Type"):
+    ax.scatter(d.PetalWidth, d.PetalLength, d.SepalLength, s=12, alpha=0.7,
+               color=colors3d[t], label=t)
+ax.set_xlabel("Petal width (mm)")
+ax.set_ylabel("Petal length (mm)")
+ax.set_zlabel("Sepal length (mm)")
+ax.legend(fontsize=8)
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.292
+
+**U.S. Age Pyramid Becomes a Rectangle.** *(Pew's animated age-sex histograms of the
+US population, 1950–2060 projected.)*
+
+- **(a)** In 1950 the age distribution has a **very wide base**: many children, with
+  counts shrinking at every older age (the baby-boom cohort forms a bulge at the
+  bottom).
+- **(b)** Drawn on a regular number line with 0 (age) on the left, the 1950
+  distribution is **right-skewed** — a tall mass of young ages with a long tail
+  stretching out toward the old ages.
+- **(c)** By 2060 the projected distribution is nearly a **rectangle** (close to a
+  uniform distribution): births, deaths, and longevity flatten the pyramid, with almost
+  as many people in each age band up through the 60s and 70s — a much older population
+  overall.
+- **(d)** In 2060 there are projected to be more **females** than males at 85+, because
+  women live longer.
+
+## Exercise 2.293
+
+**Changing Face of America.** *(Pew's 100%-scaled stacked visualization of the US
+population by racial/ethnic group, 1960–2060 projected.)*
+
+- **(a)** The **White (non-Hispanic)** share is decreasing the most — from the large
+  majority of the 1960s population toward roughly half and below.
+- **(b)** The **Hispanic/Latino** share is increasing the most, roughly quadrupling its
+  percentage over the period shown.
+- **(c)** The **Black** share stays the most constant, holding at roughly 12–13% of the
+  population throughout.
+
+## Exercise 2.294
+
+**The Wind Map.** *(hint.fm/wind draws live wind patterns across the US.)*
+
+- The two variables recorded at each weather station are **wind speed** (how hard the
+  wind blows) and **wind direction** (which way it blows) — together they generate the
+  flowing strands of the map.
+
+## Exercise 2.295
+
+**Are Carbon or Steel Bikes Faster?** *(Dr. Groves flipped a coin each day for 56
+commutes between a 20.9 lb carbon bike and a 29.75 lb steel bike; data in BikeCommute.)*
+
+- **(a)** The most obvious difference in Figure 2.104 is that the **distances were not
+  the same** for the two bikes: carbon-bike commutes cluster around 27.3–27.5 miles,
+  while steel-bike commutes spread lower (about 25.9–27.4; means 27.37 vs 26.98 miles).
+- **(b)** Average speed is time divided by distance. The carbon bike's higher average
+  speed (15.19 vs 15.04 mph) is exactly what its longer distances produce in total
+  time: more miles at a slightly faster pace still means more minutes (108.3 vs
+  107.8 min on average). The two summaries disagree only because the distances differ.
+- **(c)** The confounding variable is the **commute distance** (which routes, hence
+  which distances, happened to be ridden on each bike) — it is associated with which
+  bike was used and directly determines the commute time.
+- **(d)** Compare the bikes over the **same distance** — and since the carbon bike is
+  genuinely faster per mile, ride the carbon bike (on the shortest sensible route) to
+  minimize commute time.
+
+*Data:* `data/ch02/BikeCommute.csv` (n = 56), downloaded from
+<https://www.lock5stat.com/datasets3e/BikeCommute.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Commute time versus distance, by type of bike
+bc = pd.read_csv("data/ch02/BikeCommute.csv")
+bc = bc.loc[:, ~bc.columns.str.startswith("Unnamed")]
+fig, ax = plt.subplots(figsize=(6.5, 4))
+sns.scatterplot(data=bc, x="Distance", y="Minutes", hue="Bike",
+                palette={"Steel": "#c44e52", "Carbon": "#4c72b0"},
+                s=28, alpha=0.8, ax=ax)
+ax.set_xlabel("Commute distance (miles)")
+ax.set_ylabel("Commute time (minutes)")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.296
+
+**Political Polarization.** *(Pew's animated smoothed histograms of political values,
+1994–2014, by party.)*
+
+- **(a)** The median Democrat moved steadily **to the left (more liberal)** over
+  1994–2014.
+- **(b)** The median Republican moved steadily **to the right (more conservative)**.
+- **(c)** There is much more polarization — far less overlap between the two
+  distributions — in **2014**.
+- **(d)** The two medians begin moving rapidly away from each other around **2004**
+  (the mid-2000s); before that the drift is gradual.
+- **(e)** In 2014 the **politically active** third of the public is **more** polarized
+  than the general population — their two distributions overlap even less.
+- **(f)** Opinion — for most people the animation teaches more, faster: the growing
+  gap between the two humps is visible at a glance in a way paragraphs of numbers are
+  not, though the text supplies the context and caveats the picture leaves out.
+
+## Exercise 2.297
+
+**Regional Support for Same-Sex Marriage.** *(Pew's time-series visualization of
+support by region, 2003–2014.)*
+
+- **(a)** In 2014 the **Northeast** had the highest support.
+- **(b)** In 2014 the **South** had the lowest support.
+- **(c)** The **South** shows the smallest increase in support; the largest increase
+  belongs to one of the other regions (the lines climb in near-parallel, by roughly
+  10–15 points each, so this is a close call — read the steepest strand off the chart).
+- **(d)** Two other ways to display these data: a **single time-series plot with one
+  line per region on common axes**, or a **slopegraph** connecting each region's 2003
+  and 2014 values. (Side-by-side segmented bar charts by region, or a heat map with
+  regions as rows and years as columns, would also work.)
+
+## Exercise 2.298
+
+**Does Buying Organic Food Improve Your Health? Or Is It Income?** *(NHANES survey
+data: people who bought organic were more likely to report very good or excellent
+health.)*
+
+- **(a)** People who bought organic food have **higher incomes**: in the data, the
+  share buying organic climbs from about 26% in the lowest income band to about 56% in
+  the highest (correlation between buying organic and income about 0.19), and the
+  organic-buyers' income boxplot in Figure 2.105 sits well above the non-buyers'.
+- **(b)** Health status also **rises with income**: the proportion reporting very good
+  or excellent health increases steadily from about 31% in the lowest income category
+  to about 62% in the highest, with point size showing how many people each category
+  contains.
+- **(c)** Income is associated with the explanatory variable (buying organic — part
+  a) **and** influences the response (health status — part b). That is exactly the
+  definition of a **confounding variable** for the organic–health association.
+- **(d) No.** This is an observational survey — nobody was assigned to buy organic —
+  so even with income identified, confounding (in whole or part) cannot be ruled out
+  and a causal conclusion is not warranted.
+
+*Data:* `data/ch01/NHANES.csv` (NHANES 2009–2010 subset, n = 4716), downloaded from
+<https://www.lock5stat.com/datasets3e/NHANES.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Monthly household income by whether the respondent bought organic food
+nh = pd.read_csv("data/ch01/NHANES.csv")
+fig, ax = plt.subplots(figsize=(5.5, 3.5))
+sns.boxplot(data=nh, x="Organic", y="Income", ax=ax, color="#4c72b0", width=0.45)
+ax.set_xlabel("Bought organic food")
+ax.set_ylabel("Monthly income (USD)")
+plt.tight_layout()
+plt.show()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Proportion reporting very good or excellent health by monthly income
+nh2 = nh.assign(Band=(nh.Income // 1000) * 1000 + 500)
+g = nh2[nh2.Band < 10500].groupby("Band").agg(
+    n=("HealthBinary", "size"),
+    p=("HealthBinary", lambda s: (s == "Very good / Excellent").mean()))
+fig, ax = plt.subplots(figsize=(6.5, 3.5))
+ax.plot(g.index, g.p, color="#4c72b0", lw=1, alpha=0.7)
+ax.scatter(g.index, g.p, s=g.n / 3, color="#4c72b0", alpha=0.65)
+ax.set_ylim(0.2, 0.7)
+ax.set_xlabel("Monthly income (USD, band midpoint)")
+ax.set_ylabel("Proportion with very good or excellent health")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.299
+
+**Organic and Health: Breaking it Down by Income.** *(Figure 2.107 compares organic
+buyers and non-buyers on health within each income group.)*
+
+- **(a)** Yes, generally. Within most income groups the organic buyers still report
+  better health — e.g., in the lowest income band about 43% of organic buyers report
+  very good or excellent health vs about 27% of non-buyers, and in the highest band
+  about 69% vs 53%. The within-group differences are smaller and noisier than the
+  overall gap (one middle band even flips), but the organic advantage does not vanish.
+- **(b) No — not conclusively.** Breaking the data down by income removes much of
+  income's confounding effect, but income is only *one* of many possible confounders
+  (health consciousness, education, access to care, ...). The study is still
+  observational, the health measure is self-reported, and the small within-group
+  samples are noisy — so a causal conclusion is still not justified.
+
+```{python}
+#| echo: false
+#| fig-cap: Proportion with very good or excellent health by income group, broken down by organic purchase
+g2 = nh2[nh2.Band < 10500].groupby(["Organic", "Band"], observed=True).agg(
+    n=("HealthBinary", "size"),
+    p=("HealthBinary", lambda s: (s == "Very good / Excellent").mean()))
+fig, ax = plt.subplots(figsize=(6.5, 3.5))
+for lbl, col in [("Yes", "#4c72b0"), ("No", "#c44e52")]:
+    d = g2.xs(lbl, level="Organic")
+    ax.plot(d.index, d.p, color=col, lw=1.2, alpha=0.8)
+    ax.scatter(d.index, d.p, s=d.n / 2.5, color=col, alpha=0.7,
+               label="Bought organic" if lbl == "Yes" else "Did not buy organic")
+ax.set_ylim(0.15, 0.75)
+ax.set_xlabel("Monthly income (USD, band midpoint)")
+ax.set_ylabel("Proportion with very good or excellent health")
+ax.legend(fontsize=8, loc="upper left")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.300
+
+**Kidney Stone Treatment.** *(A study compared open surgery and percutaneous
+nephrolithotomy for kidney stones, with success = stones eliminated or under 2 mm
+after three months. Figure 2.108 shows success and failure counts, overall and broken
+down by stone size.)*
+
+- **(a)** Considering all stones, **percutaneous nephrolithotomy** is more successful:
+  289/350 = **83%** vs 273/350 = **78%** for open surgery.
+- **(b)** For **small stones, open surgery** wins: 81/87 = **93%** vs 234/270 =
+  **87%**.
+- **(c)** For **large stones, open surgery** also wins: 192/263 = **73%** vs 55/80 =
+  **69%**.
+- **(d)** **Small stones** produce higher success rates under both treatments.
+- **(e)** **Percutaneous nephrolithotomy** was more commonly used for small stones
+  (270 of its 350 cases) — doctors preferred the less invasive procedure when stones
+  were small.
+- **(f)** **Open surgery** was more commonly used for large stones (263 of its 350
+  cases).
+- **(g) Simpson's Paradox.** Stone size is associated with both the treatment chosen
+  and the success rate: open surgery was mostly applied to *large* stones (hard cases,
+  lower success for anyone) while percutaneous nephrolithotomy was mostly applied to
+  *small* stones (easy cases). Aggregating over stone size, the easy-case treatment
+  piles up successes and looks better overall — even though open surgery is better
+  within *each* stone-size group.
+- **(h)** Almost certainly **not** a randomized experiment. Treatment was tied
+  systematically to stone size (large stones got open surgery), which randomization
+  would prevent; this is an observational comparison of treatments as doctors chose
+  them.
+
+*Data (counts read from Figure 2.108):*
+
+```{python}
+#| echo: false
+ks = pd.DataFrame({
+    "Stones": ["All", "All", "Small", "Small", "Large", "Large"],
+    "Treatment": ["Open surgery", "Percutaneous", "Open surgery",
+                  "Percutaneous", "Open surgery", "Percutaneous"],
+    "Success": [273, 289, 81, 234, 192, 55],
+    "Failure": [77, 61, 6, 36, 71, 25],
+})
+ks["SuccessRate"] = (ks.Success / (ks.Success + ks.Failure)).round(3)
+ks
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Kidney stone success rates by treatment and stone size
+ks["Stones"] = pd.Categorical(ks["Stones"], categories=["All", "Small", "Large"],
+                              ordered=True)
+fig, ax = plt.subplots(figsize=(6, 3.5))
+sns.barplot(data=ks, x="Stones", y="SuccessRate", hue="Treatment", ax=ax,
+            hue_order=["Open surgery", "Percutaneous"],
+            palette=["#4c72b0", "#c44e52"])
+ax.set_ylim(0, 1)
+ax.set_xlabel("Stone size")
+ax.set_ylabel("Success rate")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.301
+
+**Draw a Graph for Income vs College!** *(The New York Times "You Draw It" exercise
+on family income and children's college attendance.)*
+
+- The reality: a **steep positive curve** — children's college attendance climbs
+  sharply with family income, from under about 30% in the poorest families to around
+  80% or more in the richest, with the rise steepest at the bottom of the income
+  scale. Most people draw a line that is far too shallow at the low end, so the site's
+  title usually reads something like **"You did better than X% of the public"** (or
+  worse!) — reproduce whatever phrase your own attempt earned.
+
+## Exercise 2.302
+
+**What's Really Warming the World?** *(Bloomberg/NASA's animated spaghetti plot of
+observed temperature against each possible driver, natural and human.)*
+
+- **Human factors — above all greenhouse gases.** The animation shows that no natural
+  forcing (solar activity, volcanoes, orbital cycles) can reproduce the observed
+  temperature rise of the last two centuries on its own; only when the human factors
+  (greenhouse gas emissions, aerosols, land use) are added does the simulated curve
+  lock onto the observed warming, with greenhouse gases doing most of the work.
+
+## Exercise 2.303
+
+**The Racial Divide.** *(A heat map of the census tracts of St. Louis colored by racial
+composition, with spacing proportional to the change between neighboring tracts.)*
+
+- The map shows **stark segregation**: large contiguous blocks of tracts that are
+  almost entirely white (roughly the southwest) and almost entirely Black (the north
+  and northeast), separated by abrupt transitions rather than gradual blends. The
+  widest gaps between neighboring tracts — the places where the racial composition
+  changes most sharply — trace out the dividing lines between these blocks, making
+  segregation visible as geometry: diversity is squeezed into thin bands between two
+  highly segregated halves.
+
+## Exercise 2.304
+
+**Cloud Cover in San Francisco.** *(Two visualizations of the same 30 years of cloud
+cover by day of year and time of day.)*
+
+- **(a) Mornings** typically have more cloud cover: the early-morning strands sit
+  highest (the marine layer), and clouds burn off toward clearer evenings and
+  afternoons.
+- **(b) Summer** shows the most variability in cloud cover throughout the day — the
+  strands fan apart most in June–August, with mornings around 45–50% but afternoons
+  down near 15–20%, while in winter all hours bunch together.
+- **(c)** Opinion — the spaghetti plot (a) makes hour-to-hour comparison easiest,
+  while the circular plot (b) is more compact and better at showing the daily rhythm;
+  which is easier depends on the question being asked.
+
+## Exercise 2.305
+
+**Cloud Cover in San Francisco – Online.** *(The interactive versions of the same
+plots.)*
+
+- **(a)** In August, cloud cover in San Francisco peaks around **8–10 am** (the
+  morning marine layer), then falls through the afternoon.
+- **(b)** Chicago tends to be least windy in **summer** (July–August), when average
+  wind speeds dip lowest.
+
+## Exercise 2.306
+
+**Data Stories: The Corporate Winner.** *(Daniel Gallagher's NASA video Martian
+Atmosphere Loss Explained.)*
+
+- Main message: **Mars lost its atmosphere to space.** After Mars lost its protective
+  global magnetic field, the solar wind stripped away its atmosphere over billions of
+  years — which is how a planet that once had thicker air and liquid water became the
+  cold, dry place it is today.
+
+## Exercise 2.307
+
+**Data Stories: The Professional Winner.** *(RJ Andrews' video Are Gazelles
+Endangered?)*
+
+- **(a)** The video conveys data on the world's **endangered mammals**: their remaining
+  population sizes — drawn to scale against one another and against humans — together
+  with each species' conservation status.
+- **(b)** Personal answer — for example, hovering over the **addax** (a desert
+  antelope) shows a **decreasing** wild population and a **critically endangered**
+  status. Choose any animal on the interactive site and report the name, trend, and
+  status it displays.
+
+## Exercise 2.308
+
+**Data Stories: The Student Winner.** *(Ulf Aslak Jensen's video How People Gather.)*
+
+- **(a)** The video displays data on **how people physically gather**: the movements
+  and interactions of many tracked individuals (via mobile devices), shown as dots
+  that split and merge into groups over the course of the day.
+- **(b)** Personal answer — exploring the interactive site, one repeatable finding is
+  a **daily gathering cycle**: people form large, dense groups around midday and the
+  clusters fragment and reform as the day progresses. Report whichever pattern your
+  own interaction surfaces.
+
+## Exercise 2.309
+
+**Data Stories: The Finalists.**
+
+- Personal answer — pick any finalist video at the link. A model response: *(a)* give
+  the link and title of the video you chose; *(b)* the data displayed (for example,
+  migration flows, city noise levels, or election results over time — whatever your
+  video shows); *(c)* what you learned — the trend, pattern, or surprise the
+  visualization revealed that a table of the same data would have hidden.
+
+## Exercise 2.310
+
+**Faculty Salary, Completion Rate, and Control.** *(CollegeScores4yr: monthly faculty
+salary and six-year graduation rate for four-year colleges, split Public vs Private,
+omitting for-profit schools.)*
+
+- **(a)** **Public** schools have the higher mean monthly faculty salary: about
+  \$8520 vs about \$7091 for private schools.
+- **(b)** **Private** schools have the higher mean completion rate: about 55.7% vs
+  50.2%.
+- **(c)** Based only on those means, you would expect completion rates to **decrease**
+  as faculty salaries increase — the group with the higher salary (public) has the
+  lower completion rate.
+- **(d)** The **blue circles and solid blue regression line represent Private**
+  colleges (they cluster at the lower salaries), with public colleges in the dashed
+  red line.
+- **(e) No — the opposite.** Within *both* types of school the association is strongly
+  **positive** (correlation about 0.65 for each), directly contradicting the negative
+  expectation built from the group means. Comparing means across groups and comparing
+  trends within groups lead to opposite conclusions — the same aggregation reversal
+  that underlies Simpson's Paradox.
+
+*Data:* `data/ch02/CollegeScores4yr.csv` (n = 1842 four-year colleges; 1243 private
+and 599 public), downloaded from
+<https://www.lock5stat.com/datasets3e/CollegeScores4yr.csv>:
+
+```{python}
+#| echo: false
+cs = pd.read_csv("data/ch02/CollegeScores4yr.csv")
+cs = cs[cs.Control.isin(["Public", "Private"])]
+cs.groupby("Control")[["FacSalary", "CompRate"]].mean().round(1)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Completion rate versus monthly faculty salary, private and public four-year colleges
+fig, ax = plt.subplots(figsize=(6.5, 4))
+sns.scatterplot(data=cs, x="FacSalary", y="CompRate", hue="Control", s=12,
+                alpha=0.45, palette={"Private": "#4c72b0", "Public": "#c44e52"},
+                ax=ax)
+for ctl, col in [("Private", "#4c72b0"), ("Public", "#c44e52")]:
+    sns.regplot(data=cs[cs.Control == ctl], x="FacSalary", y="CompRate",
+                scatter=False, ax=ax, color=col, line_kws={"lw": 2, "ls": "--"})
+ax.set_xlabel("Monthly faculty salary (USD)")
+ax.set_ylabel("Completion rate (percent)")
+ax.legend(title="Control", fontsize=8)
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.311
+
+**Google Public Data: Augmented Scatterplot.**
+
+- Personal exploration — a model answer using the default augmented scatterplot:
+  **(a)** include your screenshot; **(b)** x-axis: fertility rate (babies per woman);
+  y-axis: life expectancy; color: world region; size: population; **(c)** the points
+  trace a clear **negative** curve — countries with higher fertility have lower life
+  expectancy, with big, poor countries at the bottom right and rich small countries at
+  the top left; **(d)** hovering a point names the country and its values (e.g.,
+  India: about 2.4 births per woman, life expectancy about 68 years, over a billion
+  people); **(e)–(f)** pressing play shows every country drifting **up and to the
+  left** over time — fertility falls and life expectancy rises almost everywhere, with
+  some cases (e.g., China) moving much faster than others.
+
+## Exercise 2.312
+
+**Google Public Data: Geographic Plot.**
+
+- Personal exploration — a model answer: **(a)** include your screenshot; **(b)** color
+  shows a variable such as income or life expectancy per country, and point size shows
+  population; **(c)** the map reveals strong regional patterns (e.g., high incomes
+  across North America, Western Europe, and Japan; lower values across much of Africa,
+  with Africa's larger bubbles highlighting its population); **(d)** hovering gives the
+  country name and its value(s); **(e)–(f)** pressing play shows the colors improving
+  over time for most countries, with a few cases stagnating or reversing.
+
+## Exercise 2.313
+
+**Google Public Data: Spaghetti Plot.**
+
+- Personal exploration — a model answer: **(a)** include your screenshot; **(b)** the
+  plot shows a measure such as GDP per capita or CO2 emissions over many years, one
+  strand per country; **(c)** the overall trend is **upward** for most countries, with
+  the strands fanning out as differences between countries widen; **(d)** pick one
+  case (e.g., **China**) and describe its trend — a steep climb that accelerates in
+  recent decades and lifts it past many other strands.
+
+## Exercise 2.314
+
+**Find your own!**
+
+- Personal answer — any visualization you find online works. A model response:
+  *(a)* screenshot the graphic; *(b)* state the data (e.g., a NYT graphic of gun
+  deaths by age and race over time); *(c)* tell its story (e.g., the age distribution
+  of gun deaths shifts dramatically between white and Black Americans — a pattern
+  nearly invisible in the annual totals).
+
+## Exercise 2.315
+
+**Monthly City Temperatures.** *(CityTemps: average monthly temperature for Moscow,
+Melbourne, and San Francisco — the data file covers 2017–2018.)*
+
+- **(a)** **Moscow vs San Francisco:** Moscow swings enormously through the year —
+  from about −9 °C in winter to about +20 °C in summer — while San Francisco stays
+  mild and flat (roughly 10–21 °C all year). Moscow is far colder in winter and only
+  a little warmer in summer; its seasonal range is about four times as wide.
+- **(b)** **Melbourne vs San Francisco:** the two cities have similar annual averages
+  (about 15 °C) but **opposite seasons** — Melbourne (Southern Hemisphere) is warmest
+  in December–February, exactly when San Francisco is coolest, and coolest in
+  June–August when San Francisco peaks. The two curves are nearly mirror images.
+
+*Data:* `data/ch02/CityTemps.csv` (24 monthly observations, 2017–2018), downloaded
+from <https://www.lock5stat.com/datasets3e/CityTemps.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Average monthly temperature for Moscow, Melbourne, and San Francisco
+ct = pd.read_csv("data/ch02/CityTemps.csv")
+ct_long = ct.melt(id_vars=["Year", "Month"], var_name="City", value_name="Temp")
+fig, ax = plt.subplots(figsize=(7, 4))
+sns.lineplot(data=ct_long, x="Month", y="Temp", hue="City", style="Year",
+             markers=True, dashes=True, ax=ax)
+ax.set_xticks(range(1, 13))
+ax.set_xlabel("Month")
+ax.set_ylabel("Average temperature (C)")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.316
+
+**Create Your Own: Augmented Scatterplot.**
+
+- Using **NBAPlayers2019** (cases: 193 NBA players; quantitative: Assists and Points;
+  categorical: Pos), color each dot by the player's position:
+
+*Data:* `data/ch02/NBAPlayers2019.csv` (n = 193), downloaded from
+<https://www.lock5stat.com/datasets3e/NBAPlayers2019.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Points versus assists for NBA players in 2019, colored by position
+nba = pd.read_csv("data/ch02/NBAPlayers2019.csv")
+fig, ax = plt.subplots(figsize=(6.5, 4))
+sns.scatterplot(data=nba, x="Assists", y="Points", hue="Pos", s=18,
+                alpha=0.75, palette="tab10", ax=ax)
+ax.set_xlabel("Assists per game")
+ax.set_ylabel("Points per game")
+plt.tight_layout()
+plt.show()
+```
+
+- Comments: scoring rises with assists (a positive association), but the positions
+  occupy different regions — guards (PG, SG) fill the high-assist end of the cloud,
+  while centers (C) cluster at few assists, and the highest scorers at low assist
+  totals are the wing/big-men who score without distributing the ball.
+
+## Exercise 2.317
+
+**Create Your Own: Bubble Plot.**
+
+- Using **NutritionStudy** (cases: 315 adults; quantitative: Calories, Fat, and Fiber,
+  with bubble size showing fiber grams):
+
+*Data:* `data/ch02/NutritionStudy.csv` (n = 315), downloaded from
+<https://www.lock5stat.com/datasets3e/NutritionStudy.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Daily fat grams versus calories, with bubble size showing fiber intake
+ns = pd.read_csv("data/ch02/NutritionStudy.csv")
+fig, ax = plt.subplots(figsize=(6.5, 4))
+ax.scatter(ns.Calories, ns.Fat, s=ns.Fiber * 14, alpha=0.45,
+           color="#4c72b0", edgecolor="white")
+ax.set_xlabel("Calories per day")
+ax.set_ylabel("Fat (grams per day)")
+plt.tight_layout()
+plt.show()
+```
+
+- Comments: calories and fat are strongly, linearly **positively** associated
+  (correlation about 0.87). The bubbles tend to **grow** moving to the right: people
+  eating more calories in this sample also tend to eat more fiber (correlation about
+  0.47), though with plenty of scatter — some high-calorie diets are still low-fiber.
+
+## Exercise 2.318
+
+**Create Your Own: Be Creative!!**
+
+- Anything goes — the goal is a display that reveals something a standard graph would
+  hide. Ideas: annotate a scatterplot with the names of its most extreme cases; build
+  small multiples of a time series, one panel per decade; combine a map with a time
+  slider so geography changes before your eyes; or encode a third variable in both
+  color *and* size to see which encoding your eye trusts more. Describe what your
+  creation shows and why the extra structure earned its place.
+
+:::

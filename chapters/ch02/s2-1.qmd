@@ -1,0 +1,1147 @@
+---
+execute-dir: project
+title: "Chapter 2 · Section 2.1"
+subtitle: "Categorical Variables — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 2.1 of Lock⁵ turns to **categorical variables**. The raw information in a
+categorical variable is summarized with a **frequency table** (counts), converted
+to shares with a **relative frequency table**, and visualized with a **bar chart**.
+The workhorse statistic is a **proportion** — the fraction of cases falling in a
+category of interest — written $\hat p$ for a sample and $p$ for a population.
+Two categorical variables are summarized together in a **two-way table**, from
+which we read **marginal** percentages (computed out of everyone) and
+**conditional** percentages (computed within a row or column), and we compare
+groups with a **difference in proportions**. The exercises below are from
+*Statistics: Unlocking the Power of Data* (Lock⁵, 3rd ed., pp. 61–71):
+Skill Builders 2.1–2.12 practice finding proportions with correct notation,
+building relative frequency tables, and reading two-way tables; 2.13–2.31 apply
+the ideas to real studies; 2.32–2.35 use the ACHA–NCHA college survey;
+2.36–2.38 analyze a smoking-cessation experiment; 2.39–2.53 investigate
+association in two-way tables, with several technology exercises on Lock5 data
+files. Tabs based on Lock5 data files include a small executable EDA.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+sns.set_theme(style="whitegrid")
+```
+
+::: {.panel-tabset}
+
+## Exercise 2.1
+
+The survey students consisted of 169 females and 193 males. Find $\hat p$, the
+proportion who are female.
+
+- $\hat p = \dfrac{169}{169+193} = \dfrac{169}{362} \approx 0.467$. About 46.7%
+  of the survey students are female.
+
+## Exercise 2.2
+
+The survey included 43 students who smoke and 319 who don't. Find $\hat p$, the
+proportion who smoke.
+
+- $\hat p = \dfrac{43}{43+319} = \dfrac{43}{362} \approx 0.119$. About 11.9% of
+  the survey students smoke.
+
+## Exercise 2.3
+
+Of the students who identified their class year, 94 were first years, 195 were
+sophomores, 35 were juniors, and 36 were seniors. Find $\hat p$, the proportion
+who are upperclass students (juniors or seniors).
+
+- $\hat p = \dfrac{35+36}{94+195+35+36} = \dfrac{71}{360} \approx 0.197$. About
+  19.7% are upperclass students.
+
+## Exercise 2.4
+
+The math SAT score is higher than the verbal SAT score for 205 of the 355
+students who answered the questions about SAT scores. Find $\hat p$, the
+proportion for whom the math SAT score is higher.
+
+- $\hat p = \dfrac{205}{355} \approx 0.577$. About 57.7% of the respondents did
+  better on the math SAT than on the verbal SAT.
+
+## Exercise 2.5
+
+In the 2010 US Census, we see that 37,342,870 people, or 12.4% of all residents,
+are foreign-born. Give the relevant proportion using correct notation.
+
+- $p = 0.124$ — a **population proportion**, since the Census includes (essentially)
+  all US residents. It is the proportion of all US residents who are foreign-born.
+
+## Exercise 2.6
+
+A recent headline states that 45% think children of illegal immigrants should be
+able to attend public school. The report gives the results of a survey of 1000
+randomly selected likely voters in the US. Give the relevant proportion using
+correct notation.
+
+- $\hat p = 0.45$ — a **sample proportion**, based on a random sample of 1000
+  likely voters. It is the proportion of the sampled voters who think children
+  of illegal immigrants should be able to attend public school.
+
+## Exercise 2.7
+
+A survey conducted of 1060 randomly selected US teens aged 13 to 17 found that
+605 of them say they have made a new friend online. Give the relevant proportion
+using correct notation.
+
+- $\hat p = \dfrac{605}{1060} \approx 0.571$ — a sample proportion: the proportion
+  of the sampled US teens who say they have made a new friend online.
+
+## Exercise 2.8
+
+Of all 2,220,087 members of the high school class of 2019 who took the SAT,
+554,665 reported their race as Hispanic/Latino. Give the relevant proportion
+using correct notation.
+
+- $p = \dfrac{554{,}665}{2{,}220{,}087} \approx 0.250$ — a **population
+  proportion**, since the data include every member of the class who took the
+  SAT: the proportion of all SAT takers in the class of 2019 who reported their
+  race as Hispanic/Latino.
+
+## Exercise 2.9
+
+Of the 362 students who answered the question about what award they would
+prefer, 31 preferred an Academy Award, 149 preferred a Nobel Prize, and 182
+preferred an Olympic gold medal. Construct a relative frequency table of the
+data, rounded to three decimal places.
+
+```{python}
+#| echo: false
+award = pd.DataFrame(
+    {"Frequency": [31, 149, 182]},
+    index=["Academy Award", "Nobel Prize", "Olympic gold medal"])
+award["Rel. Freq."] = (award["Frequency"] / award["Frequency"].sum()).round(3)
+award
+```
+
+- The relative frequencies are 0.086 (Academy Award), 0.412 (Nobel Prize), and
+  0.503 (Olympic gold medal). They sum to 1.001 rather than 1 only because of
+  rounding.
+
+## Exercise 2.10
+
+Of the 361 students who answered the question about the number of piercings,
+188 had no piercings, 82 had one or two piercings, and the rest had more than
+two. Construct a relative frequency table, rounded to three decimal places.
+
+```{python}
+#| echo: false
+piercings = pd.DataFrame(
+    {"Frequency": [188, 82, 361 - 188 - 82]},
+    index=["No piercings", "One or two", "More than two"])
+piercings["Rel. Freq."] = (piercings["Frequency"] / 361).round(3)
+piercings
+```
+
+- The relative frequencies are 0.521 (no piercings), 0.227 (one or two), and
+  0.252 (more than two), which sum to 1.
+
+## Exercise 2.11
+
+A two-way table for two groups and two outcomes:
+
+```{python}
+#| echo: false
+tw = pd.DataFrame({"Outcome A": [20, 60], "Outcome B": [80, 40]},
+                  index=["Group 1", "Group 2"])
+tw["Total"] = tw.sum(axis=1)
+tw.loc["Total"] = tw.sum()
+tw
+```
+
+- **(a)** Proportion of all cases with Outcome A: $\dfrac{80}{200} = 0.40$.
+- **(b)** Proportion of all cases in Group 1: $\dfrac{100}{200} = 0.50$.
+- **(c)** Proportion of cases in Group 1 with Outcome B:
+  $\dfrac{80}{100} = 0.80$.
+- **(d)** Proportion of cases with Outcome A that were in Group 2:
+  $\dfrac{60}{80} = 0.75$.
+
+## Exercise 2.12
+
+A two-way table for two groups and two outcomes:
+
+```{python}
+#| echo: false
+tw = pd.DataFrame({"Outcome A": [40, 30], "Outcome B": [10, 20]},
+                  index=["Group 1", "Group 2"])
+tw["Total"] = tw.sum(axis=1)
+tw.loc["Total"] = tw.sum()
+tw
+```
+
+- **(a)** Proportion of all cases with Outcome A: $\dfrac{70}{100} = 0.70$.
+- **(b)** Proportion of all cases in Group 1: $\dfrac{50}{100} = 0.50$.
+- **(c)** Proportion of cases in Group 1 with Outcome B: $\dfrac{10}{50} = 0.20$.
+- **(d)** Proportion of cases with Outcome A that were in Group 2:
+  $\dfrac{30}{70} \approx 0.429$.
+
+## Exercise 2.13
+
+What Proportion of Canadian Adults Graduate High School? The 2016 Canadian
+Census shows that 81.7% of Canadian adults have a secondary or equivalent
+degree. Give the correct notation for this value and write the value as a
+proportion without a percent sign.
+
+- $p = 0.817$ — a population proportion (the Census covers all Canadian adults):
+  the proportion of all Canadian adults with a secondary or equivalent degree.
+
+## Exercise 2.14
+
+What Proportion of Canadian Adults Are Married? The 2016 Canadian Census shows
+that 45.7% of Canadian adults are married. Give the correct notation for this
+value and write the value as a proportion without a percent sign.
+
+- $p = 0.457$ — a population proportion: the proportion of all Canadian adults
+  who are married.
+
+## Exercise 2.15
+
+Home Field Advantage in Soccer: across 43 professional soccer leagues in 24
+different countries, covering more than 66,000 games, the home field advantage
+(percent of games won by the home team) is 62.4%. Is this a population or a
+sample? What are the cases and approximately how many are there? What is the
+variable and is it categorical or quantitative? What is the relevant statistic,
+including correct notation?
+
+- **Population** — the dataset covers *all* games played in those 43 leagues,
+  not a sample of them.
+- **Cases:** individual games — more than 66,000 of them.
+- **Variable:** whether the home team won the game — **categorical** (win/loss,
+  ignoring ties or treating each game's result as the outcome of interest).
+- **Relevant statistic (parameter):** the population proportion of games won by
+  the home team, $p = 0.624$.
+
+## Exercise 2.16
+
+What Proportion of College Students Have a Paying Job? The 2018 Your First
+College Year survey included 5204 first-year, full-time college students:
+1436 work on campus, 1119 work off campus, and 2649 do not work.
+
+```{python}
+#| echo: false
+job = pd.DataFrame(
+    {"Frequency": [1436, 1119, 2649]},
+    index=["Works on campus", "Works off campus", "Does not work"])
+job["Rel. Freq."] = (job["Frequency"] / 5204).round(3)
+job
+```
+
+- **(a)** Proportion who do not work at a paying job:
+  $\dfrac{2649}{5204} \approx 0.509$.
+- **(b)** Proportion who do work at a paying job (on or off campus):
+  $\dfrac{1436+1119}{5204} = \dfrac{2555}{5204} \approx 0.491$.
+- **(c)** The relative frequency table above: 0.276 on campus, 0.215 off
+  campus, 0.509 not working.
+
+## Exercise 2.17
+
+Which Food Delivery App Is Most Popular? Among US smartphone users who regularly
+use a food delivery app, the proportions using each app most recently are:
+
+```{python}
+#| echo: false
+apps = pd.DataFrame(
+    {"Proportion": [0.276, 0.267, 0.252, 0.121, np.nan]},
+    index=["DoorDash", "Grubhub", "UberEats", "Postmates", "Other"])
+apps.loc["Other", "Proportion"] = 1 - apps["Proportion"].sum()
+apps.round(3)
+```
+
+- **(a)** A **relative frequency table** — the entries are proportions of the
+  sample of food delivery app users, not counts and not a two-way table.
+- **(b)** The missing value: $1 - (0.276+0.267+0.252+0.121) = 0.084$. About
+  8.4% of users in the sample selected some other app.
+
+## Exercise 2.18
+
+Airborne Antibiotics: scientists analyzed 20 samples of dust particles from
+animal farms; tylosin, an antibiotic used in animal feed, showed up in 16 of
+the samples.
+
+- **(a) Variable:** whether the antibiotic tylosin is present in the dust sample
+  (**categorical**). **Cases:** the 20 dust samples.
+- **(b)** Frequency table below.
+- **(c)** Bar chart below.
+- **(d)** Relative frequency table: $\dfrac{16}{20} = 0.80$ of the samples
+  contain tylosin, $\dfrac{4}{20} = 0.20$ do not.
+
+```{python}
+#| echo: false
+tylo = pd.DataFrame({"Frequency": [16, 4], "Rel. Freq.": [0.80, 0.20]},
+                    index=["Tylosin present", "Not present"])
+tylo.index.name = "Dust sample"
+tylo
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Presence of the antibiotic tylosin in 20 dust samples from animal farms
+fig, ax = plt.subplots(figsize=(4.5, 3))
+tylo["Frequency"].plot.bar(ax=ax, rot=0, color="#4c72b0", width=0.5)
+ax.set_xlabel("")
+ax.set_ylabel("Number of samples")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.19
+
+Rock-Paper-Scissors: a study observed 119 people playing the game. Their
+choices are shown below.
+
+```{python}
+#| echo: false
+rps = pd.DataFrame(
+    {"Frequency": [66, 39, 14]},
+    index=["Rock", "Paper", "Scissors"])
+rps["Rel. Freq."] = (rps["Frequency"] / 119).round(3)
+rps
+```
+
+- **(a) Sample:** the 119 people observed playing the game. **Population:**
+  all people who play Rock-Paper-Scissors (broadly, people in situations where
+  the game is used). **Variable:** which option the player throws — rock, paper,
+  or scissors (**categorical**).
+- **(b)** Relative frequency table above: 0.555 rock, 0.328 paper, 0.118
+  scissors.
+- **(c)** Play **paper**. Opponents throw rock far more often than anything
+  else (about 56% of the time), so paper — which beats rock — wins most often.
+- **(d)** Play **scissors**. Players tend to repeat the option they just threw,
+  so an opponent who just played paper is likely to play paper again — and
+  scissors beats paper.
+
+## Exercise 2.20
+
+Sports-Related Concussions in Kids: all sports-related concussions reported to
+an emergency room for children ages 5 to 18 in the US over one year, by activity:
+
+```{python}
+#| echo: false
+conc = pd.DataFrame(
+    {"Frequency": [23405, 20293, 11507, 10414, 7667, 7433,
+                   5220, 4408, 4111, 3846, 2648]},
+    index=["Bicycles", "Football", "Basketball", "Playground", "Soccer",
+           "Baseball", "All-Terrain Vehicle", "Skateboarding", "Hockey",
+           "Swimming", "Horseback Riding"])
+conc["Proportion"] = (conc["Frequency"] / conc["Frequency"].sum()).round(3)
+conc
+```
+
+- **(a)** These results come from a **population**: every concussion reported
+  to emergency rooms for this age group over the year was included.
+- **(b)** Proportion from football:
+  $\dfrac{20{,}293}{100{,}952} \approx 0.201$ (about 20.1%).
+- **(c)** Proportion from bicycles:
+  $\dfrac{23{,}405}{100{,}952} \approx 0.232$ (about 23.2%).
+- **(d) No.** These proportions only tell us how the *concussions* are
+  distributed across activities — not how dangerous each activity is. Many more
+  children ride bicycles than play football, so per hour of participation,
+  football could still be riskier. Without knowing how many children take part
+  in each activity (the exposure), we cannot compare the danger of the
+  activities themselves.
+
+```{python}
+#| echo: false
+#| fig-cap: Sports-related concussions in children ages 5 to 18 by activity
+fig, ax = plt.subplots(figsize=(6.5, 4))
+conc["Frequency"].sort_values().plot.barh(ax=ax, color="#4c72b0")
+ax.set_xlabel("Number of concussions")
+ax.set_ylabel("")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.21
+
+Does Belief in One True Love Differ by Education Level? Two-way table of
+agreement with the statement that there is only one true love, by education
+level (HS = high school or less, Some = some college, College = college
+graduate or higher):
+
+```{python}
+#| echo: false
+love = pd.DataFrame(
+    {"HS": [363, 557, 20], "Some": [176, 466, 26], "College": [196, 789, 32]},
+    index=["Agree", "Disagree", "Don't know"])
+love["Total"] = love.sum(axis=1)
+love.loc["Total"] = love.sum()
+love
+```
+
+- **(a)** The table above includes row and column totals (2625 participants).
+- **(b)** Percent agreeing, within each education level: HS
+  $\dfrac{363}{940} \approx 38.6\%$; Some college
+  $\dfrac{176}{668} \approx 26.3\%$; College
+  $\dfrac{196}{1017} \approx 19.3\%$. **Yes, there is an association** —
+  agreement with one true love *decreases* as education increases.
+- **(c)** Percent with a college degree or higher:
+  $\dfrac{1017}{2625} \approx 38.7\%$.
+- **(d)** Of those who disagree, percent with a high school degree or less:
+  $\dfrac{557}{1812} \approx 30.7\%$.
+
+## Exercise 2.22
+
+Juvenile Diabetes Treatment: 76 children at high risk for Type 1 diabetes were
+randomly assigned to the drug teplizumab or a control group; 42 developed the
+disease during the study.
+
+```{python}
+#| echo: false
+diab = pd.DataFrame({"Diabetes": [16, 26], "No diabetes": [22, 12]},
+                    index=["Teplizumab", "Control"])
+diab["Total"] = diab.sum(axis=1)
+diab.loc["Total"] = diab.sum()
+diab
+```
+
+- **(a)** Control group: $\hat p_C = \dfrac{26}{38} \approx 0.684$.
+- **(b)** Teplizumab group: $\hat p_T = \dfrac{16}{38} \approx 0.421$.
+- **(c)** Difference in proportions:
+  $\hat p_C - \hat p_T = 0.684 - 0.421 \approx 0.263$.
+- **(d)** An **experiment** — participants were randomly assigned to the two
+  treatments.
+- **(e) Yes.** Because the drug was randomly assigned, confounding variables are
+  balanced between the groups, so a strong difference in proportions supports
+  the conclusion that teplizumab is responsible for stopping and/or delaying
+  the onset of the disease.
+
+## Exercise 2.23
+
+Social Media Use and ADHD: teens aged 15–16 without ADHD symptoms were rated
+for frequency of digital social media use and followed for two years.
+
+```{python}
+#| echo: false
+adhd = pd.DataFrame({"ADHD": [16, 23], "No ADHD": [149, 472]},
+                    index=["High frequency", "Low frequency"])
+adhd["Total"] = adhd.sum(axis=1)
+adhd.loc["Total"] = adhd.sum()
+adhd
+```
+
+- **(a)** $\hat p_1 = \dfrac{16}{165} \approx 0.097$ (high frequency users).
+- **(b)** $\hat p_2 = \dfrac{23}{495} \approx 0.046$ (low frequency users).
+- **(c)** The **high frequency** group had a higher proportion developing ADHD
+  symptoms (about 9.7% vs 4.6%).
+- **(d)** $\hat p_1 - \hat p_2 \approx 0.097 - 0.046 = 0.051$.
+- **(e)** Proportion of all teens developing ADHD:
+  $\dfrac{39}{660} \approx 0.059$.
+- **(f)** An **observational study** — the researchers only *rated* existing
+  social media habits; use frequency was not assigned.
+- **(g) No.** Without random assignment, confounding variables (personality,
+  home environment, sleep, ...) could account for the difference; the study
+  shows an association, not a causal effect.
+
+## Exercise 2.24
+
+Playing Hide-and-Seek with Rats: number of times rats entered transparent vs
+opaque boxes while hiding or seeking:
+
+```{python}
+#| echo: false
+rats = pd.DataFrame({"Transparent": [15, 17], "Opaque": [38, 14]},
+                    index=["Hiding", "Seeking"])
+rats["Total"] = rats.sum(axis=1)
+rats.loc["Total"] = rats.sum()
+rats
+```
+
+- **(a)** When hiding, proportion entering opaque boxes:
+  $\hat p_H = \dfrac{38}{53} \approx 0.717$.
+- **(b)** When seeking, proportion entering opaque boxes:
+  $\hat p_S = \dfrac{14}{31} \approx 0.452$.
+- **(c)** Difference: $\hat p_H - \hat p_S \approx 0.717 - 0.452 = 0.265$. The
+  notation is $\hat p_H - \hat p_S$, the sample proportion entering opaque boxes
+  when hiding minus the sample proportion entering opaque boxes when seeking.
+  Rats clearly prefer opaque boxes when they don't want to be seen.
+
+## Exercise 2.25
+
+Antibiotics in Infancy and Weight: 616 children classified by antibiotic
+exposure in the first year of life and overweight status at age 9:
+
+```{python}
+#| echo: false
+abx = pd.DataFrame(
+    {"Not overweight": [144, 37], "Overweight": [294, 141]},
+    index=["Antibiotics", "No antibiotics"])
+abx["Total"] = abx.sum(axis=1)
+abx.loc["Total"] = abx.sum()
+abx
+```
+
+- **(a)** Given antibiotics: $\dfrac{438}{616} \approx 0.711$.
+- **(b)** Overweight at age 9: $\dfrac{435}{616} \approx 0.706$.
+- **(c)** Overweight among those given antibiotics:
+  $\hat p_A = \dfrac{294}{438} \approx 0.671$.
+- **(d)** Overweight among those not given antibiotics:
+  $\hat p_N = \dfrac{141}{178} \approx 0.792$.
+- **(e)** $\hat p_A - \hat p_N \approx 0.671 - 0.792 = -0.121$. Surprisingly,
+  children given antibiotics were *less* likely to be overweight in this table.
+- **(f)** Of all overweight children, proportion given antibiotics:
+  $\dfrac{294}{435} \approx 0.676$.
+
+## Exercise 2.26
+
+Culture and Mental Illness: 60 people with schizophrenia who hear voices (20
+each from the US, India, and Ghana), by whether the voices are mostly negative,
+neutral, or positive:
+
+```{python}
+#| echo: false
+voices = pd.DataFrame(
+    {"US": [14, 6, 0], "India": [4, 3, 13], "Ghana": [2, 2, 16]},
+    index=["Negative", "Neutral", "Positive"])
+voices["Total"] = voices.sum(axis=1)
+voices.loc["Total"] = voices.sum()
+voices
+```
+
+- **(a)** Proportion hearing mostly negative voices:
+  $\dfrac{20}{60} = \dfrac{1}{3} \approx 0.333$.
+- **(b)** US participants: $\dfrac{14}{20} = 0.70$.
+- **(c)** Non-US participants: $\dfrac{6}{40} = 0.15$.
+- **(d)** Of those hearing positive voices, proportion from the US:
+  $\dfrac{0}{29} = 0$ — not a single US participant described the voices as
+  mostly positive.
+- **(e) Yes** — a strong association: negative voices are the norm for US
+  participants (70%) but rare elsewhere (15%), while positive voices are
+  reported only outside the US. Culture appears to shape how the voices are
+  experienced.
+
+## Exercise 2.27
+
+Does It Pay to Get a College Degree? In 2010, the unemployment rate for high
+school graduates with no college degree was 9.7%, while for college graduates
+with a bachelor's degree it was only 5.2%. Find the difference in proportions
+unemployed between these two groups, with correct notation. The data come from
+the census, so treat the values as population proportions, with subscripts
+identifying the two groups.
+
+- $p_{HS} - p_{C} = 0.097 - 0.052 = 0.045$. Since these values come from a
+  census, we use population proportions $p_{HS}$ (high school graduates with no
+  college) and $p_{C}$ (bachelor's degree recipients) rather than $\hat p$. The
+  unemployment rate for high school graduates is 4.5 percentage points higher.
+
+## Exercise 2.28
+
+Can Dogs Smell Cancer? A dog trained to smell bowel cancer was given five
+samples per test — one from a patient with cancer and four from healthy
+volunteers. The dog correctly selected the cancer sample in 33 of 36 breath
+tests and in 37 of 38 stool tests.
+
+- **(a) Variables:** the type of sample (breath or stool — **categorical**) and
+  whether the dog correctly identified the cancer sample (correct/incorrect —
+  **categorical**). The cases are the individual tests.
+- **(b)** Two-way table below.
+- **(c)** Breath samples: $\dfrac{33}{36} \approx 0.917$ correct. Stool samples:
+  $\dfrac{37}{38} \approx 0.974$ correct.
+- **(d)** Of all correct tests, proportion that were stool tests:
+  $\dfrac{37}{70} \approx 0.529$.
+
+```{python}
+#| echo: false
+dog = pd.DataFrame({"Correct": [33, 37], "Incorrect": [3, 1]},
+                   index=["Breath", "Stool"])
+dog["Total"] = dog.sum(axis=1)
+dog.loc["Total"] = dog.sum()
+dog
+```
+
+## Exercise 2.29
+
+Is There a Genetic Marker for Dyslexia? A disruption of a gene called DYXC1 on
+chromosome 15 may be related to dyslexia. Researchers studied the gene in 109
+people diagnosed with dyslexia and a control group of 195 others with no
+learning disorder. The DYXC1 break occurred in 10 of those with dyslexia and in
+5 of the control group.
+
+- **(a)** An **observational study** — the researchers compared existing groups;
+  nobody was assigned to dyslexia or to a gene disruption. **Variables:** group
+  (dyslexia vs control — **categorical**) and whether the DYXC1 break occurs
+  (yes/no — **categorical**).
+- **(b)** **304 rows** (109 + 195 cases) and **2 columns** (the two variables).
+- **(c)** Two-way table below.
+- **(d)** Dyslexia group: $\dfrac{10}{109} \approx 0.092$ with the break.
+  Control group: $\dfrac{5}{195} \approx 0.026$ with the break.
+- **(e) Yes** — the marker is more than three times as common in the dyslexia
+  group (9.2% vs 2.6%), so there appears to be an association between the
+  DYXC1 break and dyslexia in this sample.
+- **(f) No.** This is an observational study, so we cannot assume the gene
+  disruption *causes* dyslexia — confounding variables are not ruled out.
+  (Chapter 4 addresses whether the association generalizes to the population.)
+
+```{python}
+#| echo: false
+dys = pd.DataFrame({"Break": [10, 5], "No break": [99, 190]},
+                   index=["Dyslexia", "Control"])
+dys["Total"] = dys.sum(axis=1)
+dys.loc["Total"] = dys.sum()
+dys
+```
+
+## Exercise 2.30
+
+Help for Insomniacs: forty people diagnosed with insomnia were randomly divided
+into two groups of 20; one group received a one-hour cognitive behavioral
+therapy (CBT) session, the other no treatment. Three months later, 14 of the
+therapy group reported sleep improvements versus 3 of the others.
+
+- **(a)** Two-way table below.
+- **(b)** $14 + 3 = 17$ of the 40 people reported sleep improvement.
+- **(c)** Therapy group: $\hat p_T = \dfrac{14}{20} = 0.70$.
+- **(d)** No-treatment group: $\hat p_N = \dfrac{3}{20} = 0.15$.
+- **(e)** $\hat p_T - \hat p_N = 0.70 - 0.15 = 0.55$. A single CBT session goes
+  with a 55 percentage-point higher rate of reported sleep improvement.
+
+```{python}
+#| echo: false
+ins = pd.DataFrame({"Improved": [14, 3], "Not improved": [6, 17]},
+                   index=["Therapy", "No treatment"])
+ins["Total"] = ins.sum(axis=1)
+ins.loc["Total"] = ins.sum()
+ins
+```
+
+## Exercise 2.31
+
+Electrical Stimulation for Fresh Insight? Forty participants were trained to
+solve problems one way and then asked to solve an unfamiliar problem requiring
+fresh insight; half were randomly assigned to receive non-invasive electrical
+brain stimulation and half received sham stimulation as a placebo. Participants
+did not know which group they were in. In the control group 20% solved the
+problem, while 60% of the stimulation group did.
+
+- **(a)** An **experiment** — the explanatory variable (stimulation vs sham) was
+  actively imposed and randomly assigned by the researchers.
+- **(b)** **Single-blind** — the participants do not know which group they are
+  in. (With sham stimulation the participants are blinded; nothing indicates
+  the people measuring the outcome were also unaware.)
+- **(c)** **Variables:** treatment received (electrical vs sham stimulation —
+  **categorical**) and whether the participant solved the problem (yes/no —
+  **categorical**).
+- **(d)** Two-way table below.
+- **(e)** Of those who solved the problem, percent with electrical stimulation:
+  $\dfrac{12}{16} = 75\%$.
+- **(f)** $\hat p_E = 0.60$, $\hat p_S = 0.20$, so
+  $\hat p_E - \hat p_S = 0.60 - 0.20 = 0.40$.
+- **(g) Yes** — the stimulation group was three times as likely to solve the
+  problem, and since the study is a randomized (single-blind) experiment, the
+  difference is plausibly due to the stimulation itself.
+
+```{python}
+#| echo: false
+stim = pd.DataFrame({"Solved": [12, 4], "Not solved": [8, 16]},
+                    index=["Electrical", "Sham"])
+stim["Total"] = stim.sum(axis=1)
+stim.loc["Total"] = stim.sum()
+stim
+```
+
+## Exercise 2.32
+
+Emotionally Abusive Relationships (ACHA–NCHA survey, Table 2.16):
+
+```{python}
+#| echo: false
+abus = pd.DataFrame({"Male": [8352, 593], "Female": [16276, 2034]},
+                    index=["No", "Yes"])
+abus["Total"] = abus.sum(axis=1)
+abus.loc["Total"] = abus.sum()
+abus
+```
+
+- **(a)** Percent of all respondents who have been in an emotionally abusive
+  relationship: $\dfrac{2627}{27255} \approx 9.6\%$.
+- **(b)** Of those who have been in such a relationship, percent male:
+  $\dfrac{593}{2627} \approx 22.6\%$.
+- **(c)** Percent of males who have been in such a relationship:
+  $\dfrac{593}{8945} \approx 6.6\%$.
+- **(d)** Percent of females who have been in such a relationship:
+  $\dfrac{2034}{18310} \approx 11.1\%$. Note how (b) and (c)–(d) condition in
+  opposite directions — 22.6% of the *affected* students are male, yet only
+  6.6% of *males* were affected, versus 11.1% of females.
+
+## Exercise 2.33
+
+Binge Drinking (ACHA–NCHA survey, Table 2.17 — drinks at a sitting within the
+last two weeks):
+
+```{python}
+#| echo: false
+binge = pd.DataFrame(
+    {"Male": [5402, 2147, 912, 495],
+     "Female": [13310, 3678, 966, 358]},
+    index=["0", "1–2", "3–4", "5+"])
+binge["Total"] = binge.sum(axis=1)
+binge.loc["Total"] = binge.sum()
+binge
+```
+
+- **(a)** Percent of all respondents answering zero:
+  $\dfrac{18712}{27268} \approx 68.6\%$.
+- **(b)** Of students answering five or more, percent male:
+  $\dfrac{495}{853} \approx 58.0\%$.
+- **(c)** Percent of males reporting five or more drinks on three or more days:
+  $\dfrac{912+495}{8956} = \dfrac{1407}{8956} \approx 15.7\%$.
+- **(d)** Percent of females reporting five or more drinks on three or more
+  days: $\dfrac{966+358}{18312} = \dfrac{1324}{18312} \approx 7.2\%$. Although
+  females outnumber males overall, repeated heavy drinking is more than twice
+  as common among the males.
+
+## Exercise 2.34
+
+How Accurate Are Student Perceptions? Students answered both how many drinks
+*they* had the last time they partied (Figure 2.3(a)) and how many drinks they
+think the *typical student* at their school had (Figure 2.3(b)), shown as
+side-by-side bar charts for males and females.
+
+- **(a)** For personal use, the most likely response for both males and females
+  is **0 drinks** — the tallest bars in (a) are at zero.
+- **(b)** For the typical student, the most likely response for both sexes is
+  much higher — around **3–4 drinks**.
+- **(c) No.** Students' perceptions of typical alcohol use far exceed reality:
+  most students themselves drink nothing, yet they believe the typical student
+  drinks several. Students overestimate the norm, plausibly because heavy
+  drinkers are the most visible (the same failure to sample representatively
+  seen in Chapter 1).
+
+## Exercise 2.35
+
+Does Stress Affect Academic Performance? Students were asked whether stress has
+negatively affected their academics. Figure 2.4(a) shows a segmented bar chart
+of response *frequencies*; Figure 2.4(b) shows response *relative frequencies*
+as percents (red = no stress, green = stress but no effect on grades,
+blue = stress hurt grades).
+
+- **(a)** **More females** participated — the female bar in graph (a) is about
+  twice the height of the male bar. Only the **frequency** graph (a) can answer
+  this.
+- **(b)** A **greater number of females** said they had no stress — again read
+  from the frequency graph **(a)**.
+- **(c)** **Approximately equal** percents of males and females said they had
+  no stress — visible only in the relative frequency graph **(b)**.
+- **(d)** A greater **percent of females** say stress hurt their grades —
+  visible only in the relative frequency graph **(b)**. Parts (a)–(b) and
+  (c)–(d) illustrate why frequencies answer how many while relative
+  frequencies answer how likely.
+
+## Exercise 2.36
+
+Success at Quitting Smoking: after six months, 156 of the 914 smokers in the
+reward-only program had stopped smoking, while 78 of the 146 smokers who paid a
+deposit quit.
+
+```{python}
+#| echo: false
+quit = pd.DataFrame({"Quit": [156, 78], "Did not quit": [758, 68]},
+                    index=["Reward", "Deposit"])
+quit["Total"] = quit.sum(axis=1)
+quit.loc["Total"] = quit.sum()
+quit
+```
+
+- Success rates: Reward $\dfrac{156}{914} \approx 0.171$ (17.1%); Deposit
+  $\dfrac{78}{146} \approx 0.534$ (53.4%). The deposit program's success rate is
+  roughly three times that of the reward-only program — though see Exercise
+  2.38 for an important caveat.
+
+## Exercise 2.37
+
+Agreeing to Participate: random assignment put 1017 smokers in the Reward
+group, of whom 914 agreed to participate, and 1053 smokers in the Deposit
+group, of whom only 146 agreed (they had to risk their own money).
+
+```{python}
+#| echo: false
+part = pd.DataFrame({"Agreed": [914, 146], "Declined": [103, 907]},
+                    index=["Reward", "Deposit"])
+part["Total"] = part.sum(axis=1)
+part.loc["Total"] = part.sum()
+part
+```
+
+- Participation rates: Reward $\dfrac{914}{1017} \approx 0.899$ (89.9%);
+  Deposit $\dfrac{146}{1053} \approx 0.139$ (13.9%). Nearly everyone assigned to
+  the Reward group took part, but fewer than one in seven assigned to the
+  Deposit group agreed to participate.
+
+## Exercise 2.38
+
+Accounting for Participation Rates: among smokers who declined to participate,
+30 of those originally in the Deposit group stopped smoking on their own, and
+only 3 of the Reward decliners stopped. Compare the proportion of all subjects
+originally assigned to each group who quit for six months. (A no-incentive
+group at the company had about a 6.0% success rate.)
+
+- **Reward:** $\dfrac{156+3}{1017} = \dfrac{159}{1017} \approx 0.156$ (15.6%).
+- **Deposit:** $\dfrac{78+30}{1053} = \dfrac{108}{1053} \approx 0.103$ (10.3%).
+- Once non-participants are included, the picture **reverses**: Reward (15.6%)
+  beats Deposit (10.3%) for the originally assigned groups, although both still
+  beat the 6.0% rate with no incentive. The deposit program looked better in
+  Exercise 2.36 only among the self-selected participants — a vivid reminder
+  that ignoring non-response can flip a conclusion.
+
+## Exercise 2.39
+
+Association or Not? Which dataset shows a clear association and which shows no
+association between group and Yes/No outcome?
+
+```{python}
+#| echo: false
+a = pd.DataFrame({"Yes": [41, 42], "No": [9, 8]}, index=["Group 1", "Group 2"])
+b = pd.DataFrame({"Yes": [37, 15], "No": [13, 35]}, index=["Group 1", "Group 2"])
+for d, name in [(a, "Dataset A"), (b, "Dataset B")]:
+    d["Total"] = d.sum(axis=1)
+    d.loc["Total"] = d.sum()
+    d.index.name = name
+a
+```
+
+```{python}
+#| echo: false
+b
+```
+
+- **(a) Dataset B** shows a clear association: 74% of Group 1 answers Yes
+  versus only 30% of Group 2 ($\hat p_1 - \hat p_2 = 0.44$).
+- **(b) Dataset A** shows (essentially) no association: 82% of Group 1 and 84%
+  of Group 2 answer Yes — virtually identical proportions.
+
+## Exercise 2.40
+
+Association or No Association? An experiment will randomly divide 40 cases
+between treatments A and B (20 each) and record Successful / Not successful.
+Fill in a two-way table with possible values showing:
+
+- **(a) A clear association**, for example — the success rate differs sharply
+  by treatment: Treatment A: 16 successful, 4 not; Treatment B: 8 successful,
+  12 not. Then $\hat p_A = 0.80$ versus $\hat p_B = 0.40$.
+- **(b) No association at all**, for example — identical success rates:
+  Treatment A: 10 successful, 10 not; Treatment B: 10 successful, 10 not. Then
+  $\hat p_A = \hat p_B = 0.50$, so treatment and outcome are unrelated.
+  (Many other fill-ins are possible; the requirement is merely that the
+  margins match the outline: 20 per treatment, 40 total.)
+
+## Exercise 2.41
+
+Vaccine for Malaria: 500 malaria-free volunteers are split — 200 receive the
+experimental vaccine and 300 are unvaccinated. Suppose the chance of
+contracting malaria is 10% for the unvaccinated. Construct a two-way table for:
+
+- **(a) The vaccine has no effect:** the vaccinated group should also catch
+  malaria at the 10% rate — 30 of the 300 unvaccinated and 20 of the 200
+  vaccinated (table below).
+- **(b) The vaccine cuts the risk in half:** the vaccinated risk drops to 5% —
+  30 of the 300 unvaccinated but only 10 of the 200 vaccinated (table below).
+
+```{python}
+#| echo: false
+va = pd.DataFrame({"Malaria": [20, 30], "No malaria": [180, 270]},
+                  index=["Vaccine", "No vaccine"])
+vb = pd.DataFrame({"Malaria": [10, 30], "No malaria": [190, 270]},
+                  index=["Vaccine", "No vaccine"])
+for d, name in [(va, "No effect"), (vb, "Risk halved")]:
+    d["Total"] = d.sum(axis=1)
+    d.index.name = name
+va
+```
+
+```{python}
+#| echo: false
+vb
+```
+
+## Exercise 2.42
+
+Pick a Superpower: high school seniors in Pennsylvania picked the superpower
+they would most like to have (fly, freeze time, be invisible, super strength,
+or telepathy), stored in the Superpower variable in PASeniors.
+
+*Data:* `data/ch02/PASeniors.csv` (n = 457), from
+<https://www.lock5stat.com/datasets3e/PASeniors.csv>. The most common choice is
+**Freeze time** (129 of 453 answering, about 28.5%) and the least popular is
+**Super strength** (19, about 4.2%):
+
+```{python}
+#| echo: false
+pas = pd.read_csv("data/ch02/PASeniors.csv")
+sp = pas["Superpower"].value_counts()
+pd.DataFrame({"Count": sp, "Percent": (sp / sp.sum() * 100).round(1)})
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Superpower choices of Pennsylvania high school seniors
+fig, ax = plt.subplots(figsize=(6, 3.4))
+sp.plot.bar(ax=ax, rot=15, color="#4c72b0", width=0.6)
+ax.set_xlabel("")
+ax.set_ylabel("Number of students")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.43
+
+Class Year in Statistics: the Year variable in StudentSurvey shows the class
+year (FirstYear, Sophomore, Junior, Senior) for each student.
+
+*Data:* `data/ch02/StudentSurvey.csv` (n = 362), from
+<https://www.lock5stat.com/datasets3e/StudentSurvey.csv>.
+
+```{python}
+#| echo: false
+ss = pd.read_csv("data/ch02/StudentSurvey.csv")
+yr = ss["Year"].value_counts()[["FirstYear", "Sophomore", "Junior", "Senior"]]
+pd.DataFrame({"Frequency": yr, "Rel. Freq.": (yr / yr.sum()).round(3)})
+```
+
+- **(a)** The frequency table above (two students did not answer; they are
+  ignored): 94 first years, 195 sophomores, 35 juniors, 36 seniors.
+- **(b)** The largest group is **Sophomore**, with relative frequency
+  $\dfrac{195}{360} \approx 0.542$ — over half the class.
+
+## Exercise 2.44
+
+Bistro Servers: RestaurantTips comes from a sample of 157 bills at a small
+bistro/wine bar where three servers (A, B, C) worked.
+
+*Data:* `data/ch02/RestaurantTips.csv` (n = 157), from
+<https://www.lock5stat.com/datasets3e/RestaurantTips.csv>.
+
+```{python}
+#| echo: false
+rt = pd.read_csv("data/ch02/RestaurantTips.csv")
+sv = rt["Server"].value_counts().sort_index()
+pd.DataFrame({"Frequency": sv, "Rel. Freq.": (sv / sv.sum()).round(3)})
+```
+
+- Server **B** had the most bills — 65 of the 157, a relative frequency of
+  $\dfrac{65}{157} \approx 0.414$.
+
+## Exercise 2.45
+
+Class Year by Sex: use the StudentSurvey data (Year and Sex) to produce a
+two-way table showing the sex distribution within each class year, and comment
+on interesting features.
+
+```{python}
+#| echo: false
+year_sex = pd.crosstab(ss["Year"], ss["Sex"])[["F", "M"]]
+year_sex = year_sex.reindex(["FirstYear", "Sophomore", "Junior", "Senior"])
+year_sex.index.name = "Year"
+year_sex
+```
+
+- The lower years are close to gender-balanced with a slight female majority
+  among first years (43 F vs 51 M is nearly even), sophomores are 96 F / 99 M,
+  and juniors 18 F / 17 M — but **seniors stand out at 10 F vs 26 M**, more
+  than 70% male. Overall there are more males than females in the sample
+  (193 vs 169), and the imbalance is concentrated in the senior class.
+
+## Exercise 2.46
+
+Credit Card by Server: the Credit variable in RestaurantTips records whether
+each bill was paid with a credit card (y) or cash (n). Produce a two-way table
+showing the credit/cash distribution for each server, and comment.
+
+```{python}
+#| echo: false
+sv_credit = pd.crosstab(rt["Server"], rt["Credit"])[["n", "y"]]
+sv_credit.index.name = "Server"
+pct = pd.crosstab(rt["Server"], rt["Credit"], normalize="index")[["n", "y"]] * 100
+pd.concat([sv_credit, pct.round(1).add_suffix(" %")], axis=1)
+```
+
+- Servers differ noticeably in how their bills are paid: server **C**'s tables
+  pay by credit card almost half the time (46.9%), while server **B**'s pay by
+  credit only 23.1% of the time (server A: 35.0%). Cash dominates for A and B,
+  while C's split is nearly even.
+
+## Exercise 2.47
+
+Graph Class Year by Sex: use technology to construct a graph of the
+relationship between class Year and Sex from Exercise 2.45.
+
+```{python}
+#| echo: false
+#| fig-cap: Class year by sex in the StudentSurvey data
+fig, ax = plt.subplots(figsize=(6.5, 3.4))
+year_sex.plot.bar(ax=ax, rot=0, color=["#c44e52", "#4c72b0"])
+ax.set_xlabel("Class year")
+ax.set_ylabel("Number of students")
+ax.legend(title="Sex", fontsize=8)
+plt.tight_layout()
+plt.show()
+```
+
+- Side-by-side bars show both the sizes of the class years and the sex split
+  within each; the lopsided senior bar (10 F vs 26 M) is easy to spot. A
+  segmented (stacked, percent) bar chart of Sex within Year would show the
+  conditional percentages even more clearly.
+
+## Exercise 2.48
+
+Graph Credit Card by Server: use technology to construct a graph of the
+relationship between Server and Credit from Exercise 2.46.
+
+```{python}
+#| echo: false
+#| fig-cap: Credit card use by server at the bistro
+fig, ax = plt.subplots(figsize=(5.5, 3.4))
+sv_credit.plot.bar(ax=ax, rot=0, color=["#ccb974", "#4c72b0"])
+ax.set_xlabel("Server")
+ax.set_ylabel("Number of bills")
+ax.legend(title="Credit", fontsize=8)
+plt.tight_layout()
+plt.show()
+```
+
+- The side-by-side bars display both the number of bills each server carried
+  (B the most, C the fewest) and the payment mix; server C's nearly even
+  cash/credit split contrasts with the cash-heavy B.
+
+## Exercise 2.49
+
+US Colleges: Type of Control. Find the distribution (counts and percentages)
+of the type of Control for all US post-secondary schools in CollegeScores.
+Which type of control is found most often?
+
+*Data:* `data/ch02/CollegeScores.csv` (n = 6141), from
+<https://www.lock5stat.com/datasets3e/CollegeScores.csv>.
+
+```{python}
+#| echo: false
+cs = pd.read_csv("data/ch02/CollegeScores.csv")
+ctl = cs["Control"].value_counts()[["Public", "Private", "Profit"]]
+pd.DataFrame({"Count": ctl, "Percent": (ctl / ctl.sum() * 100).round(1)})
+```
+
+- **For-profit** schools are the most common type of control (2333 of 6141,
+  about 38.0%), edging out public (1976, 32.2%) and private non-profit (1832,
+  29.8%) schools.
+
+```{python}
+#| echo: false
+#| fig-cap: Number of US post-secondary schools by type of control
+fig, ax = plt.subplots(figsize=(5, 3.2))
+ctl.plot.bar(ax=ax, rot=0, color="#4c72b0", width=0.5)
+ax.set_xlabel("Type of control")
+ax.set_ylabel("Number of schools")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.50
+
+US Colleges: Type of Degree. Find the distribution (counts and percentages) of
+the type of MainDegree for all US post-secondary schools. Which type of primary
+degree is found most often? (0 = no degree, 1 = certificate, 2 = associate,
+3 = bachelor, 4 = graduate.)
+
+```{python}
+#| echo: false
+md = cs["MainDegree"].value_counts().sort_index()
+md.index = pd.Index(
+    ["0 No degree", "1 Certificate", "2 Associate", "3 Bachelor", "4 Graduate"],
+    name="Main degree")
+pd.DataFrame({"Count": md, "Percent": (md / md.sum() * 100).round(1)})
+```
+
+- **Certificates** (MainDegree = 1) are the most common primary degree, awarded
+  by 2689 schools (43.8%) — ahead of bachelor's degrees (2012, 32.8%),
+  associate degrees (1141, 18.6%), graduate degrees (295, 4.8%), and a handful
+  of schools (4) reporting no degree.
+
+```{python}
+#| echo: false
+#| fig-cap: Number of US post-secondary schools by main degree type
+fig, ax = plt.subplots(figsize=(6, 3.2))
+md.plot.bar(ax=ax, rot=0, color="#4c72b0", width=0.6)
+ax.set_xlabel("Main degree type")
+ax.set_ylabel("Number of schools")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 2.51
+
+US Colleges: Main Degree within Each Type of Control. Within each of the three
+types of Control, which type of MainDegree is most common? Also give the
+relative percentage of the most frequent degree for each control type.
+
+```{python}
+#| echo: false
+tab51 = pd.crosstab(cs["Control"], cs["MainDegree"])[[1, 2, 3, 4]]
+tab51.index.name = "Control"
+tab51
+```
+
+```{python}
+#| echo: false
+(pd.crosstab(cs["Control"], cs["MainDegree"], normalize="index")
+ [[1, 2, 3, 4]] * 100).round(1)
+```
+
+- Within **Private** schools the most common main degree is **bachelor's**
+  (1243 schools, 67.8%); within **For-profit** schools it is a **certificate**
+  (1906, 81.7%); within **Public** schools it is an **associate** degree (749,
+  37.9%). The three sectors play clearly different roles in higher education.
+
+## Exercise 2.52
+
+US Colleges: Type of Control within Main Degree. Within each of the five types
+of MainDegree, which type of Control is most common? Also give the relative
+percentage of the most frequent control type for each degree.
+
+```{python}
+#| echo: false
+tab52 = pd.crosstab(cs["MainDegree"], cs["Control"])[["Public", "Private", "Profit"]]
+tab52.index.name = "MainDegree"
+tab52
+```
+
+```{python}
+#| echo: false
+(pd.crosstab(cs["MainDegree"], cs["Control"], normalize="index")
+ [["Public", "Private", "Profit"]] * 100).round(1)
+```
+
+- The most common type of control within each degree level, with its percent:
+  **No degree (0):** Private — 100% (all 4 schools). **Certificate (1):**
+  For-profit — 70.9%. **Associate (2):** Public — 65.6%. **Bachelor's (3):**
+  Private — 61.8%. **Graduate (4):** Private — 82.4%. Certificates belong
+  mostly to for-profits, associate degrees to community (public) colleges, and
+  bachelor's and graduate degrees mostly to private institutions.
+
+## Exercise 2.53
+
+Which of These Things Is Not Like the Other? Four students graphed the same
+two-way table (college accept/reject decision by type of high school: public,
+private, parochial) four ways; Figure 2.5 shows the results. Three graphs come
+from the same data, but one is inconsistent with the other three.
+
+- **Graph (b) is the bogus one.** Graphs (a), (c), and (d) are consistent
+  views of a single two-way table: the school totals in the grouped bar chart
+  (a) match the group totals implied by the side-by-side charts (c) and (d),
+  just rearranged. In graph (b) the segments within the Accept and Reject bars
+  do not add up to the school totals implied by the other three panels — the
+  heights disagree with the margins of the same table — so (b) cannot have been
+  drawn from these data. The lesson: when several graphs claim to show one
+  dataset, check that the margins (totals) agree across all of them.
+
+:::
