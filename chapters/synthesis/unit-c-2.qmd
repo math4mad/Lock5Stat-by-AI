@@ -1,0 +1,1540 @@
+---
+execute-dir: project
+title: "Unit C · Essential Synthesis (C.66–C.130)"
+subtitle: "Confidence intervals & tests for means and proportions (Chapters 5–6)"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+The Unit C Essential Synthesis exercises work everything from the unit at
+once: **z**-intervals and **t**-intervals for means and proportions, tests for
+one mean or proportion, comparisons of two groups (difference in means or
+proportions), and **matched-pairs** analyses — choosing the right tool for
+each situation. Exercises C.66–C.130 are worked in order. Wherever a real
+Lock⁵ dataset is referenced we load it and re-derive the statistics, and we
+cross-check applied tests with a **randomization/permutation test** or a
+**bootstrap CI** (10,000 replicates, seed 2026); exercises that only print
+summary statistics or software output are computed directly from those
+numbers. Following the book's convention we use the conservative degrees of
+freedom $df = \min(n_1-1,\, n_2-1)$ for two-sample $t$ tools, and success–
+failure counts of at least 10 to judge when the normal distribution applies.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+from scipy import stats
+import matplotlib.pyplot as plt, seaborn as sns
+sns.set_theme(style="whitegrid")
+
+def tstar(df, conf=0.95):
+    return stats.t.ppf(1 - (1 - conf) / 2, df)
+
+def t_ci(mean, sd, n, conf=0.95):
+    """One-sample t interval."""
+    me = tstar(n - 1, conf) * sd / np.sqrt(n)
+    return mean - me, mean + me
+
+def t2_ci(m1, s1, n1, m2, s2, n2, conf=0.95):
+    """Two-sample t interval, conservative df = min(n1-1, n2-1)."""
+    se = np.sqrt(s1**2 / n1 + s2**2 / n2)
+    df = min(n1, n2) - 1
+    me = tstar(df, conf) * se
+    return df, se, (m1 - m2 - me, m1 - m2 + me)
+
+def t2_test(m1, s1, n1, m2, s2, n2, alt="two"):
+    """Two-sample t test, conservative df."""
+    se = np.sqrt(s1**2 / n1 + s2**2 / n2)
+    df = min(n1, n2) - 1
+    t = (m1 - m2) / se
+    p = {"two": 2 * stats.t.sf(abs(t), df),
+         "greater": stats.t.sf(t, df),
+         "less": stats.t.cdf(t, df)}[alt]
+    return t, df, p, se
+
+def p_ci(x, n, conf=0.95):
+    z = stats.norm.ppf(1 - (1 - conf) / 2)
+    p, se = x / n, np.sqrt(x / n * (1 - x / n) / n)
+    return p, se, (p - z * se, p + z * se)
+
+def p_test(x, n, p0, alt="two"):
+    z = (x / n - p0) / np.sqrt(p0 * (1 - p0) / n)
+    p = {"two": 2 * stats.norm.sf(abs(z)),
+         "greater": stats.norm.sf(z),
+         "less": stats.norm.cdf(z)}[alt]
+    return z, p
+
+def dp_ci(x1, n1, x2, n2, conf=0.95):
+    z = stats.norm.ppf(1 - (1 - conf) / 2)
+    p1, p2 = x1 / n1, x2 / n2
+    se = np.sqrt(p1 * (1 - p1) / n1 + p2 * (1 - p2) / n2)
+    return p1 - p2, se, (p1 - p2 - z * se, p1 - p2 + z * se)
+
+def dp_test(x1, n1, x2, n2, alt="two"):
+    pp = (x1 + x2) / (n1 + n2)
+    se = np.sqrt(pp * (1 - pp) * (1 / n1 + 1 / n2))
+    z = (x1 / n1 - x2 / n2) / se
+    p = {"two": 2 * stats.norm.sf(abs(z)),
+         "greater": stats.norm.sf(z),
+         "less": stats.norm.cdf(z)}[alt]
+    return z, p
+
+def boot(samples, stat_fn, reps=10000, seed=2026):
+    """Bootstrap: resample each array in `samples` with replacement, apply stat_fn."""
+    r = np.random.default_rng(seed)
+    out = np.empty(reps)
+    for i in range(reps):
+        out[i] = stat_fn([s[r.integers(0, len(s), len(s))] for s in samples])
+    return out
+
+def perm2(v, n1, reps=10000, seed=2026):
+    """Randomization for a difference in means/proportions: split a shuffled v."""
+    r = np.random.default_rng(seed)
+    out = np.empty(reps)
+    for i in range(reps):
+        p = r.permutation(v)
+        out[i] = p[:n1].mean() - p[n1:].mean()
+    return out
+
+def dist_plot(boots, xlabel, obs=None, tail="two", bins=30, figsize=(6, 3)):
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.histplot(x=boots, bins=bins, ax=ax, color="#4c72b0")
+    if obs is not None:
+        lines = (-abs(obs), abs(obs)) if tail == "two" else ((obs,) if tail == "right" else (-abs(obs),))
+        for v in lines:
+            ax.axvline(v, color="#c44e52", ls="--", lw=1)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Simulated statistics")
+    plt.tight_layout()
+    plt.show()
+```
+
+::: {.panel-tabset}
+
+## Exercise C.66
+
+**HRT and Invasive Breast Cancer.** In the Women's Health Initiative
+randomized experiment, 8506 women took HRT and 8102 took a placebo; over five
+years 166 vs 124 developed invasive breast cancer.
+
+```{python}
+#| echo: false
+d, se, ci = dp_ci(166, 8506, 124, 8102)
+pd.Series({"p_HRT": round(166 / 8506, 5), "p_placebo": round(124 / 8102, 5),
+           "Difference": round(d, 5), "SE": round(se, 5),
+           "95% CI": f"({ci[0]:.5f}, {ci[1]:.5f})"}).to_string()
+```
+
+The difference in proportions is $0.0042 \pm 0.0040$: the 95% CI is
+**(0.0002, 0.0082)** — it **just barely excludes zero**. We are 95% sure that
+HRT raises the five-year invasive breast cancer rate by between 0.02 and 0.8
+percentage points. Since this is a randomized experiment, the effect is
+**causal** — exactly why the study was stopped early.
+
+## Exercise C.67
+
+**HRT and Cancer (All Types).** 502 vs 458 cancers of any type:
+
+```{python}
+#| echo: false
+d, se, ci = dp_ci(502, 8506, 458, 8102)
+pd.Series({"p_HRT": round(502 / 8506, 5), "p_placebo": round(458 / 8102, 5),
+           "Difference": round(d, 5), "SE": round(se, 5),
+           "95% CI": f"({ci[0]:.4f}, {ci[1]:.4f})"}).to_string()
+```
+
+The 95% CI for $p_H - p_P$ is **(−0.0046, 0.0096)** — it **includes zero**, so
+despite the breast-cancer signal there is no detectable difference in the
+overall cancer rate. The breast-cancer excess is offset within a roughly
+unchanged total.
+
+## Exercise C.68
+
+**HRT and Fractures.** 650 vs 788 fractures:
+
+```{python}
+#| echo: false
+d, se, ci = dp_ci(650, 8506, 788, 8102)
+pd.Series({"p_HRT": round(650 / 8506, 5), "p_placebo": round(788 / 8102, 5),
+           "Difference": round(d, 5), "SE": round(se, 5),
+           "95% CI": f"({ci[0]:.4f}, {ci[1]:.4f})"}).to_string()
+```
+
+The 95% CI is **(−0.0294, −0.0123)** — **entirely negative**: HRT *reduces*
+the fracture rate by between 1.2 and 2.9 percentage points. (These three
+exercises show the trade-off that terminated the trial: a real harm — breast
+cancer — outweighed real benefits such as fewer fractures.)
+
+## Exercise C.69
+
+**Number of Bedrooms, NY vs PA.** `HomesForSale`: 30 homes per state; the data
+confirm the printed counts — **17/30 = 0.567** of NY homes and **8/30 = 0.267**
+of PA homes have more than three bedrooms.
+
+- **(a) No.** The success–failure condition fails: PA contributes only
+  $30(0.267) = 8$ homes with more than three bedrooms, below 10, so the normal
+  distribution is not appropriate for the difference in proportions.
+- **(b)** With $H_0: p_{NY} = p_{PA}$ vs $H_a: p_{NY} \ne p_{PA}$ we deal the
+  25 "large" homes at random to the 60 homes (30 to NY):
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in proportions of homes with more than three bedrooms, NY minus PA
+hs = pd.read_csv("data/ch10/HomesForSale.csv")
+ny = hs[hs.State == "NY"]; pa = hs[hs.State == "PA"]
+x_ny, x_pa = int((ny.Beds > 3).sum()), int((pa.Beds > 3).sum())
+labels = np.repeat([1.0, 0.0], [x_ny + x_pa, 60 - x_ny - x_pa])
+out = perm2(labels, 30)
+obs = x_ny / 30 - x_pa / 30
+dist_plot(out, "Randomization differences in proportions (NY - PA)", obs=obs)
+from scipy import stats as st
+rv = st.hypergeom(60, x_ny + x_pa, 30)
+p_ex = float(rv.pmf(np.arange(x_ny, 26)).sum() + rv.pmf(np.arange(0, x_pa + 1)).sum())
+pd.Series({"Observed difference": round(obs, 3),
+           "Randomization two-tail p (10000 deals)": round(float((np.abs(out) >= abs(obs) - 1e-9).mean()), 3),
+           "Exact two-tail p (hypergeometric)": round(p_ex, 3)}).to_string()
+```
+
+The randomization two-tailed **p-value ≈ 0.038** (exact hypergeometric 0.035;
+the book's simulation gave ≈ 0.022) — **reject $H_0$** at 5%: New York homes for sale are
+significantly more likely to have four or more bedrooms than Pennsylvania
+homes, by roughly 30 percentage points.
+
+## Exercise C.70
+
+**THC vs Prochlorperazine.** Randomized double-blind experiment: 36/79 THC
+patients found relief vs 16/78 on prochlorperazine. Testing
+$H_0: p_T = p_P$ vs $H_a: p_T > p_P$ at the 1% level:
+
+```{python}
+#| echo: false
+z, p = dp_test(36, 79, 16, 78, alt="greater")
+rv = stats.hypergeom(157, 52, 79)
+pd.Series({"p_T": round(36 / 79, 4), "p_P": round(16 / 78, 4),
+           "z": round(z, 3), "One-tail p (normal)": round(p, 5),
+           "Exact one-tail p (hypergeometric)": round(float(rv.sf(35)), 5)}).to_string()
+```
+
+With $\hat p_T - \hat p_P = 0.456 - 0.205 = 0.251$ and $z = 3.34$, the
+one-tailed **p-value ≈ 0.0004** (exact 0.0007) — **reject $H_0$ even at 1%**:
+very strong evidence that THC relieves nausea more often.
+- **(b)** These are data from a randomized, double-blind comparative
+  experiment, so a significant difference would establish a **causal** benefit
+  of THC, and blinding rules out expectation/placebo effects — exactly what a
+  switch in standard treatment requires.
+
+## Exercise C.71
+
+**Quality Control.** $n = 30$ bottles, $\bar x = 11.92$, $s = 0.26$; test
+$H_0: \mu = 12$ vs $H_a: \mu \ne 12$ at $\alpha = 0.01$:
+
+```{python}
+#| echo: false
+t = (11.92 - 12) / (0.26 / np.sqrt(30))
+pd.Series({"t": round(t, 3), "df": 29,
+           "Two-tail p": round(2 * stats.t.sf(abs(t), 29), 4)}).to_string()
+```
+
+$t = -1.69$ with $df = 29$ gives **p = 0.103**, far above 0.01 → **do not
+reject $H_0$**. The observed mean is within chance range of 12 fl oz, so
+Susan should **not** recalibrate the machinery.
+
+## Exercise C.72
+
+**College Football Playoffs.** $\hat p = 0.63$ with margin of error
+$m = 0.031$ at 95% confidence. Solving $1.96\sqrt{\hat p(1-\hat p)/n} = 0.031$:
+
+$$n = \frac{1.96^2(0.63)(0.37)}{0.031^2} \approx \mathbf{932}$$
+
+About **930–940 college football fans** were sampled.
+
+## Exercise C.73
+
+**Light at Night and Weight Gain (99% CI).** Dark: $n=8$, $\bar x = 5.9$,
+$s = 1.9$; light: $n=19$, $\bar x = 9.4$, $s = 3.2$. Figure C.3 shows no
+extreme skew, so $t$ applies. With the conservative
+$df = \min(7, 18) = 7$, $t^* = 3.50$:
+
+```{python}
+#| echo: false
+df, se, ci = t2_ci(5.9, 1.9, 8, 9.4, 3.2, 19, conf=0.99)
+pd.Series({"SE": round(se, 4), "df (conservative)": df,
+           "t* (99%)": round(tstar(df, 0.99), 3),
+           "99% CI (light - dark)": f"({9.4 - 5.9 - tstar(df, 0.99) * se:.2f}, {9.4 - 5.9 + tstar(df, 0.99) * se:.2f})"}).to_string()
+```
+
+The difference is $3.5 \pm 3.48$: a 99% CI of **(0.02, 6.98) grams** — we are
+99% sure mice with light at night gain, on average, between 0.02 and 6.98 g
+more body mass than mice in darkness.
+
+## Exercise C.74
+
+**Home Field Advantage, Two Samples.** Home: $\bar x_H = 25.16$, $s_H = 9.22$,
+$n = 80$; away: $\bar x_A = 20.86$, $s_A = 10.38$, $n = 80$:
+
+```{python}
+#| echo: false
+df, se, ci = t2_ci(25.16, 9.22, 80, 20.86, 10.38, 80, conf=0.90)
+pd.Series({"Best estimate": 4.30, "SE": round(se, 3), "df": df,
+           "t* (90%)": round(tstar(df, 0.90), 3),
+           "90% CI": f"({ci[0]:.2f}, {ci[1]:.2f})"}).to_string()
+```
+
+Best estimate of the mean home-field advantage: $\bar x_H - \bar x_A =
+\mathbf{4.30}$ points, with SE $= 1.55$. The 90% CI is
+$4.30 \pm 1.66(1.55) =$ **(1.72, 6.88)** — we are 90% sure NFL home teams
+outscore opponents by between 1.7 and 6.9 points on average.
+
+## Exercise C.75
+
+**Home Field Advantage: Matched Pairs.** `NFLScores2018` has home and away
+scores for all $n = 256$ regular-season games; the pairing of home and away
+scores within the same game removes game-to-game noise.
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the mean (home - away) scoring difference over 256 NFL games
+nf = pd.read_csv("data/synthesis/NFLScores2018.csv")
+dif = (nf.HomeScore - nf.AwayScore).to_numpy(float)
+n = len(dif)
+md, sd = dif.mean(), dif.std(ddof=1)
+me = tstar(n - 1, 0.90) * sd / np.sqrt(n)
+boots = boot([dif], lambda r: r[0].mean())
+ci_b = np.percentile(boots, [5, 95])
+pd.Series({"n": n, "Mean difference": round(md, 3), "StDev": round(sd, 3),
+           "SE": round(sd / np.sqrt(n), 3),
+           "90% t CI": f"({md - me:.2f}, {md + me:.2f})",
+           "90% bootstrap CI (check)": f"({ci_b[0]:.2f}, {ci_b[1]:.2f})"}).to_string()
+```
+
+The paired differences average $\bar x_D = 2.20$ points with $s_D = 14.36$,
+so $SE = 0.90$ and the 90% $t$ interval is $2.20 \pm 1.65(0.90) =$ **(0.72,
+3.69)** (book: 0.72 to 3.68; the bootstrap percentile interval agrees). We
+are 90% sure the mean home-field scoring advantage is between **0.7 and 3.7
+points** — much smaller than the two-independent-samples estimate in C.74,
+because pairing controls for the strength of both teams in each game.
+
+## Exercise C.76
+
+**NHL Penalty Minutes.** The 30 team values (matching Table C.11, also in
+`HockeyPenalties2019`):
+
+```{python}
+#| echo: false
+pim = pd.read_csv("data/synthesis/HockeyPenalties2019.csv").PIM.to_numpy(float)
+lo, hi = t_ci(pim.mean(), pim.std(ddof=1), 30)
+boots = boot([pim], lambda r: r[0].mean())
+ci_b = np.percentile(boots, [2.5, 97.5])
+pd.Series({"Mean": round(pim.mean(), 3), "StDev": round(pim.std(ddof=1), 3),
+           "SE": round(pim.std(ddof=1) / np.sqrt(30), 3),
+           "95% t CI": f"({lo:.2f}, {hi:.2f})",
+           "95% bootstrap CI (check)": f"({ci_b[0]:.2f}, {ci_b[1]:.2f})"}).to_string()
+```
+
+- **(a)** Mean $\bar x = \mathbf{12.80}$ penalty minutes/game, standard
+  deviation $s = \mathbf{2.10}$.
+- **(b)** With $df = 29$, $t^* = 2.045$: the 95% CI is
+  $12.80 \pm 2.045(0.383) =$ **(12.01, 13.58)** minutes per game (bootstrap
+  agrees). We are 95% sure the mean team penalty-minutes average for all NHL
+  teams in all years is between about 12.0 and 13.6.
+- **(c)** The 30 values are *all* teams in one season, so they are a census of
+  2018–19 — but only a convenience sample of "all NHL teams in all years."
+  Generalizing assumes this season is representative; era-specific rule
+  enforcement and style of play could make other seasons differ.
+
+## Exercise C.77
+
+**Sex and Award Preference.** 109/193 males vs 73/169 females chose Olympic
+gold:
+
+```{python}
+#| echo: false
+d, se, ci = dp_ci(109, 193, 73, 169, conf=0.90)
+pd.Series({"p_M": round(109 / 193, 4), "p_F": round(73 / 169, 4),
+           "Difference": round(d, 4), "SE": round(se, 4),
+           "90% CI": f"({ci[0]:.4f}, {ci[1]:.4f})"}).to_string()
+```
+
+The 90% CI for $p_M - p_F$ is $0.133 \pm 0.086 =$ **(0.047, 0.219)** — we are
+90% sure that the proportion of male statistics students choosing the Olympic
+gold medal is between 4.7 and 21.9 points higher than for females.
+
+## Exercise C.78
+
+**Stomach Bacteria and IBS.** Healthy: $\bar x = 564$, $s = 122$, $n = 99$;
+IBS: $\bar x = 425$, $s = 127$, $n = 25$. Test $H_0: \mu_H = \mu_{IBS}$ vs
+$H_a: \mu_H > \mu_{IBS}$:
+
+```{python}
+#| echo: false
+t, df, p, se = t2_test(564, 122, 99, 425, 127, 25, alt="greater")
+pd.Series({"Difference": 139, "SE": round(se, 2), "t": round(t, 3),
+           "df (conservative)": df, "One-tail p": f"{p:.2e}"}).to_string()
+```
+
+$t = 139/28.2 = \mathbf{4.93}$ with $df = 24$ gives **p < 0.001** → **reject
+$H_0$**: people with IBS have significantly fewer unique stomach bacterial
+genes (on average about 139 million fewer) than healthy patients.
+
+## Exercise C.79
+
+**Spring Break Effect?**
+
+- **(a)** $H_0: \mu_1 = \mu_2$ vs $H_a: \mu_1 > \mu_2$, where $\mu_1$ is the
+  mean midterm grade of *all* students who attend class the Friday before
+  break and $\mu_2$ for those who miss.
+- **(b)** In class: $n=15$, $\bar x=80.9$, $s=11.07$; missed: $n=9$,
+  $\bar x=68.2$, $s=9.26$:
+
+```{python}
+#| echo: false
+t, df, p, se = t2_test(80.9, 11.07, 15, 68.2, 9.26, 9, alt="greater")
+pd.Series({"Difference": 12.7, "SE": round(se, 3), "t": round(t, 3),
+           "df (conservative)": df, "One-tail p": round(p, 4)}).to_string()
+```
+
+$t = 3.02$ with $df = 8$ gives **p = 0.008** → **reject $H_0$**: attenders
+average significantly higher midterm grades.
+- **(c) No.** Students chose whether to attend, so this is an observational
+  comparison — stronger (or more conscientious) students may also be the ones
+  who show up; skipping class itself is not established as the cause.
+- **(d) Yes.** The chronic non-attender's near-zero grades reflect a
+  fundamentally different situation (essentially withdrawn), not the effect
+  of missing one pre-break class; including him would misrepresent the
+  comparison the professor cares about.
+
+## Exercise C.80
+
+**Mobile Phones in India.** $p = 0.30$, $n = 500$:
+
+$$\text{mean} = \mathbf{0.30}, \qquad SE = \sqrt{\tfrac{0.30(0.70)}{500}} = \mathbf{0.0205}$$
+
+## Exercise C.81
+
+**Owned vs Rented Housing.** $p = 0.651$, $n = 50$:
+
+$$\text{mean} = \mathbf{0.651}, \qquad SE = \sqrt{\tfrac{0.651(0.349)}{50}} = \mathbf{0.067}$$
+
+## Exercise C.82
+
+**Percent of Free Throws Made.** Mean and standard deviation of the
+distribution of sample proportions, $SE = \sqrt{p(1-p)/n}$:
+
+| Case | $p$ | $n$ | Mean | SE |
+|---|---|---|---|---|
+| (a) college | 0.69 | 100 | **0.69** | **0.046** |
+| (b) college | 0.69 | 1000 | **0.69** | **0.015** |
+| (c) NBA | 0.75 | 100 | **0.75** | **0.043** |
+| (d) NBA | 0.75 | 1000 | **0.75** | **0.014** |
+
+Ten times the sample size divides the standard error by $\sqrt{10}$.
+
+## Exercise C.83
+
+**How Old Is the US Population?** $\mu = 36.78$, $\sigma = 22.58$; the mean of
+sample means is always **36.78**, with $SE = \sigma/\sqrt{n}$:
+
+- **(a)** $n=10$: SE $= 22.58/\sqrt{10} = \mathbf{7.14}$ years
+- **(b)** $n=100$: SE $= \mathbf{2.258}$ years
+- **(c)** $n=1000$: SE $= \mathbf{0.714}$ years
+
+## Exercise C.84
+
+**Time to Finish the Boston Marathon.** $\mu = 233$ min, $\sigma = 45$ min;
+mean of sample means is always **233**, with $SE = 45/\sqrt{n}$:
+
+- **(a)** $n=10$: **14.2** minutes
+- **(b)** $n=100$: **4.5** minutes
+- **(c)** $n=1000$: **1.42** minutes
+
+## Exercise C.85
+
+**Austria vs Switzerland (Elderly).** $p_A = 0.194$, $p_S = 0.186$, $n = 200$
+each:
+
+```{python}
+#| echo: false
+se = np.sqrt(0.194 * 0.806 / 200 + 0.186 * 0.814 / 200)
+pd.Series({"Mean of p_A - p_S": 0.008, "SE": round(se, 3)}).to_string()
+```
+
+The differences in sample proportions center at $0.194 - 0.186 =
+\mathbf{0.008}$ with standard deviation $\mathbf{0.039}$.
+
+## Exercise C.86
+
+**Australia vs New Zealand (Elderly).** $p_A = 0.157$ ($n=500$),
+$p_{NZ} = 0.156$ ($n=300$):
+
+```{python}
+#| echo: false
+se = np.sqrt(0.157 * 0.843 / 500 + 0.156 * 0.844 / 300)
+pd.Series({"Mean of p_A - p_NZ": 0.001, "SE": round(se, 3)}).to_string()
+```
+
+Mean $\mathbf{0.001}$; standard deviation $\mathbf{0.027}$.
+
+## Exercise C.87
+
+**Male-Female Ratios.** $p_A = 0.52$, $p_{RI} = 0.483$, $n = 300$ each:
+
+```{python}
+#| echo: false
+se = np.sqrt(0.52 * 0.48 / 300 + 0.483 * 0.517 / 300)
+pd.Series({"Mean of p_a - p_ri": 0.037, "SE": round(se, 3)}).to_string()
+```
+
+$\hat p_a - \hat p_{ri}$ is approximately **N(0.037, 0.041)** — centered at
+3.7 percentage points with SD about 4.1 points (both $np$ and $n(1-p)$ are
+large, so the normal model is fine).
+
+## Exercise C.88
+
+**How Likely Is a Female President?** $\hat p = 0.73$, $n = 1000$:
+
+```{python}
+#| echo: false
+p, se, ci = p_ci(730, 1000)
+pd.Series({"p_hat": p, "SE": round(se, 4), "ME": round(1.96 * se, 4),
+           "95% CI": f"({ci[0]:.4f}, {ci[1]:.4f})"}).to_string()
+```
+
+The 95% CI is $0.73 \pm 0.028 =$ **(0.702, 0.758)**: we are 95% sure that
+between about **70% and 76%** of likely US voters in 2010 thought a woman
+president was likely within ten years.
+
+## Exercise C.89
+
+**Can Rats Feel Empathy?** Shocked: $\bar x = 36.6$, $s = 21.3$, $n = 15$;
+control: $\bar x = 1.2$, $s = 2.3$, $n = 11$. Test $H_0: \mu_1 = \mu_2$ vs
+$H_a: \mu_1 > \mu_2$:
+
+```{python}
+#| echo: false
+t, df, p, se = t2_test(36.6, 21.3, 15, 1.2, 2.3, 11, alt="greater")
+pd.Series({"Difference": 35.4, "SE": round(se, 2), "t": round(t, 3),
+           "df (conservative)": df, "One-tail p": f"{p:.2e}"}).to_string()
+```
+
+$t = 35.4/5.54 = \mathbf{6.39}$ with $df = 10$ gives **p < 0.001** → **reject
+$H_0$**: rats with prior shock experience spend far more time frozen while
+watching another rat suffer — strong evidence of empathy-like behavior in
+this randomized, double-blind experiment.
+
+## Exercise C.90
+
+**Laptop Computers and Sperm Count.** $n = 29$, $\bar x = 2.31^\circ$C,
+$s = 0.96$; test $H_0: \mu = 1$ vs $H_a: \mu > 1$:
+
+```{python}
+#| echo: false
+t = (2.31 - 1) / (0.96 / np.sqrt(29))
+pd.Series({"t": round(t, 3), "df": 28,
+           "One-tail p": f"{stats.t.sf(t, 28):.2e}"}).to_string()
+```
+
+$t = \mathbf{7.35}$, $df = 28$, **p < 0.001** → **reject $H_0$**: the mean
+scrotal temperature increase after one hour with a laptop on the lap
+significantly exceeds the 1°C danger threshold.
+
+## Exercise C.91
+
+**Gender Bias.** Male name: $\bar x = 30238$, $s = 5152$, $n = 63$; female
+name: $\bar x = 26508$, $s = 7348$, $n = 64$. Test $H_0: \mu_M = \mu_F$ vs
+$H_a: \mu_M > \mu_F$:
+
+```{python}
+#| echo: false
+t, df, p, se = t2_test(30238, 5152, 63, 26508, 7348, 64, alt="greater")
+pd.Series({"Difference": 3730, "SE": round(se, 1), "t": round(t, 3),
+           "df (conservative)": df, "One-tail p": round(p, 4)}).to_string()
+```
+
+$t = 3730/1124.7 = \mathbf{3.32}$ with $df = 62$ gives **p = 0.0008** →
+**reject $H_0$**: the identical application with a male name received
+significantly higher recommended salaries (about \$3,730 more on average) —
+and because names were randomly assigned, this is evidence of **causal**
+gender bias.
+
+## Exercise C.92
+
+**Is Gender Bias Influenced by Faculty Gender?** Among the 64 female-named
+applications: male faculty $\bar x = 27111$, $s = 6948$; female faculty
+$\bar x = 25000$, $s = 7966$ ($n = 32$ each). Two-tailed test:
+
+```{python}
+#| echo: false
+t, df, p, se = t2_test(27111, 6948, 32, 25000, 7966, 32, alt="two")
+pd.Series({"Difference": 2111, "SE": round(se, 1), "t": round(t, 3),
+           "df (conservative)": df, "Two-tail p": round(p, 3)}).to_string()
+```
+
+$t = \mathbf{1.13}$ with $df = 31$ gives **p = 0.267** → **do not reject
+$H_0$**: no evidence that the gender of the evaluating faculty member changes
+the recommended salary, so the bias in C.91 does not appear to depend on the
+evaluator's own gender.
+
+## Exercise C.93
+
+**NFL Overtime.**
+
+- **(a)** Coin-flip winner won 240 of 428 games ($\hat p = 0.561$). Testing
+  $H_0: p = 0.5$ vs $H_a: p > 0.5$:
+
+```{python}
+#| echo: false
+z, p = p_test(240, 428, 0.5, alt="greater")
+p_ex = 1 - stats.binom.cdf(239, 428, 0.5)
+pd.Series({"z": round(z, 3), "One-tail p (normal)": round(p, 4),
+           "Exact one-tail p (binomial)": round(p_ex, 4)}).to_string()
+```
+
+$z = \mathbf{2.52}$, **p = 0.006** → **reject $H_0$**: winning the overtime
+coin flip conferred a real advantage.
+
+- **(b)** Old rules: 94/188 $= 0.500$; new rules: 146/240 $= 0.608$:
+
+```{python}
+#| echo: false
+z, p = dp_test(94, 188, 146, 240, alt="two")
+pd.Series({"p_old": 0.5, "p_new": round(146 / 240, 4),
+           "z (old - new)": round(z, 3), "Two-tail p": round(p, 4)}).to_string()
+```
+
+$z = \mathbf{-2.24}$ (book: $-2.23$), two-tailed **p = 0.025** (book: 0.026) →
+**reject $H_0$**: the coin-flip advantage was absent before 1994 and
+significant after the rule change — the two eras genuinely differ.
+
+## Exercise C.94
+
+**A Genetic Marker for Dyslexia?** 10/109 with dyslexia vs 5/195 controls.
+For a normal-based CI each group needs at least 10 successes and 10 failures:
+the control group has only **5** "successes," so the normal distribution is
+**not** appropriate — we bootstrap the difference:
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the difference in proportions with the gene disruption, dyslexia minus control
+d94 = np.repeat([1.0, 0.0], [10, 99])
+c94 = np.repeat([1.0, 0.0], [5, 190])
+boots = boot([d94, c94], lambda r: r[0].mean() - r[1].mean())
+ci = np.percentile(boots, [2.5, 97.5])
+dist_plot(boots, "Bootstrap differences in proportions", obs=10/109 - 5/195, bins=30)
+pd.Series({"Observed difference": round(10/109 - 5/195, 4),
+           "Bootstrap SE": round(boots.std(ddof=1), 4),
+           "95% bootstrap CI": f"({ci[0]:.4f}, {ci[1]:.4f})"}).to_string()
+```
+
+The observed difference is $0.0917 - 0.0256 = \mathbf{0.066}$, and the
+95% **bootstrap percentile CI ≈ (0.01, 0.13)** — just barely above zero,
+suggesting (but only suggestively, given the tiny counts) a higher gene-
+disruption rate among those with dyslexia.
+
+## Exercise C.95
+
+**Lie Detectors: Accuracy on Liars.** Of 48 liars, the detector flagged 31:
+$\hat p = 31/48 = 0.646$:
+
+```{python}
+#| echo: false
+p, se, ci = p_ci(31, 48, conf=0.90)
+pd.Series({"p_hat": round(p, 4), "SE": round(se, 4),
+           "90% CI": f"({ci[0]:.4f}, {ci[1]:.4f})"}).to_string()
+```
+
+The 90% CI is $0.646 \pm 0.114 =$ **(0.532, 0.759)**: we are 90% sure the
+detector catches between 53% and 76% of liars.
+
+## Exercise C.96
+
+**Does the Detector Say "Lying" More than Half the Time?** It said lying 58
+of 96 times. Test $H_0: p = 0.5$ vs $H_a: p > 0.5$:
+
+```{python}
+#| echo: false
+z, p = p_test(58, 96, 0.5, alt="greater")
+pd.Series({"p_hat": round(58 / 96, 4), "z": round(z, 3),
+           "One-tail p": round(p, 4)}).to_string()
+```
+
+$z = \mathbf{2.04}$, **p = 0.021** → **reject $H_0$** at 5%: the detector
+labels people "lying" significantly more than half the time overall.
+
+## Exercise C.97
+
+**Does the "Lying" Rate Depend on Truth?** 31/48 $= 0.646$ (liars) vs 27/48
+$= 0.562$ (truth-tellers):
+
+```{python}
+#| echo: false
+z, p = dp_test(31, 48, 27, 48, alt="two")
+pd.Series({"Difference": round(31/48 - 27/48, 4), "z": round(z, 3),
+           "Two-tail p": round(p, 3)}).to_string()
+```
+
+$z = \mathbf{0.83}$, **p = 0.404** → **do not reject $H_0$**: the detector's
+tendency to say "lying" is essentially the same whether the person lies or
+not — the hallmark of an uninformative test.
+
+## Exercise C.98
+
+**CI for the Difference in "Lying" Rates.**
+
+```{python}
+#| echo: false
+d, se, ci = dp_ci(31, 48, 27, 48)
+pd.Series({"Difference": round(d, 4), "SE": round(se, 4),
+           "95% CI": f"({ci[0]:.4f}, {ci[1]:.4f})"}).to_string()
+```
+
+The 95% CI is **(−0.112, 0.278)** — it includes zero, exactly consistent with
+the non-significant test in C.97. We cannot rule out equal "lying" rates for
+liars and truth-tellers.
+
+## Exercise C.99
+
+**Support for Returning Troops.** 931 of 1502 US adults
+($\hat p = 0.620$); 99% CI for $p$, the proportion of *all* US adults who
+believed the government does not provide enough support:
+
+```{python}
+#| echo: false
+p, se, ci = p_ci(931, 1502, conf=0.99)
+pd.Series({"p_hat": round(p, 4), "SE": round(se, 4),
+           "ME": round(stats.norm.ppf(0.995) * se, 4),
+           "99% CI": f"({ci[0]:.4f}, {ci[1]:.4f})"}).to_string()
+```
+
+The 99% CI is **(0.588, 0.652)**: we are 99% sure that between 58.8% and
+65.2% of all US adults believed returning soldiers were not getting enough
+government support.
+
+## Exercise C.100
+
+**Arsenic in Toenails.**
+
+- **(a)** The 8 British values are heavily right-skewed (skewness 1.6, with
+  26.0 a huge outlier), so a $t$ interval is **not** appropriate — bootstrap:
+
+```{python}
+#| echo: false
+gb = np.array([0.8, 1.9, 2.7, 3.4, 3.9, 7.1, 11.9, 26.0])
+boots = boot([gb], lambda r: r[0].mean())
+ci = np.percentile(boots, [2.5, 97.5])
+pd.Series({"Mean": round(gb.mean(), 3), "Median": float(np.median(gb)),
+           "95% bootstrap CI (mg/kg)": f"({ci[0]:.2f}, {ci[1]:.2f})"}).to_string()
+```
+
+Mean 7.21 mg/kg but median only 3.65 — the 95% **bootstrap CI is about
+(2.8, 13.3) mg/kg** (a $t$ interval would have been misleadingly wide and
+low: (0.2, 14.2)).
+- **(b)** The 19 New Hampshire values are right-skewed but without extreme
+  outliers, and the bootstrap check agrees with $t$, so the $t$-distribution
+  is reasonable:
+
+```{python}
+#| echo: false
+nh = pd.read_csv("data/synthesis/ToenailArsenic.csv").Arsenic.to_numpy(float)
+lo, hi = t_ci(nh.mean(), nh.std(ddof=1), 19)
+boots = boot([nh], lambda r: r[0].mean())
+ci_b = np.percentile(boots, [2.5, 97.5])
+pd.Series({"Mean (ppm)": round(nh.mean(), 3), "StDev": round(nh.std(ddof=1), 3),
+           "95% t CI": f"({lo:.3f}, {hi:.3f})",
+           "95% bootstrap CI (check)": f"({ci_b[0]:.3f}, {ci_b[1]:.3f})"}).to_string()
+```
+
+The 95% $t$ CI is **(0.158, 0.386) ppm** (bootstrap (0.18, 0.39) agrees): we
+are 95% sure mean toenail arsenic for people with private wells in this New
+Hampshire area is between about 0.16 and 0.39 ppm.
+
+## Exercise C.101
+
+**Smoking and Pregnancy Rate.** Smokers: 38/135 $= 0.281$ pregnant in the
+first cycle; non-smokers: 206/543 $= 0.379$.
+
+- **(a)**
+
+```{python}
+#| echo: false
+d, se, ci = dp_ci(38, 135, 206, 543)
+pd.Series({"Difference": round(d, 4), "SE": round(se, 4),
+           "95% CI": f"({ci[0]:.4f}, {ci[1]:.4f})"}).to_string()
+```
+
+The 95% CI for $p_S - p_N$ is **(−0.184, −0.012)** — **entirely negative**, so
+yes: smokers have a significantly lower first-cycle pregnancy success rate
+(book's rounded interval: −0.186 to −0.014).
+- **(b)** Testing $H_0: p_S = p_N$ vs $H_a: p_S \ne p_N$:
+
+```{python}
+#| echo: false
+z, p = dp_test(38, 135, 206, 543, alt="two")
+cards = np.repeat([1.0, 0.0], [244, 434])
+out = perm2(cards, 135)
+d = 38/135 - 206/543
+pd.Series({"z": round(z, 3), "Two-tail p (normal)": round(p, 4),
+           "Randomization two-tail p": round(float((np.abs(out) >= abs(d) - 1e-9).mean()), 4)}).to_string()
+```
+
+$z = -2.12$, **p = 0.034** (randomization p = 0.041, same conclusion) →
+**reject $H_0$** — the
+test agrees with the interval in (a), as it must since the CI excludes zero.
+- **(c) No.** Women chose whether to smoke, so this is an observational
+  study; confounders (stress, health, lifestyle) could explain the
+  association even though the prospective design rules out reverse causation.
+
+## Exercise C.102
+
+**Does Red Increase Men's Attraction to Women?** Red: $\bar x = 7.2$,
+$s = 0.6$, $n = 15$; white: $\bar x = 6.1$, $s = 0.4$, $n = 12$. Test
+$H_0: \mu_R = \mu_W$ vs $H_a: \mu_R > \mu_W$:
+
+```{python}
+#| echo: false
+t, df, p, se = t2_test(7.2, 0.6, 15, 6.1, 0.4, 12, alt="greater")
+pd.Series({"Difference": 1.1, "SE": round(se, 3), "t": round(t, 3),
+           "df (conservative)": df, "One-tail p": f"{p:.2e}"}).to_string()
+```
+
+$t = 1.1/0.193 = \mathbf{5.69}$ with $df = 11$ gives **p < 0.0001** →
+**reject $H_0$**: men rate the same women as significantly more attractive
+against a red background (by about 1.1 points on the 1–9 scale).
+
+## Exercise C.103
+
+**Close Confidants and Social Networking.**
+
+- **(a)** The sample is the **2006 randomly selected US adults** interviewed;
+  the intended population is **all US adults** (18 or older).
+- **(b) Observational** — nobody was assigned to use a social networking
+  site, so **no causal conclusions** are possible.
+- **(c)** SNS users: $\bar x = 2.5$, $s = 1.4$, $n = 947$; non-users:
+  $\bar x = 1.9$, $s = 1.3$, $n = 1059$. Testing $H_a: \mu_{SNS} > \mu_{no}$:
+
+```{python}
+#| echo: false
+t, df, p, se = t2_test(2.5, 1.4, 947, 1.9, 1.3, 1059, alt="greater")
+pd.Series({"Difference": 0.6, "SE": round(se, 4), "t": round(t, 2),
+           "One-tail p": f"{p:.2e}"}).to_string()
+```
+
+$t = \mathbf{9.91}$, **p ≈ 0** → **reject $H_0$**: SNS users average
+significantly more close confidants (about 0.6 more).
+- **(d)** A likely confounder is **age**: younger adults both use social
+  networking sites more and tend to have larger active social circles, so age
+  could account for the association.
+
+## Exercise C.104
+
+**Near Death Experiences.** Of 116 cardiac-arrest patients, 11 (9.5%)
+reported a near-death experience; of the other 1479 patients, 16 (1.1%) did.
+
+- **(a)** $\hat p_A = 11/116 = \mathbf{0.095}$; $\hat p_O = 16/1479 =
+  \mathbf{0.011}$.
+- **(b)** Test $H_0: p_A = p_O$ vs $H_a: p_A > p_O$:
+
+```{python}
+#| echo: false
+z, p = dp_test(11, 116, 16, 1479, alt="greater")
+rv = stats.hypergeom(1595, 27, 116)
+pd.Series({"z": round(z, 3), "One-tail p (normal)": f"{p:.2e}",
+           "Exact randomization p (hypergeometric)": f"{float(rv.sf(10)):.2e}"}).to_string()
+```
+
+$z = \mathbf{6.75}$, **p ≈ 7 × 10⁻¹²** → **reject $H_0$**: cardiac-arrest
+patients are far more likely to report near-death experiences. (With expected
+counts this small the normal tail is unreliable — the exact permutation
+p-value is ≈ 9 × 10⁻⁷ — but both are decisively significant.)
+
+## Exercise C.105
+
+**Time Spent Exercising, Males vs Females.** The 26 male and 10 female
+seniors in `StudentSurvey` (Table C.17):
+
+```{python}
+#| echo: false
+ss = pd.read_csv("data/ch09/StudentSurvey.csv")
+sen = ss[ss.Year == "Senior"]
+m = sen[sen.Sex == "M"].Exercise.dropna().to_numpy(float)
+f = sen[sen.Sex == "F"].Exercise.dropna().to_numpy(float)
+df, se, ci = t2_ci(m.mean(), m.std(ddof=1), len(m), f.mean(), f.std(ddof=1), len(f))
+pd.Series({"Males (n, mean, sd)": f"26, {m.mean():.2f}, {m.std(ddof=1):.2f}",
+           "Females (n, mean, sd)": f"10, {f.mean():.2f}, {f.std(ddof=1):.2f}",
+           "SE": round(se, 3), "df (conservative)": df,
+           "95% CI (M - F)": f"({ci[0]:.2f}, {ci[1]:.2f})"}).to_string()
+```
+
+Males average 6.81 h/week vs 6.40 for females — a difference of only 0.41
+hours. The 95% CI for $\mu_M - \mu_F$ is $0.41 \pm 2.262(1.637) =$
+**(−3.29, 4.11)** hours (the book's females-minus-males interval, −4.11 to
+3.29, is its mirror image). The interval includes 0: no evidence of a
+difference in mean exercise time between male and female seniors.
+
+## Exercise C.106
+
+**Fighting Insomnia.**
+
+- **(a)** Combining "Much" + "Some" into *Any improvement*, and putting
+  *Training* (+ Both) against *No training* (Medication + Neither):
+
+| | Training | No Training | Total |
+|---|---|---|---|
+| Any improvement | 28 | 10 | 38 |
+| No improvement | 9 | 25 | 34 |
+| Total | 37 | 35 | 72 |
+
+- **(b)** Testing $H_0: p_T = p_N$ vs $H_a: p_T > p_N$:
+
+```{python}
+#| echo: false
+z, p = dp_test(28, 37, 10, 35, alt="greater")
+pd.Series({"p_Training": round(28 / 37, 4), "p_NoTraining": round(10 / 35, 4),
+           "z": round(z, 3), "One-tail p": f"{p:.2e}"}).to_string()
+```
+
+$z = \mathbf{4.00}$, **p < 0.0001** → **reject $H_0$**: 76% of the training
+group improved vs 29% without training — strong evidence that the behavioral
+training helps fight insomnia.
+
+## Exercise C.107
+
+**Heart Rates.** `ICUAdmissions`: $n = 200$, $\bar x = 98.9$, $s = 26.8$.
+Test $H_0: \mu = 80$ vs $H_a: \mu > 80$:
+
+```{python}
+#| echo: false
+icu = pd.read_csv("data/ch03/ICUAdmissions.csv")
+hr = icu.HeartRate.to_numpy(float)
+t = (hr.mean() - 80) / (hr.std(ddof=1) / np.sqrt(len(hr)))
+sh = hr - hr.mean() + 80          # null world with mean 80
+r = np.random.default_rng(2026)
+sims = np.array([sh[r.integers(0, 200, 200)].mean() for _ in range(10000)])
+pd.Series({"n": len(hr), "Mean": round(hr.mean(), 2), "StDev": round(hr.std(ddof=1), 2),
+           "t": round(t, 3), "df": 199,
+           "One-tail p (t)": f"{stats.t.sf(t, 199):.2e}",
+           "Randomization p (shifted bootstrap)": f"{float((sims >= hr.mean() - 1e-12).mean()):.4f}"}).to_string()
+```
+
+$t = (98.9 - 80)/(26.8/\sqrt{200}) = \mathbf{9.97}$ with $df = 199$ gives
+**p < 0.0001** (randomization check agrees) → **reject $H_0$**: ICU patients'
+average pulse is significantly above the normal 80 bpm.
+
+## Exercise C.108
+
+**Normal Body Temperature.** Twelve readings for one healthy woman:
+mean $= 98.40^\circ$F, $s = 0.49$. Test $H_0: \mu = 98.6$ vs
+$H_a: \mu \ne 98.6$:
+
+```{python}
+#| echo: false
+bt = np.array([97.6, 98.0, 98.8, 98.9, 98.7, 98.1, 97.7, 98.1, 98.9, 98.9, 98.8, 98.3])
+t = (bt.mean() - 98.6) / (bt.std(ddof=1) / np.sqrt(12))
+pd.Series({"Mean": round(bt.mean(), 3), "StDev": round(bt.std(ddof=1), 3),
+           "t": round(t, 3), "df": 11,
+           "Two-tail p": round(2 * stats.t.sf(abs(t), 11), 3)}).to_string()
+```
+
+$t = \mathbf{-1.41}$ with $df = 11$ gives **p = 0.185** → **do not reject
+$H_0$**: this woman's mean body temperature is not detectably different from
+the traditional 98.6°F.
+
+## Exercise C.109
+
+**Prostate Cancer and a Drug for Baldness.** Finasteride: 804/4368 =
+0.184; placebo: 1145/4692 = 0.244. Test $H_0: p_F = p_P$ vs
+$H_a: p_F < p_P$:
+
+```{python}
+#| echo: false
+z, p = dp_test(804, 4368, 1145, 4692, alt="less")
+cards = np.repeat([1.0, 0.0], [1949, 7111])
+r = np.random.default_rng(2026)
+out = np.empty(10000)
+for i in range(10000):
+    pm = r.permutation(cards)
+    out[i] = pm[:4368].mean()
+pd.Series({"Difference": round(804/4368 - 1145/4692, 4),
+           "z": round(z, 3), "One-tail p (normal)": f"{p:.2e}",
+           "Randomization one-tail p": f"{float((out <= 804/4368 + 1e-12).mean()):.4f}"}).to_string()
+```
+
+$z = \mathbf{-6.94}$, **p ≈ 2 × 10⁻¹²** (randomization agrees) → **reject
+$H_0$**: men taking finasteride are significantly *less* likely to develop
+prostate cancer (24.4% → 18.4% over seven years).
+
+## Exercise C.110
+
+**Dark Chocolate for Good Health.** Flavonoid-rich: $\bar x = 1.3$,
+$s = 2.32$, $n = 11$; reduced-flavonoid control: $\bar x = -0.96$,
+$s = 1.58$, $n = 10$.
+
+- **(a)** The control chocolate keeps taste, texture, and the expectation of
+  "eating dark chocolate daily" identical, so participants can't tell which
+  group they're in — that's what makes the study double-blind and separates
+  the flavonoids' effect from the chocolate itself.
+- **(b)** Testing $H_0: \mu_F = \mu_C$ vs $H_a: \mu_F > \mu_C$:
+
+```{python}
+#| echo: false
+t, df, p, se = t2_test(1.3, 2.32, 11, -0.96, 1.58, 10, alt="greater")
+pd.Series({"Difference": 2.26, "SE": round(se, 3), "t": round(t, 3),
+           "df (conservative)": df, "One-tail p": round(p, 4)}).to_string()
+```
+
+$t = 2.26/0.860 = \mathbf{2.63}$ with $df = 9$ gives **p = 0.014**:
+significant at the **5% level** but **not at the 1% level**.
+- **(c) Yes** — within the limits of this study we can conclude the flavonoid
+ -rich chocolate *caused* better vascular health, because participants were
+  randomly assigned, double-blind, and placebo-controlled.
+
+## Exercise C.111
+
+**How Old Are Scout Honeybees?** $n = 50$, $\bar x = 29.1$, $s = 5.6$ vs
+$\mu_0 = 12$ days. Test $H_0: \mu = 12$ vs $H_a: \mu > 12$:
+
+```{python}
+#| echo: false
+t = (29.1 - 12) / (5.6 / np.sqrt(50))
+pd.Series({"SE": round(5.6 / np.sqrt(50), 3), "t": round(t, 3), "df": 49,
+           "One-tail p": f"{stats.t.sf(t, 49):.2e}"}).to_string()
+```
+
+$t = 17.1/0.792 = \mathbf{21.6}$ with $df = 49$, **p ≈ 0** → **reject
+$H_0$**: overwhelming evidence that scout bees (mean ≈ 29 days) are far older
+than the hive average of about 12 days.
+
+## Exercise C.112
+
+**Tribulus.** Tribulus: $\bar x = 1305.6$, $s = 177.3$, $n = 20$; control:
+$\bar x = 1255.9$, $s = 66.8$, $n = 12$.
+
+- **(a)** Testing $H_0: \mu_T = \mu_C$ vs $H_a: \mu_T > \mu_C$:
+
+```{python}
+#| echo: false
+t, df, p, se = t2_test(1305.6, 177.3, 20, 1255.9, 66.8, 12, alt="greater")
+pd.Series({"Difference": 49.7, "SE": round(se, 2), "t": round(t, 3),
+           "df (conservative)": df, "One-tail p": round(p, 4)}).to_string()
+```
+
+$t = \mathbf{1.13}$ with $df = 11$ gives **p = 0.14** → **do not reject
+$H_0$**: no evidence that Tribulus raises mean muscular power.
+- **(b)** A before-vs-after comparison for the same 20 athletes is a
+  **matched-pairs** analysis, which needs the *differences* — in particular
+  the standard deviation of each athlete's (after − before) change. Two
+  separate summaries (pre mean and SD, post mean and SD) never determine the
+  variability of the within-subject differences, so the paired test cannot be
+  carried out from this information.
+
+## Exercise C.113
+
+**Homes for Sale: Mid-Atlantic.** 15 of 90 Mid-Atlantic homes exceed
+2400 sq ft (`HomesForSale` confirms 15/90).
+
+```{python}
+#| echo: false
+hs = pd.read_csv("data/ch10/HomesForSale.csv")
+ma = hs[hs.State != "CA"]
+xm, nm = int((ma.Size > 2400).sum()), len(ma)
+p, se = xm / nm, np.sqrt((xm / nm) * (1 - xm / nm) / nm)
+lo, hi = p_ci(xm, nm)[2]
+pd.Series({"p_hat": round(p, 4), "SE": round(se, 4),
+           "95% CI": f"({lo:.4f}, {hi:.4f})"}).to_string()
+```
+
+- **(a)** $\hat p = 15/90 = \mathbf{0.167}$; SE $= \sqrt{0.167(0.833)/90} =
+  \mathbf{0.039}$.
+- **(b) Yes** — the sample has 15 successes and 75 failures, both ≥ 10, so
+  the CLT/normal model applies.
+- **(c)** The 95% CI is $0.167 \pm 1.96(0.039) =$ **(0.090, 0.244)**: we are
+  95% sure between 9% and 24% of all Mid-Atlantic homes for sale are larger
+  than 2400 sq ft.
+
+## Exercise C.114
+
+**Homes for Sale: Mid-Atlantic vs California.**
+
+- **(a)** Mid-Atlantic: 15 successes / 75 failures — normal is fine. California:
+  3 of 30 homes — only **3 successes**, well below 10, so the normal model is
+  **not** appropriate.
+- **(b)** Test $H_0: p_M = 0.25$ vs $H_a: p_M < 0.25$:
+
+```{python}
+#| echo: false
+se0 = np.sqrt(0.25 * 0.75 / 90)
+z = (15 / 90 - 0.25) / se0
+pd.Series({"p_hat": round(15 / 90, 4), "z": round(z, 3),
+           "One-tail p": round(stats.norm.cdf(z), 4)}).to_string()
+```
+
+$z = \mathbf{-1.83}$, **p = 0.034** → **reject $H_0$** at 5%: the Mid-Atlantic
+proportion of large homes is significantly below 25%.
+- **(c)** Since the normal model fails, use the exact binomial randomization
+  under $p = 0.25$:
+
+```{python}
+#| echo: false
+r = np.random.default_rng(2026)
+sims = r.binomial(30, 0.25, 10000) / 30
+pd.Series({"p_hat_CA": round(3 / 30, 4),
+           "Exact P(X <= 3 | n=30, p=0.25)": round(float(stats.binom.cdf(3, 30, 0.25)), 4),
+           "Randomization p (10000 sims)": round(float((sims <= 3/30 + 1e-12).mean()), 4)}).to_string()
+```
+
+**p = 0.037** → **reject $H_0$** at 5%: California's rate (10%) is
+significantly below 25% as well.
+
+## Exercise C.115
+
+**How Big Is the Difference?**
+
+- **(a)** $\hat p_M - \hat p_C = 15/90 - 3/30 = 0.167 - 0.100 = \mathbf{0.067}$.
+- **(b)** California's 3 successes violate the normal condition, so bootstrap
+  the difference (resampling the 90 and 30 homes):
+
+```{python}
+#| echo: false
+v1 = np.repeat([1.0, 0.0], [15, 75])
+v2 = np.repeat([1.0, 0.0], [3, 27])
+boots = boot([v1, v2], lambda r: r[0].mean() - r[1].mean())
+ci = np.percentile(boots, [5, 95])
+pd.Series({"Bootstrap SE": round(boots.std(ddof=1), 4),
+           "90% bootstrap CI": f"({ci[0]:.4f}, {ci[1]:.4f})"}).to_string()
+```
+
+The 90% **bootstrap percentile CI ≈ (−0.04, 0.18)** (the book's bootstrap
+interval: −0.056 to 0.167).
+- **(c)** The interval **contains zero** → **no evidence** of a difference in
+  the proportion of large homes between the Mid-Atlantic states and
+  California.
+
+## Exercise C.116
+
+**Football Air Pressure.** Patriots: $n = 11$, $\bar x = 11.10$, $s = 0.40$;
+Colts: $n = 4$, $\bar x = 12.63$, $s = 0.12$. Test $H_0: \mu_P = \mu_C$ vs
+$H_a: \mu_P < \mu_C$:
+
+```{python}
+#| echo: false
+t, df, p, se = t2_test(11.10, 0.40, 11, 12.63, 0.12, 4, alt="less")
+pd.Series({"Difference": -1.53, "SE": round(se, 4), "t": round(t, 3),
+           "df (conservative)": df, "One-tail p": round(p, 5)}).to_string()
+```
+
+$t = -1.53/0.135 = \mathbf{-11.36}$ with $df = 3$ gives **p = 0.0007** →
+**reject $H_0$**: the Patriots' game balls averaged significantly less
+pressure than the Colts' — a difference of 1.53 psi that the "weather"
+explanation cannot accommodate (the Colts played in the same conditions).
+
+## Exercise C.117
+
+**Infection in Dialysis Patients.** $n = 38$, $\bar x = 111.7$ days,
+$s = 144.0$.
+
+```{python}
+#| echo: false
+se = 144.0 / np.sqrt(38)
+me = tstar(37, 0.99) * se
+pd.Series({"SE": round(se, 2), "t* (99%, df=37)": round(tstar(37, 0.99), 3),
+           "Margin of error": round(me, 1),
+           "99% CI": f"({111.7 - me:.1f}, {111.7 + me:.1f})"}).to_string()
+```
+
+- **(a)** Best estimate $\bar x = \mathbf{111.7}$ days; SE $= 23.4$; with
+  $t^* = 2.715$ ($df = 37$) the margin of error is $\mathbf{63.4}$, giving a
+  99% CI of **(48.3, 175.1)** days: we are 99% sure the mean time to infection
+  for such patients is between about 48 and 175 days.
+- **(b)** Yes and yes — these are questions about *individuals*, and with
+  $s = 144$ days individual times vary enormously around the mean, so both
+  24 days and 152 days are ordinary values for a single patient.
+- **(c)** 24 days lies **below** the interval → **not plausible** for the
+  *mean*; 152 days lies **inside** the interval → **plausible**.
+
+## Exercise C.118
+
+**Age and Blood Pressure.** Teens ($n = 13$): mean 126.15, $s = 19.57$;
+eighties ($n = 15$): mean 132.27, $s = 31.23$.
+
+```{python}
+#| echo: false
+teens = np.array([100, 100, 104, 104, 112, 130, 130, 136, 140, 140, 142, 146, 156], float)
+eighties = np.array([80, 100, 100, 110, 110, 122, 130, 135, 136, 138, 140, 141, 162, 190, 190], float)
+lo_t, hi_t = t_ci(teens.mean(), teens.std(ddof=1), 13)
+lo_e, hi_e = t_ci(eighties.mean(), eighties.std(ddof=1), 15)
+me_t = tstar(12) * teens.std(ddof=1) / np.sqrt(13)
+me_e = tstar(14) * eighties.std(ddof=1) / np.sqrt(15)
+t, df, p, se = t2_test(teens.mean(), teens.std(ddof=1), 13, eighties.mean(), eighties.std(ddof=1), 15, alt="two")
+pd.Series({"Teens 95% CI": f"({lo_t:.1f}, {hi_t:.1f})", "Teens ME": round(me_t, 2),
+           "Eighties 95% CI": f"({lo_e:.1f}, {hi_e:.1f})", "Eighties ME": round(me_e, 2),
+           "(b) diff (teens - eighties)": round(teens.mean() - eighties.mean(), 2),
+           "(b) t, df, p": f"{t:.2f}, {df}, {p:.3f}"}).to_string()
+```
+
+- **(a)** Teens: **(114.3, 138.0)** mm Hg (ME 11.8); eighties: **(115.0,
+  149.6)** (ME 17.3). The **eighties** group has the larger margin of error,
+  caused by its much larger **standard deviation** (31.2 vs 19.6) — blood
+  pressure is more variable among the very old.
+- **(b)** $t = -0.63$ with $df = 12$, **p = 0.54** → **do not reject
+  $H_0$**: no evidence of a difference in mean systolic blood pressure
+  between the two age groups.
+
+## Exercise C.119
+
+**Light at Night and Weight Gain (test).** Light: $n = 19$, $\bar x = 9.4$,
+$s = 3.2$; dark: $n = 8$, $\bar x = 5.9$, $s = 1.9$. Test
+$H_0: \mu_L = \mu_D$ vs $H_a: \mu_L > \mu_D$:
+
+```{python}
+#| echo: false
+t, df, p, se = t2_test(9.4, 3.2, 19, 5.9, 1.9, 8, alt="greater")
+pd.Series({"Difference": 3.5, "SE": round(se, 3), "t": round(t, 3),
+           "df (conservative)": df, "One-tail p": round(p, 4)}).to_string()
+```
+
+$t = 3.5/0.995 = \mathbf{3.52}$ with $df = 7$ gives **p = 0.005** → **reject
+$H_0$**: mice with light at night gain significantly more weight (on the same
+calories) — consistent with the 99% CI (0.02, 6.98) of C.73.
+
+## Exercise C.120
+
+**CAOS Exam.** Paired pretest/posttest scores for $n = 10$ students
+(`CAOSExam`); differences (post − pre): 17.5, 5, 7.5, 15, 5, 25, 15, 17.5,
+15, 17.5.
+
+```{python}
+#| echo: false
+caos = pd.read_csv("data/synthesis/CAOSExam.csv")
+dif = (caos.Posttest - caos.Pretest).to_numpy(float)
+n = len(dif)
+md, sd = dif.mean(), dif.std(ddof=1)
+me = tstar(n - 1) * sd / np.sqrt(n)
+pd.Series({"Mean improvement": round(md, 2), "StDev of diffs": round(sd, 3),
+           "SE": round(sd / np.sqrt(n), 3), "t* (df=9)": round(tstar(9), 3),
+           "95% CI": f"({md - me:.2f}, {md + me:.2f})"}).to_string()
+```
+
+The mean improvement is $\bar x_D = \mathbf{14.0}$ points with $s_D = 6.37$;
+the 95% CI is $14.0 \pm 2.262(2.014) =$ **(9.44, 18.56)**: we are 95% sure
+this instructor's students improve, on average, by between 9.4 and 18.6
+CAOS points from pretest to posttest.
+
+## Exercise C.121
+
+**CAOS Comparisons.** Benchmark means: pretest 44.9, posttest 54.0,
+improvement 9.1.
+
+```{python}
+#| echo: false
+caos = pd.read_csv("data/synthesis/CAOSExam.csv")
+pre = caos.Pretest.to_numpy(float); post = caos.Posttest.to_numpy(float)
+dif = post - pre
+rows = []
+for lab, arr, mu, in [("posttest vs 54.0", post, 54.0),
+                      ("pretest vs 44.9", pre, 44.9),
+                      ("improvement vs 9.1", dif, 9.1)]:
+    t = (arr.mean() - mu) / (arr.std(ddof=1) / np.sqrt(10))
+    rows.append({lab: f"mean {arr.mean():.2f}; t = {t:.2f}; p = {stats.t.sf(t, 9):.3f}"})
+pd.Series(rows).to_string()
+```
+
+- **(a)** Posttest mean 60.25 vs benchmark 54.0: $t = 1.98$, **p = 0.039** →
+  **reject $H_0$** at 5%: this instructor's students score significantly
+  higher than the national posttest norm.
+- **(b)** Pretest mean 46.25 vs 44.9: $t = 0.46$, **p = 0.33** → **do not
+  reject $H_0$**: no evidence the students started stronger, so the high
+  posttest is not explained by stronger incoming students.
+- **(c)** Mean improvement 14.0 vs 9.1: $t = 2.43$, **p = 0.019** → **reject
+  $H_0$**: this instructor's students improve significantly more than the
+  national norm of 9.1 points.
+
+## Exercise C.122
+
+**Sex and Commuting Time — St. Louis.** The printed Minitab output shows
+240 females averaging 21.6 minutes ($s = 13.9$) and 260 males averaging 22.3
+minutes ($s = 14.6$); the estimated difference ($\mu_F - \mu_M$) is −0.70
+minutes with a 95% CI of **(−3.20, 1.80)** and $T = -0.55$,
+$p = 0.585$, $DF = 497$ (recomputing from `CommuteStLouis` reproduces every
+number). **Interpretation:** female commuters in St. Louis average a mere
+0.7 minutes — 42 seconds — less than males, a difference well within chance
+variation (the interval spans −3.2 to +1.8 minutes and the p-value is far
+from significant). There is **no evidence of any relationship between sex
+and commuting time** in St. Louis.
+
+## Exercise C.123
+
+**Sex and Commuting Time — Atlanta.** Same analysis on `CommuteAtlanta`
+($n = 500$): 254 men, 246 women.
+
+```{python}
+#| echo: false
+catl = pd.read_csv("data/ch03/CommuteAtlanta.csv")
+tm = catl.Time.to_numpy(float)
+g = (catl.Sex == "M").to_numpy()
+m, f = tm[g], tm[~g]
+df, se, ci = t2_ci(m.mean(), m.std(ddof=1), len(m), f.mean(), f.std(ddof=1), len(f))
+t, dfr, p, _ = t2_test(m.mean(), m.std(ddof=1), len(m), f.mean(), f.std(ddof=1), len(f), alt="two")
+out = perm2(tm, len(m))
+obs = m.mean() - f.mean()
+pd.Series({"Men (n, mean, sd)": f"{len(m)}, {m.mean():.2f}, {m.std(ddof=1):.2f}",
+           "Women (n, mean, sd)": f"{len(f)}, {f.mean():.2f}, {f.std(ddof=1):.2f}",
+           "Diff (M - F)": round(obs, 2), "SE": round(se, 3), "df (conservative)": df,
+           "95% CI": f"({ci[0]:.2f}, {ci[1]:.2f})",
+           "Two-tail p (t)": round(p, 4),
+           "Randomization two-tail p": round(float((np.abs(out) >= abs(obs) - 1e-9).mean()), 4)}).to_string()
+```
+
+Atlanta men average 31.3 minutes vs 26.8 for women: a difference of **4.5
+minutes** with a 95% CI of **(0.92, 8.15)** and $t = 2.47$,
+**p = 0.014** (randomization agrees) → **reject $H_0$**. Unlike St. Louis,
+Atlanta shows a significant sex difference in commuting time — men commute
+longer, plausibly reflecting residential/job geography rather than anything
+causal.
+
+## Exercise C.124
+
+**Commuting by Bicycle.** `BikeCommute`: 56 commute days randomized by coin
+flip to the carbon (26 days) or steel (30 days) bike.
+
+```{python}
+#| echo: false
+bc = pd.read_csv("data/ch10/BikeCommute.csv")
+mn = bc.Minutes.to_numpy(float)
+gb = (bc.Bike == "Carbon").to_numpy()
+c, s = mn[gb], mn[~gb]
+df, se, ci = t2_ci(c.mean(), c.std(ddof=1), len(c), s.mean(), s.std(ddof=1), len(s))
+t, dfr, p, _ = t2_test(c.mean(), c.std(ddof=1), len(c), s.mean(), s.std(ddof=1), len(s), alt="two")
+out = perm2(mn, len(c))
+obs = c.mean() - s.mean()
+pd.Series({"Carbon (n, mean, sd)": f"{len(c)}, {c.mean():.2f}, {c.std(ddof=1):.2f}",
+           "Steel (n, mean, sd)": f"{len(s)}, {s.mean():.2f}, {s.std(ddof=1):.2f}",
+           "Diff (C - S)": round(obs, 2), "SE": round(se, 3),
+           "95% CI": f"({ci[0]:.2f}, {ci[1]:.2f})",
+           "Two-tail p (t)": round(p, 3),
+           "Randomization two-tail p": round(float((np.abs(out) >= abs(obs) - 1e-9).mean()), 3)}).to_string()
+```
+
+The carbon bike averaged 108.34 minutes vs 107.79 for steel — a difference of
+**0.55 minutes** with 95% CI **(−2.56, 3.67)** and **p = 0.72** → **do not
+reject $H_0$**: no evidence that bike type changes commute time. The
+lightweight carbon bike's cost bought no measurable speed on this 27-mile
+route (weather and legs dominate).
+
+## Exercise C.125
+
+**Marriage Ages.** `MarriageAges`: ages of husband and wife for 105 couples.
+
+```{python}
+#| echo: false
+mag = pd.read_csv("data/ch02/MarriageAges.csv")
+dif = (mag.Husband - mag.Wife).to_numpy(float)
+n = len(dif)
+md, sd = dif.mean(), dif.std(ddof=1)
+t = md / (sd / np.sqrt(n))
+p_t = stats.t.sf(t, n - 1)
+r = np.random.default_rng(2026)
+flip = np.array([(dif * r.choice([-1.0, 1.0], n)).mean() for _ in range(10000)])
+older = int((mag.Husband > mag.Wife).sum())
+z = (older / n - 0.5) / np.sqrt(0.25 / n)
+lo_d, hi_d = t_ci(md, sd, n)
+lo_p, hi_p = (older / n - 1.96 * np.sqrt((older / n) * (1 - older / n) / n),
+              older / n + 1.96 * np.sqrt((older / n) * (1 - older / n) / n))
+pd.Series({"(a) Mean diff (H - W)": round(md, 3), "(a) sd of diffs": round(sd, 3),
+           "(a) t, one-tail p": f"{t:.2f}, {p_t:.2e}",
+           "(a) randomization (sign-flip) p": f"{float((flip >= md - 1e-12).mean()):.4f}",
+           "(a) 95% CI for mu_D": f"({lo_d:.2f}, {hi_d:.2f})",
+           "(b) Husband older": f"{older} of {n} = {older/n:.4f}",
+           "(b) z, one-tail p": f"{z:.2f}, {1 - stats.norm.cdf(z):.5f}",
+           "(c) 95% CI for p": f"({lo_p:.3f}, {hi_p:.3f})"}).to_string()
+```
+
+- **(a)** Husbands average 2.83 years older: $t = \mathbf{5.80}$,
+  **p < 0.0001** (sign-flip randomization agrees) → **reject $H_0$**: husbands
+  are significantly older, on average.
+- **(b)** The husband is older in 75 of 105 couples ($\hat p = 0.714$):
+  $z = \mathbf{4.39}$, **p ≈ 0.00001** → **reject $H_0$**: the proportion of
+  couples with an older husband exceeds 50%.
+- **(c)** For the significant results: the 95% CI for the mean age gap
+  $\mu_D$ is **(1.86, 3.80) years** (book: 1.87 to 3.80), and the 95% CI for
+  the proportion $p$ is **(0.628, 0.801)** (book: 0.618 to 0.798) — we are
+  95% sure between 63% and 80% of such couples have an older husband.
+
+## Exercise C.126
+
+**Marriage Age Intervals.**
+
+```{python}
+#| echo: false
+mag = pd.read_csv("data/ch02/MarriageAges.csv")
+w = mag.Wife.to_numpy(float); h = mag.Husband.to_numpy(float)
+lw, hw_ = t_ci(w.mean(), w.std(ddof=1), 105)
+lh, hh = t_ci(h.mean(), h.std(ddof=1), 105)
+se2 = w.std(ddof=1)**2 / 105 + h.std(ddof=1)**2 / 105
+dfi = 2 * 104
+t_ind = (h.mean() - w.mean()) / np.sqrt(se2)
+pd.Series({"(a) Wives: mean, 95% CI": f"{w.mean():.2f}, ({lw:.2f}, {hw_:.2f})",
+           "(b) Husbands: mean, 95% CI": f"{h.mean():.2f}, ({lh:.2f}, {hh:.2f})",
+           "(c) Independent two-sample t, p": f"{t_ind:.2f}, {2 * stats.t.sf(abs(t_ind), dfi):.4f}"}).to_string()
+```
+
+- **(a)** Wives: mean **31.84** years, 95% CI **(29.82, 33.86)**.
+- **(b)** Husbands: mean **34.67** years, 95% CI **(32.31, 37.03)**.
+- **(c) Yes — but only with care.** The two intervals overlap substantially,
+  and two *separate* intervals can overlap even when the difference is
+  significant, so we cannot legitimately predict the test's conclusion from
+  them alone. In fact the paired test (C.125) is decisively significant
+  ($p < 0.0001$) because pairing removes couple-to-couple variability, while
+  a (wrong here) two-independent-sample test would give only $t = 1.81$,
+  $p = 0.072$. The right conclusion: use the paired analysis — husbands are
+  significantly older.
+
+## Exercise C.127
+
+**Better Traffic Flow.** `TrafficFlow`: paired delay times (minutes) for 24
+simulated runs, Difference = Timed − Flexible.
+
+```{python}
+#| echo: false
+tf = pd.read_csv("data/ch04/TrafficFlow.csv")
+dif = tf.Difference.to_numpy(float)
+n = len(dif)
+md, sd = dif.mean(), dif.std(ddof=1)
+me = tstar(n - 1) * sd / np.sqrt(n)
+t = md / (sd / np.sqrt(n))
+r = np.random.default_rng(2026)
+flip = np.array([(dif * r.choice([-1.0, 1.0], n)).mean() for _ in range(10000)])
+pd.Series({"n": n, "Mean diff": round(md, 2), "StDev": round(sd, 3),
+           "SE": round(sd / np.sqrt(n), 3),
+           "95% CI": f"({md - me:.2f}, {md + me:.2f})",
+           "t, two-tail p": f"{t:.2f}, {2 * stats.t.sf(abs(t), n - 1):.2e}",
+           "Randomization (sign-flip) p": f"{float((np.abs(flip) >= abs(md) - 1e-9).mean()):.4f}"}).to_string()
+```
+
+The mean difference is $\bar x_D = \mathbf{61.0}$ minutes with $s_D = 15.19$;
+the 95% CI is $61.0 \pm 2.069(3.10) =$ **(54.59, 67.41) minutes**, and
+$t = \mathbf{19.68}$ with **p ≈ 0** → **reject $H_0$**: the flexible
+communicating-lights system reduces average delay by roughly 55–67 minutes
+per simulation. The **flexible system has the least average delay**.
+
+## Exercise C.128
+
+**Hockey Malevolence.** `MalevolentUniformsNHL` ($n = 21$ teams): the
+correlation between perceived uniform malevolence and standardized penalty
+minutes is $r = 0.521$. Randomizing (permuting the malevolence ratings)
+10,000 times:
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the correlation between uniform malevolence and penalty minutes for 21 NHL teams
+mun = pd.read_csv("data/ch04/MalevolentUniformsNHL.csv").dropna()
+x = mun.NHL_Malevolence.to_numpy(float); y = mun.ZPenMin.to_numpy(float)
+r_obs = np.corrcoef(x, y)[0, 1]
+r = np.random.default_rng(2026)
+out = np.array([np.corrcoef(x, r.permutation(y))[0, 1] for _ in range(10000)])
+se_r = out.std(ddof=1)
+z = r_obs / se_r
+dist_plot(out, "Randomization correlations", obs=r_obs, tail="right", bins=20)
+pd.Series({"Observed r": round(r_obs, 3),
+           "Randomization SE": round(se_r, 3),
+           "z = r / SE": round(z, 3),
+           "One-tail p (normal approx)": round(1 - stats.norm.cdf(z), 4),
+           "One-tail p (empirical)": round(float((out >= r_obs - 1e-12).mean()), 4)}).to_string()
+```
+
+Since the randomization distribution is roughly normal with mean 0 and
+SE $\approx 0.22$, the standardized statistic is $z = 0.521/0.224 =
+\mathbf{2.32}$, giving a one-tailed **p-value ≈ 0.010** (empirical 0.013) →
+**reject $H_0$**: there is evidence of a positive correlation — teams wearing
+"more malevolent" uniforms draw significantly more penalty minutes.
+
+## Exercise C.129
+
+**More Hockey Malevolence.**
+
+- **(a)** The student's standard error (0.22) came from the **randomization**
+  distribution — the spread of correlations when $H_0: \rho = 0$ is *forced to
+  be true* by scrambling. A confidence interval must reflect the sampling
+  variability of the statistic around the *observed* $r$, not variation under
+  a null world, so $\pm 1.645 \times 0.22$ around 0.521 is not a valid CI.
+- **(b)** Use a **bootstrap**: resample the 21 (malevolence, ZPenMin) *pairs*
+  with replacement and compute the correlation of each bootstrap sample; the
+  SD of those correlations estimates the SE.
+- **(c)–(d)**
+
+```{python}
+#| echo: false
+mun = pd.read_csv("data/ch04/MalevolentUniformsNHL.csv").dropna()
+x = mun.NHL_Malevolence.to_numpy(float); y = mun.ZPenMin.to_numpy(float)
+r_obs = np.corrcoef(x, y)[0, 1]
+n = len(x)
+boots = np.empty(10000)
+r = np.random.default_rng(2026)
+for i in range(10000):
+    idx = r.integers(0, n, n)
+    boots[i] = np.corrcoef(x[idx], y[idx])[0, 1]
+se_b = boots.std(ddof=1)
+ci = np.percentile(boots, [5, 95])
+pd.Series({"Observed r": round(r_obs, 3), "n": n,
+           "Bootstrap SE": round(se_b, 3),
+           "90% CI = r ± 1.645·SE": f"({r_obs - 1.645 * se_b:.3f}, {r_obs + 1.645 * se_b:.3f})",
+           "90% percentile CI": f"({ci[0]:.3f}, {ci[1]:.3f})",
+           "Bootstrap skewness": round(float(stats.skew(boots)), 2)}).to_string()
+```
+
+The bootstrap SE is $\approx \mathbf{0.235}$, so the 90% CI is
+$0.521 \pm 1.645(0.235) =$ **(0.13, 0.91)** (book: approximately 0.13 to
+0.91): we are 90% sure the correlation between uniform malevolence and
+penalty minutes for all NHL teams is between 0.13 and 0.91. **(d)** Not
+really — the bootstrap distribution is noticeably **left-skewed** (skewness
+≈ −1.4) because a correlation is bounded above by 1, so the normal-based
+interval is only roughly right (the percentile interval, (0.01, 0.75), is
+asymmetric and lower).
+
+## Exercise C.130
+
+**Penny Spinning.** A penny spun 200 times landed heads 84 times
+($\hat p = 0.42$); `RandomP50N200` holds 5000 randomization samples with
+$p = 0.5$.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the proportion of heads in 200 spins when p = 0.5, with the observed 0.42 marked
+rp = pd.read_csv("data/synthesis/RandomP50N200.csv")
+se_p = rp.Phat.std(ddof=1)
+se_c = rp.Count.std(ddof=1)
+phat = 84 / 200
+z_p = (phat - 0.5) / se_p
+z_c = (84 - 100) / se_c
+dist_plot(rp.Phat.to_numpy(), "Randomization proportions of heads", obs=phat, tail="two", bins=25)
+pd.Series({"(a) SE of p-hat": round(se_p, 4),
+           "(a) Theory sqrt(0.25/200)": round(np.sqrt(0.25 / 200), 4),
+           "(b) z (proportions)": round(z_p, 3),
+           "(c) Expected count": 100,
+           "(d) SD of counts": round(se_c, 3),
+           "(d) Theory sqrt(50)": round(np.sqrt(50), 3),
+           "(e) z (counts)": round(z_c, 3),
+           "(f) Two-tail p (normal)": round(2 * stats.norm.cdf(-abs(z_p)), 4),
+           "(f) Exact binomial two-tail": round(2 * stats.binom.cdf(84, 200, 0.5), 4),
+           "(f) Empirical p (5000 samples)": round(float((np.abs(rp.Phat - 0.5) >= abs(phat - 0.5) - 1e-12).mean()), 4)}).to_string()
+```
+
+- **(a)** The SD of the 5000 randomization proportions is SE $\approx
+  \mathbf{0.0354}$ (theory: $\sqrt{0.5(0.5)/200} = 0.0354$).
+- **(b)** $z = (0.42 - 0.5)/0.0354 = \mathbf{-2.26}$.
+- **(c)** The mean count of heads should be $200(0.5) = \mathbf{100}$.
+- **(d)** The SD of the 5000 counts is $\approx \mathbf{7.08}$
+  (theory: $\sqrt{200(0.5)(0.5)} = \sqrt{50} = 7.07$).
+- **(e)** $z = (84 - 100)/7.08 = \mathbf{-2.26}$ — **identical** to (b), as it
+  must be: the count is just 200 times the proportion, so the two
+  standardizations agree exactly.
+- **(f)** With a relatively normal randomization distribution, the
+  two-tailed **p-value ≈ 0.024** (exact binomial 0.028; empirical from the
+  5000 samples 0.027) → **reject $H_0$** at 5%: a spun penny is **not fair**
+  — it lands tails significantly more often than heads.
+
+:::

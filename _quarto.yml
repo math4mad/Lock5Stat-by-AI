@@ -93,6 +93,10 @@ website:
             text: "Ch. 4 · Section 4.4"
           - href: chapters/ch04/s4-5.qmd
             text: "Ch. 4 · Section 4.5"
+          - href: chapters/synthesis/unit-c-1.qmd
+            text: "Unit C · Synthesis (C.1–C.65)"
+          - href: chapters/synthesis/unit-c-2.qmd
+            text: "Unit C · Synthesis (C.66–C.130)"
           - href: chapters/synthesis/unit-b-1.qmd
             text: "Unit B · Synthesis (B.1–B.44)"
           - href: chapters/synthesis/unit-b-2.qmd

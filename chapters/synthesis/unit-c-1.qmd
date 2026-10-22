@@ -1,0 +1,1232 @@
+---
+execute-dir: project
+title: "Unit C · Essential Synthesis (C.1–C.65)"
+subtitle: "One and two samples, means and proportions — t and normal inference end to end"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+The Unit C Essential Synthesis exercises (Lock⁵, 3rd ed., pp. 521–535) are the capstone of the
+*t* and normal worlds: pick the tool — **hypothesis test or confidence interval** — pick the
+**parameter** (mean, proportion, difference in means, difference in proportions, matched-pairs
+mean difference), pick the **distribution** (normal for proportions, $t$ for means), and carry
+the analysis through to a conclusion in context. Wherever raw data exist, the $t$/normal
+answers are **verified by resampling** — randomization distributions for tests, bootstrap
+distributions for intervals — using 10,000 replicates with seed 2026, so every p-value and
+interval below is reproducible. Output- and summary-statistic exercises (C.9–C.19, C.22,
+C.37–C.65) are computed directly from the printed numbers; odd-numbered results are
+cross-checked against the book's partial answer key (agreement is noted wherever it goes
+beyond round-off).
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+sns.set_theme(style="whitegrid")
+from scipy import stats as st
+
+def perm_diff(pool, n1, reps=10000, seed=2026):
+    """Randomization: shuffle `pool`, split n1 / rest, return difference in means."""
+    rng = np.random.default_rng(seed)
+    out = np.empty(reps)
+    for i in range(reps):
+        p = rng.permutation(pool)
+        out[i] = p[:n1].mean() - p[n1:].mean()
+    return out
+
+def boot_mean(x, reps=10000, seed=2026):
+    """Bootstrap: resample `x` with replacement, return each resample mean."""
+    rng = np.random.default_rng(seed)
+    n = len(x)
+    return np.array([x[rng.integers(0, n, n)].mean() for _ in range(reps)])
+
+def boot_diff(x, y, reps=10000, seed=2026):
+    """Bootstrap: resample each group independently, return difference in means."""
+    rng = np.random.default_rng(seed)
+    return np.array([x[rng.integers(0, len(x), len(x))].mean()
+                     - y[rng.integers(0, len(y), len(y))].mean() for _ in range(reps)])
+
+def sign_flip(d, reps=10000, seed=2026):
+    """Randomization for paired data: randomly flip the sign of each difference."""
+    rng = np.random.default_rng(seed)
+    return (rng.choice([-1.0, 1.0], size=(reps, len(d))) * d).mean(axis=1)
+
+def dist_plot(boots, xlabel, obs=None, tail="two", bins=30, figsize=(6, 3)):
+    """Histogram of simulated statistics, optionally marking the observed statistic."""
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.histplot(x=boots, bins=bins, ax=ax, color="#4c72b0")
+    if obs is not None:
+        lines = (-abs(obs), abs(obs)) if tail == "two" else ((obs,) if tail == "right" else (-abs(obs),))
+        for v in lines:
+            ax.axvline(v, color="#c44e52", ls="--", lw=1)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Simulated statistics")
+    plt.tight_layout()
+    plt.show()
+```
+
+::: {.panel-tabset}
+
+## Exercise C.1
+
+**Estimate the average amount spent** at a retail store → **confidence interval for a mean**
+(one sample; $\mu$, estimated with $\bar x$ and a $t$-interval, or a bootstrap interval).
+
+## Exercise C.2
+
+**Compare average waiting time for two check-out cashiers** → **hypothesis test for a
+difference in means** (two independent samples; $H_0: \mu_1 = \mu_2$ vs $H_0: \mu_1 \ne \mu_2$).
+
+## Exercise C.3
+
+**Are high-sugar-fed mice more likely to be insulin-resistant?** → **hypothesis test for a
+difference in proportions** (two groups from an experiment; $H_0: p_s = p_n$ vs $H_a: p_s > p_n$).
+
+## Exercise C.4
+
+**Estimate the proportion of site visitors who make a purchase** → **confidence interval for a
+proportion** (one sample; $p$, estimated with $\hat p$).
+
+## Exercise C.5
+
+**Measure how large the early-decision vs regular-decision aid gap is** → **confidence interval
+for a difference in means** ("how large" asks for an interval, not a test).
+
+## Exercise C.6
+
+**Muscle mass measured before and after the program** → **confidence interval for a matched
+pairs difference in means** (the same participants are measured twice; analyze the individual
+differences $d$).
+
+## Exercise C.7
+
+**Is the left-handed proportion different from the national 10%?** → **hypothesis test for a
+proportion** ($H_0: p = 0.10$ vs $H_a: p \ne 0.10$).
+
+## Exercise C.8
+
+**Estimate the male–female gap in "trying to lose weight"** → **confidence interval for a
+difference in proportions**.
+
+## Exercise C.9
+
+A standardized statistic of $z = 5.6$ sits more than five standard errors from 0 — essentially
+impossible under $H_0$:
+
+```{python}
+#| echo: false
+pd.Series({"Two-tail p-value": float(st.norm.sf(5.6) * 2)}).to_string()
+```
+
+p-value essentially **0** → **reject $H_0$**. *(Key: small; reject.)*
+
+## Exercise C.10
+
+$z = 8.3$ is even further out — the p-value is effectively **0** → **reject $H_0$**.
+
+## Exercise C.11
+
+$z = 0.54$ is well within ordinary chance variation:
+
+```{python}
+#| echo: false
+pd.Series({"Two-tail p-value": round(st.norm.sf(0.54) * 2, 3)}).to_string()
+```
+
+p-value ≈ **0.59** → **do not reject $H_0$**. *(Key: large; do not reject.)*
+
+## Exercise C.12
+
+$t = 12.2$ (large df) is far in the tail — p-value **< 0.0001** → **reject $H_0$**.
+
+## Exercise C.13
+
+$t = 7.1$ is likewise many standard errors out — p-value **essentially 0** → **reject $H_0$**.
+*(Key: small; reject.)*
+
+## Exercise C.14
+
+$t = 0.83$ is an unremarkable value of $t$:
+
+```{python}
+#| echo: false
+pd.Series({"Two-tail p-value (large df)": round(st.t.sf(0.83, 10000) * 2, 3)}).to_string()
+```
+
+p-value ≈ **0.41** → **do not reject $H_0$**.
+
+## Exercise C.15
+
+Table C.1: Server B handled 65 of the 157 bills (60 = 21 card + 39 cash; C = 32). Testing
+$H_0: p_B = 1/3$ vs $H_a: p_B > 1/3$ with $\hat p_B = 65/157 = 0.414$:
+$z = \frac{0.414 - 0.333}{\sqrt{(1/3)(2/3)/157}} =$ **2.14, p-value = 0.016 → reject $H_0$** —
+there is evidence that Server B rings up **more than a third** of the bills. *(Key: z = 2.14,
+p = 0.0162.)*
+
+```{python}
+#| echo: false
+nB, ntot = 65, 157
+pB = nB / ntot
+z = (pB - 1/3) / np.sqrt((1/3) * (2/3) / ntot)
+pd.Series({"Sample proportion for B": round(pB, 3),
+           "z-statistic": round(z, 3),
+           "One-tail p-value": round(st.norm.sf(z), 4)}).to_string()
+```
+
+## Exercise C.16
+
+Cards paid 51 of 157 bills: $\hat p = 0.325$, $SE = \sqrt{0.325(0.675)/157} = 0.037$, so the
+95% CI is $0.325 \pm 1.96(0.037) =$ **(0.252, 0.398)** — we are 95% sure that between about
+25% and 40% of all bills at this bistro are paid with a credit/debit card.
+
+```{python}
+#| echo: false
+p = 51 / 157; se = np.sqrt(p * (1 - p) / 157)
+pd.Series({"Sample proportion": round(p, 4),
+           "95% CI": f"({p - 1.96*se:.3f}, {p + 1.96*se:.3f})"}).to_string()
+```
+
+## Exercise C.17
+
+Cash proportions: B = 50/65 = **0.769**, C = 17/32 = **0.531** (difference 0.238). Pooled
+$\hat p = 67/97 = 0.691$ gives $z = 0.238/0.0998 = $ **2.38, two-tailed p = 0.017 → reject
+$H_0$**: there **is** evidence of a difference in the cash-paying proportions of Servers B and
+C (B's bills are more often cash). *(Key: z = 2.39, p = 0.0168.)*
+
+```{python}
+#| echo: false
+b, bn, c, cn = 50, 65, 17, 32
+d = b/bn - c/cn
+pp = (b + c) / (bn + cn)
+z = d / np.sqrt(pp * (1 - pp) * (1/bn + 1/cn))
+pd.Series({"pB (cash)": round(b/bn, 3), "pC (cash)": round(c/cn, 3),
+           "z-statistic": round(z, 3),
+           "Two-tail p-value": round(st.norm.sf(abs(z)) * 2, 4)}).to_string()
+```
+
+## Exercise C.18
+
+Tip percent by payment (Table C.2): **credit has the larger average** (17.10 vs 16.39) and
+**cash has more variability** ($s = 5.05$ vs 2.47). Two-sample $t$:
+$SE = \sqrt{2.47^2/51 + 5.05^2/106} = 0.600$, $t = 0.71/0.600 = $ **1.18, p ≈ 0.24 → do not
+reject $H_0$** — despite the 0.71-point sample gap, there is **no evidence** of a difference in
+mean tip percentage by payment method (cash's big SD swamps it).
+
+```{python}
+#| echo: false
+se = np.sqrt(2.47**2/51 + 5.05**2/106)
+df = se**4 / ((2.47**2/51)**2/50 + (5.05**2/106)**2/105)
+t = (17.10 - 16.39) / se
+pd.Series({"Difference in means": round(17.10 - 16.39, 2),
+           "SE": round(se, 3), "t-statistic": round(t, 2),
+           "Two-tail p-value": round(st.t.sf(abs(t), df) * 2, 3)}).to_string()
+```
+
+## Exercise C.19
+
+Bill size by payment (Table C.3): **credit cards are used for larger bills** (\$29.40 vs
+\$19.50) and **show more variability** ($s = 14.5$ vs 9.4). Two-sample $t$:
+$SE = \sqrt{14.5^2/51 + 9.4^2/106} = 2.226$, $t = 9.9/2.226 = $ **4.45, p < 0.001 → reject
+$H_0$** — strong evidence that mean bill size differs by payment method (people put bigger
+bills on cards). *(Key: t = 4.45, p ≈ 0.)*
+
+```{python}
+#| echo: false
+se = np.sqrt(14.5**2/51 + 9.4**2/106)
+df = se**4 / ((14.5**2/51)**2/50 + (9.4**2/106)**2/105)
+t = (29.4 - 19.5) / se
+pd.Series({"Difference in means ($)": round(29.4 - 19.5, 2),
+           "SE": round(se, 3), "t-statistic": round(t, 2),
+           "Two-tail p-value": round(st.t.sf(abs(t), df) * 2, 5)}).to_string()
+```
+
+## Exercise C.20
+
+**Posture and Pain.** Three experiments on pose and pain tolerance.
+
+- **(a) Dominant vs submissive pose (independent groups).** Difference
+  $14.3 - (-6.1) = 20.4$ mmHg; $SE = \sqrt{39.8^2/45 + 40.4^2/44} = 8.50$; Welch
+  $df \approx 87$; $t = 2.40$, one-tailed **p = 0.009 → reject $H_0$**: dominant posing
+  increases mean pain tolerance more than submissive posing.
+- **(b) Dominant vs submissive interaction partner.** Difference
+  $-13.8 - 4.2 = -18.0$; $SE = \sqrt{27.1^2/15 + 22.9^2/15} = 9.16$; $df \approx 27$;
+  $t = -1.97$, one-tailed **p = 0.030 → reject $H_0$**: mean pain tolerance is higher when the
+  partner is submissive (complementary-pose effect).
+- **(c) Handgrip strength, 90% CI.** Difference (submissive − dominant partner) =
+  $-6.8 - (-45.3) = 38.5$ newtons; $SE = \sqrt{46.5^2/15 + 31.0^2/15} = 14.43$, $df \approx 24$,
+  $t^*_{0.95} = 1.71$: 90% CI **(13.8, 63.2)** newtons. The interval lies **entirely above 0**
+  → yes, a **significant difference**: participants with a submissive partner lost much less
+  grip strength (dominant partners are literally intimidating).
+- **(d) Implications:** posture shapes pain perception — a care provider's dominant stance
+  may make procedures hurt more, and helping patients feel in control could raise pain
+  tolerance. Cheap, non-drug, but based on small short-term experiments with approximated
+  data, so treat the effect sizes as provisional.
+
+```{python}
+#| echo: false
+def welch_t(m1, s1, n1, m2, s2, n2):
+    se = np.sqrt(s1**2/n1 + s2**2/n2)
+    df = se**4 / ((s1**2/n1)**2/(n1-1) + (s2**2/n2)**2/(n2-1))
+    return (m1 - m2), se, df, (m1 - m2)/se
+d, se, df, t = welch_t(14.3, 39.8, 45, -6.1, 40.4, 44)
+a = (round(d,1), round(se,2), round(df,1), round(t,2), round(st.t.sf(t, df), 4))
+d, se, df, t = welch_t(-13.8, 27.1, 15, 4.2, 22.9, 15)
+b = (round(d,1), round(se,2), round(df,1), round(t,2), round(st.t.cdf(t, df), 4))
+d, se, df, t = welch_t(-6.8, 31.0, 15, -45.3, 46.5, 15)
+lo = d - st.t.ppf(0.95, df) * se; hi = d + st.t.ppf(0.95, df) * se
+c = (round(d,1), round(se,2), round(df,1), f"({lo:.1f}, {hi:.1f})")
+pd.Series({"(a) diff, SE, df, t, p (1-tail)": a,
+           "(b) diff, SE, df, t, p (1-tail)": b,
+           "(c) diff, SE, df, 90% CI": c}).to_string()
+```
+
+## Exercise C.21
+
+**Mental Imaging and Muscle Fatigue** (`MentalMuscle`, 8 participants per group, 5% level).
+Group means (seconds): mental 7.34 pre / 6.10 post; actual 7.16 pre / 8.04 post.
+
+- **(a) Mental vs actual, pre-fatigue (two-sample, two-tailed):** $t = 0.35$, **p = 0.73 →
+  do not reject** — before fatigue the two modes take equally long. *(Key: t = 0.36, p = 0.73.)*
+- **(b) Actual motions, post vs pre (paired):** $\bar x_d = 0.875$ s, $s_d = 1.15$,
+  $t = 2.16$, one-tailed **p = 0.034 → reject**: actually performing the motions is **slower**
+  after fatigue. *(Key: t = 2.16, p = 0.0338.)*
+- **(c) Mental imaging, post vs pre (paired):** $\bar x_d = -1.24$ s, $s_d = 1.54$,
+  $t = -2.27$, one-tailed **p = 0.029 → reject**: mentally imaging the actions is **faster**
+  after fatigue. *(Key: t = −2.28, p = 0.0283.)*
+- **(d) Mental vs actual, post-fatigue (two-sample, two-tailed):** $t = -3.84$, **p = 0.002 →
+  reject**: after fatigue mental imaging is much faster than actual motion. *(Key: t = −3.83.)*
+- **(e) Summary:** actual movement slows with muscle fatigue while mental imaging does not
+  (it even speeds up), so the brain's simulation of action is largely insulated from the
+  periphery — mental rehearsal runs on central processes that fatigue doesn't drain.
+
+```{python}
+#| echo: false
+mm = pd.read_csv("data/synthesis/MentalMuscle.csv").dropna()
+mp = mm.loc[mm.Action == "Mental", "PreFatigue"].to_numpy(float)
+mq = mm.loc[mm.Action == "Mental", "PostFatigue"].to_numpy(float)
+ap = mm.loc[mm.Action == "Actual", "PreFatigue"].to_numpy(float)
+aq = mm.loc[mm.Action == "Actual", "PostFatigue"].to_numpy(float)
+pa = st.ttest_ind(mp, ap, equal_var=False)              # (a)
+db = aq - ap                                            # (b) actual post - pre
+pb = st.ttest_rel(aq, ap)
+dc = mq - mp                                            # (c) mental post - pre
+pc = st.ttest_rel(mq, mp)
+pd_ = st.ttest_ind(mq, aq, equal_var=False)             # (d)
+pd.Series({"(a) t, p (2-tail)": (round(pa.statistic, 2), round(pa.pvalue, 3)),
+           "(b) mean d, t, p (1-tail)": (round(db.mean(), 3), round(pb.statistic, 2), round(pb.pvalue/2, 4)),
+           "(c) mean d, t, p (1-tail)": (round(dc.mean(), 3), round(pc.statistic, 2), round(pc.pvalue/2, 4)),
+           "(d) t, p (2-tail)": (round(pd_.statistic, 2), round(pd_.pvalue, 4))}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distributions for the pre- and post-fatigue differences in mean time (mental minus actual)
+pool = np.concatenate([mp, ap]); obs_a = mp.mean() - ap.mean()
+perm_a = perm_diff(pool, 8)
+pool = np.concatenate([mq, aq]); obs_d = mq.mean() - aq.mean()
+perm_d = perm_diff(pool, 8)
+fig, axes = plt.subplots(1, 2, figsize=(7, 3))
+for ax, perm, obs, ttl in [(axes[0], perm_a, obs_a, "(a) pre-fatigue"),
+                           (axes[1], perm_d, obs_d, "(d) post-fatigue")]:
+    sns.histplot(x=perm, bins=20, ax=ax, color="#4c72b0")
+    for v in (-abs(obs), abs(obs)):
+        ax.axvline(v, color="#c44e52", ls="--", lw=1)
+    ax.set_title(ttl, fontsize=10)
+    ax.set_xlabel("Randomization differences in means")
+plt.tight_layout()
+plt.show()
+pd.Series({"(a) randomization p (2-tail)": round(float((np.abs(perm_a) >= abs(obs_a)).mean()), 3),
+           "(b) sign-flip p (1-tail)": round(float((sign_flip(db) >= db.mean()).mean()), 3),
+           "(c) sign-flip p (1-tail)": round(float((sign_flip(dc) <= dc.mean()).mean()), 3),
+           "(d) randomization p (2-tail)": round(float((np.abs(perm_d) >= abs(obs_d)).mean()), 4)}).to_string()
+```
+
+The randomization checks agree with every $t$-based verdict above (and with the book's key).
+
+## Exercise C.22
+
+**Student Survey** (`StudentSurvey`, n = 362; answered from the Minitab output, which the
+verification chunk below reproduces from the raw data).
+
+- **(a) Smoking.** Sample percent: $43/362 = $ **11.9%**. Test of $H_0: p = 0.20$ vs
+  $H_a: p \ne 0.20$: the output gives **p = 0.000 → reject $H_0$** — the percent of smokers at
+  this university differs from the national 20% (it is *lower*: the 95% CI,
+  (0.085, 0.152), lies entirely below 0.20).
+- **(b) Math SAT > 600?** One-sample $t$ of $H_0: \mu = 600$ vs $H_a: \mu > 600$: $\bar x =
+  609.44$, $T = 2.62$, **p = 0.005 → reject $H_0$** — average Math SAT at this university is
+  greater than 600.
+- **(c) Higher verbal SAT by sex.** Females: $84/165 = $ **0.509**; males: $66/190 = $
+  **0.347**. Test of $H_0: p_F = p_M$: $Z = 3.11$, **p = 0.002 → reject $H_0$** — the
+  proportion is different between the sexes. The 95% CI for $p_F - p_M$ is **(0.060, 0.264)**:
+  we are 95% sure the female "verbal-higher" rate exceeds the male rate by between 6 and 26
+  percentage points.
+- **(d) Pulse by smoking.** Sample means: smokers **71.8** vs non-smokers **69.3** — smokers
+  higher by 2.5 beats. Two-sample $t$: $T = -1.33$, **p = 0.188 → do not reject $H_0$** — no
+  evidence of a difference in mean pulse (the 95% CI, (−6.37, 1.28), contains 0).
+- **(e) GPA by smoking.** Sample means: non-smokers **3.173** vs smokers **3.054** (difference
+  0.119). $T = 1.91$, **p = 0.061**: significant **at the 10% level, but not at 5% or 1%**.
+  (The 95% CI, (−0.006, 0.244), just barely contains 0.)
+
+```{python}
+#| echo: false
+ss = pd.read_csv("data/ch02/StudentSurvey.csv")
+smk = (ss.Smoke == "Yes").sum()
+ms = ss.MathSAT.dropna()
+tb = st.ttest_1samp(ms, 600, alternative="greater")
+fv, mv = ss.loc[ss.Sex == "F", "HigherSAT"], ss.loc[ss.Sex == "M", "HigherSAT"]
+puN = ss.loc[ss.Smoke == "No", "Pulse"].dropna(); puY = ss.loc[ss.Smoke == "Yes", "Pulse"].dropna()
+gpN = ss.loc[ss.Smoke == "No", "GPA"].dropna(); gpY = ss.loc[ss.Smoke == "Yes", "GPA"].dropna()
+pd.Series({"(a) smokers / n": (int(smk), len(ss)),
+           "(b) MathSAT mean, T, p": (round(ms.mean(), 2), round(tb.statistic, 2), round(tb.pvalue, 4)),
+           "(c) F verbal-higher, M verbal-higher": ((int((fv == "Verbal").sum()), int(fv.notna().sum())),
+                                                    (int((mv == "Verbal").sum()), int(mv.notna().sum()))),
+           "(d) pulse No/Yes means, p": (round(puN.mean(), 1), round(puY.mean(), 1),
+                                         round(st.ttest_ind(puN, puY, equal_var=False).pvalue, 3)),
+           "(e) GPA No/Yes means, p": (round(gpN.mean(), 3), round(gpY.mean(), 3),
+                                       round(st.ttest_ind(gpN, gpY, equal_var=False).pvalue, 3))}).to_string()
+```
+
+Every value matches the printed output (43/362 = 0.1188; $\bar x$ = 609.44, T = 2.62;
+84/165 and 66/190; pulse 69.3 vs 71.8, T = −1.33; GPA 3.173 vs 3.054, T = 1.91).
+
+## Exercise C.23
+
+**GSW free throw attempts vs all NBA.** Test $H_0: \mu = 25.0$ vs $H_a: \mu \ne 25.0$ over the
+82 games: $\bar x = 20.39$ attempts/game ($s = 6.93$), $t = (20.39 - 25)/0.765 = $ **−6.02,
+p < 0.0001 → reject $H_0$** — the Warriors attempt far **fewer** free throws than the league
+average. The 95% t-interval (18.87, 21.91) and the 95% bootstrap interval **(18.9, 21.9)**
+agree: 25.0 is nowhere near plausible. *(Key: t = −6.03, p ≈ 0.)*
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the mean number of Warrior free throw attempts per game
+gw = pd.read_csv("data/synthesis/GSWarriors2019.csv")
+fta = gw.FTA.to_numpy(float)
+boots = boot_mean(fta)
+ci = np.percentile(boots, [2.5, 97.5])
+dist_plot(boots, "Bootstrap mean free throw attempts per game", obs=fta.mean())
+pd.Series({"Mean attempts (n = 82)": round(fta.mean(), 2),
+           "t-statistic vs 25": round((fta.mean() - 25)/(fta.std(ddof=1)/np.sqrt(82)), 2),
+           "Two-tail p-value": float(st.t.sf(abs(fta.mean()-25)/(fta.std(ddof=1)/np.sqrt(82)), 81)*2),
+           "95% t-interval": f"({fta.mean()-st.t.ppf(0.975,81)*fta.std(ddof=1)/np.sqrt(82):.2f}, {fta.mean()+st.t.ppf(0.975,81)*fta.std(ddof=1)/np.sqrt(82):.2f})",
+           "95% bootstrap interval": f"({ci[0]:.2f}, {ci[1]:.2f})"}).to_string()
+```
+
+## Exercise C.24
+
+**GSW free throw percentage vs all NBA.** $1339/1672 = \hat p = 0.801$ vs $H_0: p = 0.756$:
+$z = \frac{0.801 - 0.756}{\sqrt{0.756(0.244)/1672}} = $ **4.27, p < 0.0001 (two-tailed) →
+reject $H_0$** — Warrior players make a **higher** proportion of free throws than the league.
+Randomization check (10,000 binomial(1672, 0.756) samples): **p = 0.0001**. The 95% CI,
+(0.782, 0.820), excludes 0.756.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the made proportion when p equals 0.756
+ftm = gw.FT.to_numpy(float)
+p24 = ftm.sum() / fta.sum()
+rng = np.random.default_rng(2026)
+rp = rng.binomial(int(fta.sum()), 0.756, 10000) / fta.sum()
+dist_plot(rp, "Randomization proportions (p = 0.756)", obs=p24, tail="right", bins=24)
+se0 = np.sqrt(0.756 * 0.244 / fta.sum())
+seb = np.sqrt(p24 * (1 - p24) / fta.sum())
+pd.Series({"Made / attempts": (int(ftm.sum()), int(fta.sum())),
+           "Sample proportion": round(p24, 4),
+           "z-statistic": round((p24 - 0.756)/se0, 2),
+           "Two-tail p-value": float(st.norm.sf(abs((p24-0.756)/se0)) * 2),
+           "Randomization p (2-tail)": round(float((np.abs(rp - 0.756) >= abs(p24 - 0.756)).mean()), 4),
+           "95% CI": f"({p24-1.96*seb:.3f}, {p24+1.96*seb:.3f})"}).to_string()
+```
+
+## Exercise C.25
+
+**Home vs road free throw percentage.** Using `GSWarriors2019` as printed in the book's table
+(Home 664/827, Away 675/845 — note the **dataset's Location rows come out swapped**:
+home 675/845 = 0.799, away 664/827 = 0.803; either way the two rates differ by only 0.004).
+Two-proportion test: pooled $\hat p = 1339/1672 = 0.801$, $SE = 0.0195$,
+$z = $ **−0.21, two-tailed p ≈ 0.83 (one-tailed, home > away: p ≈ 0.58; randomization gives
+0.61) → do not reject $H_0$**. Unlike Example C.4's attempts, there is **no detectable home
+advantage in free throw accuracy** — the tiny gap is pure chance. *(Key: z ≈ 0.2, one-tail
+p = 0.421 — same "do not reject".)*
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in made proportions, home minus away
+home = gw.Location == "Home"
+hm, ha = ftm[home].sum(), fta[home].sum()
+am, aa = ftm[~home].sum(), fta[~home].sum()
+d25 = hm/ha - am/aa
+pool = np.concatenate([np.ones(int(hm + am)), np.zeros(int((ha - hm) + (aa - am)))])
+perm = perm_diff(pool, int(ha))
+dist_plot(perm, "Randomization differences in proportions (home - away)", obs=d25, bins=16)
+pp = (hm + am) / (ha + aa)
+z = d25 / np.sqrt(pp * (1 - pp) * (1/ha + 1/aa))
+pd.Series({"Home made/attempts": (int(hm), int(ha)), "Away made/attempts": (int(am), int(aa)),
+           "Difference": round(d25, 4), "z-statistic": round(z, 2),
+           "Two-tail p-value": round(float(st.norm.sf(abs(z)) * 2), 3),
+           "Randomization p (2-tail)": round(float((np.abs(perm) >= abs(d25)).mean()), 3)}).to_string()
+```
+
+## Exercise C.26
+
+**Home vs road attempts — 95% CI for the difference in means.** Home games average 20.61
+attempts, road games 20.17: difference $= 0.44$, $SE = 1.54$ (Welch $df \approx 74$), giving a
+95% t-interval of **(−2.63, 3.51)** (bootstrap: (−2.59, 3.46)). We are 95% sure the Warriors
+get between about 2.6 *fewer* and 3.5 *more* attempts per game at home — 0 is in the interval,
+so any true home edge in attempts can't be pinned down with one season.
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the difference in mean free throw attempts, home minus away
+fa_h, fa_a = fta[home], fta[~home]
+boots = boot_diff(fa_h, fa_a)
+ci = np.percentile(boots, [2.5, 97.5])
+dist_plot(boots, "Bootstrap differences in mean attempts (home - away)", obs=fa_h.mean() - fa_a.mean())
+se = np.sqrt(fa_h.var(ddof=1)/len(fa_h) + fa_a.var(ddof=1)/len(fa_a))
+dfc = se**4 / ((fa_h.var(ddof=1)/len(fa_h))**2/(len(fa_h)-1) + (fa_a.var(ddof=1)/len(fa_a))**2/(len(fa_a)-1))
+d = fa_h.mean() - fa_a.mean()
+pd.Series({"Home mean, Away mean": (round(fa_h.mean(), 2), round(fa_a.mean(), 2)),
+           "Difference": round(d, 2),
+           "95% t-interval": f"({d - st.t.ppf(0.975, dfc)*se:.2f}, {d + st.t.ppf(0.975, dfc)*se:.2f})",
+           "95% bootstrap interval": f"({ci[0]:.2f}, {ci[1]:.2f})"}).to_string()
+```
+
+## Exercise C.27
+
+**ICU Admissions** (`ICUAdmissions`, n = 200; Sex coded 0 = male, 1 = female; Status 1 = died).
+
+- **(a) Heart rate.** Sample mean $= $ **98.92** bpm ($s = 26.8$) — far above the healthy 72.
+  $t = (98.92 - 72)/1.897 = 14.19$, **p < 0.0001 → reject $H_0$**: ICU admissions' average
+  heart rate differs from (is much higher than) 72. Bootstrap 95% CI: **(95.2, 102.6)**.
+- **(b) Deaths.** $40/200 = \hat p = $ **0.20**. 95% CI (Wald) (0.145, 0.255); the exact
+  (Clopper–Pearson) interval is **0.147 to 0.262** *(matching the book's key)*: we are 95%
+  sure between about 15% and 26% of admissions to this ICU die.
+- **(c) Sex split.** 124 of 200 admissions (**62%**) are male, 38% female. Test of
+  $H_0: p = 0.5$: $z = 3.39$, **p = 0.0007 → reject $H_0$** — admissions are **not** equally
+  split (males predominate). *(The book's key answers "Females" here, but with the book's own
+  coding 0 = male the majority group in these data is male; the p-value — the key's 0.001 —
+  is the same either way.)*
+- **(d) Age by sex.** Males: $\bar x = 56.0$ ($n = 124$); females: $\bar x = 60.0$ ($n = 76$).
+  Two-sample $t = -1.34$, **p = 0.184 (randomization 0.18) → do not reject $H_0$** — no
+  evidence of an age difference. *(Key: p = 0.184.)*
+- **(e) Death by sex.** Males: 24/124 = 0.194; females: 16/76 = 0.211. $z = 0.29$,
+  **p = 0.77 (randomization 0.86) → do not reject $H_0$** — death rates are statistically
+  indistinguishable. *(Key: p = 0.772.)*
+
+```{python}
+#| echo: false
+ic = pd.read_csv("data/ch03/ICUAdmissions.csv")
+hr = ic.HeartRate.to_numpy(float); died = ic.Status.to_numpy(float); fem = ic.Sex.to_numpy(float)
+rb = np.random.default_rng(2026)
+bhr = np.array([hr[rb.integers(0, 200, 200)].mean() for _ in range(10000)])
+p27 = died.mean()
+cp = (st.beta.ppf(0.025, died.sum(), len(died)-died.sum()+1),
+      st.beta.ppf(0.975, died.sum()+1, len(died)-died.sum()))
+z_c = (fem.mean() - 0.5)/np.sqrt(0.25/200)
+pd.Series({"(a) mean HR, t, p (2-tail)": (round(hr.mean(), 2),
+            round((hr.mean()-72)/(hr.std(ddof=1)/np.sqrt(200)), 2),
+            float(st.t.sf(abs(hr.mean()-72)/(hr.std(ddof=1)/np.sqrt(200)), 199)*2)),
+           "(a) bootstrap 95% CI": f"({bhr.min() and np.percentile(bhr, 2.5):.1f}, {np.percentile(bhr, 97.5):.1f})",
+           "(b) deaths, p-hat": (int(died.sum()), round(p27, 3)),
+           "(b) exact 95% CI": f"({cp[0]:.3f}, {cp[1]:.3f})",
+           "(c) n male, n female, z": (int((fem == 0).sum()), int((fem == 1).sum()), round(abs(z_c), 2)),
+           "(c) two-tail p-value": round(st.norm.sf(abs(z_c)) * 2, 4)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distributions for the sex differences in mean age and in death proportion
+age_m = ic.loc[ic.Sex == 0, "Age"].to_numpy(float); age_f = ic.loc[ic.Sex == 1, "Age"].to_numpy(float)
+dm = died[ic.Sex.to_numpy() == 0]; dfem = died[ic.Sex.to_numpy() == 1]
+perm_age = perm_diff(np.concatenate([age_m, age_f]), len(age_m))
+perm_die = perm_diff(np.concatenate([dm, dfem]), len(dm))
+fig, axes = plt.subplots(1, 2, figsize=(7, 3))
+for ax, perm, obs, ttl in [(axes[0], perm_age, age_m.mean() - age_f.mean(), "(d) mean age"),
+                           (axes[1], perm_die, dfem.mean() - dm.mean(), "(e) death proportion")]:
+    sns.histplot(x=perm, bins=24, ax=ax, color="#55a868")
+    for v in (-abs(obs), abs(obs)):
+        ax.axvline(v, color="#c44e52", ls="--", lw=1)
+    ax.set_title(ttl, fontsize=10)
+plt.tight_layout()
+plt.show()
+td = st.ttest_ind(age_m, age_f, equal_var=False)
+pp = (dm.sum() + dfem.sum())/200
+ze = (dfem.mean() - dm.mean())/np.sqrt(pp*(1-pp)*(1/len(dm) + 1/len(dfem)))
+pd.Series({"(d) male age, female age": (round(age_m.mean(), 1), round(age_f.mean(), 1)),
+           "(d) t, p (2-tail)": (round(td.statistic, 2), round(td.pvalue, 3)),
+           "(d) randomization p (2-tail)": round(float((np.abs(perm_age) >= abs(age_m.mean()-age_f.mean())).mean()), 3),
+           "(e) male, female death proportions": (round(dm.mean(), 3), round(dfem.mean(), 3)),
+           "(e) z, p (2-tail)": (round(ze, 2), round(st.norm.sf(abs(ze))*2, 3)),
+           "(e) randomization p (2-tail)": round(float((np.abs(perm_die) >= abs(dfem.mean()-dm.mean())).mean()), 3)}).to_string()
+```
+
+## Exercise C.28
+
+**Nutrition Study** (`NutritionStudy`, n = 315; 273 females, 42 males; Smoke = "Yes"/"No").
+
+- **(a) Percent who smoke.** $43/315 = 13.7\%$; 95% CI **(0.099, 0.174)** — we are 95% sure
+  between about 10% and 17% of this population smokes.
+- **(b) Fiber, 99% CI.** $\bar x = 12.79$ g/day, $s = 5.33$: $12.79 \pm 2.595(0.300) =$
+  **(12.01, 13.57)** grams. Best estimate 12.79, margin of error ≈ **0.78 g**.
+- **(c) Fat, 90% CI.** $\bar x = 77.0$ g/day, $s = 33.8$: $77.0 \pm 1.650(1.905) =$
+  **(73.9, 80.2)** grams.
+- **(d) Smoking by sex.** Males 16.7% vs females 13.2%: $z = -0.61$, **p = 0.54
+  (randomization 0.63) → do not reject $H_0$** — no evidence of a sex difference in smoking.
+- **(e) Cholesterol by sex.** Males $\bar x = 328.1$ ($n = 42$) vs females $\bar x = 229.3$
+  ($n = 273$): $t = 4.17$, **p = 0.0001 (randomization 0.0001) → reject $H_0$** — males have
+  much higher mean cholesterol in these data.
+- **(f) Beta carotene by smoking.** Smokers $\bar x = 121.3$ ($n = 43$) vs non-smokers
+  $\bar x = 200.7$ ($n = 272$): $t = -4.74$, **p < 0.0001 → reject $H_0$** — smokers' mean
+  blood beta carotene is far lower. (The randomization p-value, 0.010, is less extreme than
+  the $t$ p-value because BetaPlasma is heavily right-skewed, but both reject decisively.)
+
+```{python}
+#| echo: false
+nu = pd.read_csv("data/ch02/NutritionStudy.csv")
+smk = (nu.Smoke == "Yes").astype(float).to_numpy()
+fib = nu.Fiber.to_numpy(float); fat = nu.Fat.to_numpy(float)
+p28 = smk.mean(); se = np.sqrt(p28*(1-p28)/315)
+lo_f = fib.mean() - st.t.ppf(0.995, 314)*fib.std(ddof=1)/np.sqrt(315)
+hi_f = fib.mean() + st.t.ppf(0.995, 314)*fib.std(ddof=1)/np.sqrt(315)
+lo_a = fat.mean() - st.t.ppf(0.95, 314)*fat.std(ddof=1)/np.sqrt(315)
+hi_a = fat.mean() + st.t.ppf(0.95, 314)*fat.std(ddof=1)/np.sqrt(315)
+pd.Series({"(a) smokers, p-hat, 95% CI": (int(smk.sum()), round(p28, 4), f"({p28-1.96*se:.3f}, {p28+1.96*se:.3f})"),
+           "(b) fiber mean, 99% CI": (round(fib.mean(), 2), f"({lo_f:.2f}, {hi_f:.2f})"),
+           "(c) fat mean, 90% CI": (round(fat.mean(), 2), f"({lo_a:.1f}, {hi_a:.1f})")}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distributions for the three two-sample comparisons in Exercise C.28
+sm_m = (nu.loc[nu.Sex == "Male", "Smoke"] == "Yes").astype(float).to_numpy()
+sm_f = (nu.loc[nu.Sex == "Female", "Smoke"] == "Yes").astype(float).to_numpy()
+ch_m = nu.loc[nu.Sex == "Male", "Cholesterol"].dropna().to_numpy(float)
+ch_f = nu.loc[nu.Sex == "Female", "Cholesterol"].dropna().to_numpy(float)
+bp_y = nu.loc[nu.Smoke == "Yes", "BetaPlasma"].dropna().to_numpy(float)
+bp_n = nu.loc[nu.Smoke == "No", "BetaPlasma"].dropna().to_numpy(float)
+perm_d = perm_diff(np.concatenate([sm_m, sm_f]), len(sm_m))
+perm_e = perm_diff(np.concatenate([ch_m, ch_f]), len(ch_m))
+perm_f = perm_diff(np.concatenate([bp_y, bp_n]), len(bp_y))
+fig, axes = plt.subplots(1, 3, figsize=(9, 3))
+for ax, perm, obs, ttl in [(axes[0], perm_d, sm_m.mean()-sm_f.mean(), "(d) % smoking (M − F)"),
+                           (axes[1], perm_e, ch_m.mean()-ch_f.mean(), "(e) cholesterol (M − F)"),
+                           (axes[2], perm_f, bp_y.mean()-bp_n.mean(), "(f) beta carotene (S − N)")]:
+    sns.histplot(x=perm, bins=24, ax=ax, color="#4c72b0")
+    for v in (-abs(obs), abs(obs)):
+        ax.axvline(v, color="#c44e52", ls="--", lw=1)
+    ax.set_title(ttl, fontsize=9)
+plt.tight_layout()
+plt.show()
+ppd = (sm_m.sum()+sm_f.sum())/315
+zd = (sm_f.mean()-sm_m.mean())/np.sqrt(ppd*(1-ppd)*(1/len(sm_m)+1/len(sm_f)))
+te = st.ttest_ind(ch_m, ch_f, equal_var=False)
+tf = st.ttest_ind(bp_y, bp_n, equal_var=False)
+pd.Series({"(d) male, female smoke %": (round(sm_m.mean(), 3), round(sm_f.mean(), 3)),
+           "(d) z, p (2-tail)": (round(zd, 2), round(st.norm.sf(abs(zd))*2, 3)),
+           "(d) randomization p (2-tail)": round(float((np.abs(perm_d) >= abs(sm_m.mean()-sm_f.mean())).mean()), 3),
+           "(e) t, p (2-tail)": (round(te.statistic, 2), round(te.pvalue, 4)),
+           "(e) randomization p (2-tail)": round(float((np.abs(perm_e) >= abs(ch_m.mean()-ch_f.mean())).mean()), 4),
+           "(f) t, p (2-tail)": (round(tf.statistic, 2), float(tf.pvalue)),
+           "(f) randomization p (2-tail)": round(float((np.abs(perm_f) >= abs(bp_y.mean()-bp_n.mean())).mean()), 4)}).to_string()
+```
+
+## Exercise C.29
+
+- (a) Area below $z = -2.10$: $\Phi(-2.10) = $ **0.0179**. *(Key: 0.018.)*
+- (b) Area above $z = 1.25$: $1 - \Phi(1.25) = $ **0.1056**. *(Key: 0.106.)*
+
+```{python}
+#| echo: false
+pd.Series({"(a) below -2.10": round(st.norm.cdf(-2.10), 4),
+           "(b) above 1.25": round(st.norm.sf(1.25), 4)}).to_string()
+```
+
+## Exercise C.30
+
+- (a) Area below $z = 1.68$: **0.9535**.
+- (b) Area above $z = 2.60$: **0.0047**.
+
+```{python}
+#| echo: false
+pd.Series({"(a) below 1.68": round(st.norm.cdf(1.68), 4),
+           "(b) above 2.60": round(st.norm.sf(2.60), 5)}).to_string()
+```
+
+## Exercise C.31
+
+- (a) Endpoint with 0.60 to its left: $z = $ **0.253**. *(Key: 0.253.)*
+- (b) Endpoint with 0.02 to its left: $z = $ **−2.054**. *(Key: −2.054.)*
+
+```{python}
+#| echo: false
+pd.Series({"(a) z with 0.60 left": round(st.norm.ppf(0.60), 4),
+           "(b) z with 0.02 left": round(st.norm.ppf(0.02), 4)}).to_string()
+```
+
+## Exercise C.32
+
+- (a) Endpoint with 0.25 to its left: $z = $ **−0.674**.
+- (b) Endpoint with 0.08 to its right (0.92 to its left): $z = $ **1.405**.
+
+```{python}
+#| echo: false
+pd.Series({"(a) z with 0.25 left": round(st.norm.ppf(0.25), 4),
+           "(b) z with 0.08 right": round(st.norm.ppf(0.92), 4)}).to_string()
+```
+
+## Exercise C.33
+
+$n = 25 \Rightarrow df = 24$; 5% beyond each tail: $\pm t_{0.95, 24} = $ **±1.711**. *(Key:
+±1.711.)*
+
+```{python}
+#| echo: false
+round(st.t.ppf(0.95, 24), 3)
+```
+
+## Exercise C.34
+
+$n = 12 \Rightarrow df = 11$; 1% beyond each tail: $\pm t_{0.99, 11} = $ **±2.718**.
+
+```{python}
+#| echo: false
+round(st.t.ppf(0.99, 11), 3)
+```
+
+## Exercise C.35
+
+$n = 10 \Rightarrow df = 9$; area right of 2.75: $t_{0.75\text{-tail}} =$ **0.0112**. *(Key:
+0.011.)*
+
+```{python}
+#| echo: false
+round(st.t.sf(2.75, 9), 4)
+```
+
+## Exercise C.36
+
+$n = 24 \Rightarrow df = 23$; area left of −1.50: **0.0736**.
+
+```{python}
+#| echo: false
+round(st.t.cdf(-1.50, 23), 4)
+```
+
+## Exercise C.37
+
+**Grams of Fiber per Day.** $\bar x = 12.79$, $SE = 0.30$, $n = 315$ (normal ok).
+
+- **(a)** 95% CI: $12.79 \pm 1.96(0.30) = $ **(12.20, 13.38)** grams — we are 95% sure mean
+  daily fiber intake is between about 12.2 and 13.4 grams. *(Key: 12.20 to 13.38.)*
+- **(b)** Test $H_0: \mu = 12$ vs $H_a: \mu > 12$: $z = (12.79 - 12)/0.30 = $ **2.63**,
+  **p = 0.004 → reject $H_0$** — good evidence that mean fiber consumption exceeds 12 g/day.
+  *(Key: z = 2.63, p = 0.004.)*
+
+```{python}
+#| echo: false
+pd.Series({"(a) 95% CI": (round(12.79 - 1.96*0.30, 2), round(12.79 + 1.96*0.30, 2)),
+           "(b) z, p (1-tail)": (round((12.79-12)/0.30, 2), round(st.norm.sf((12.79-12)/0.30), 4))}).to_string()
+```
+
+## Exercise C.38
+
+**Online Browsing on a Phone.** $\hat p = 0.17$, $SE = 0.0085$, $n = 1954$.
+
+- **(a)** 90% CI: $0.17 \pm 1.645(0.0085) = $ **(0.156, 0.184)** — we are 90% sure the
+  proportion of cell owners who do most of their browsing on the phone is between 15.6% and
+  18.4%.
+- **(b)** Test $H_0: p = 0.15$ vs $H_a: p > 0.15$: $z = (0.17-0.15)/0.0085 = $ **2.35**,
+  **p = 0.009 → reject $H_0$** — the proportion is greater than 0.15.
+
+```{python}
+#| echo: false
+pd.Series({"(a) 90% CI": (round(0.17 - 1.645*0.0085, 4), round(0.17 + 1.645*0.0085, 4)),
+           "(b) z, p (1-tail)": (round((0.17-0.15)/0.0085, 2), round(st.norm.sf((0.17-0.15)/0.0085), 4))}).to_string()
+```
+
+## Exercise C.39
+
+**Kids and Electronic Devices.** $\hat p = 0.83$, $n = 1000$: $SE = \sqrt{0.83(0.17)/1000} =
+0.0119$; 95% CI $0.83 \pm 1.96(0.0119) = $ **(0.807, 0.853)**; margin of error $\approx$
+**0.023**. **Below 80%? Not plausible** (0.80 is below the whole interval). **Above 85%?
+Plausible** (0.85 is inside). *(Key: 0.807 to 0.853; 0.023; No; Yes.)*
+
+```{python}
+#| echo: false
+se = np.sqrt(0.83*0.17/1000)
+pd.Series({"SE": round(se, 4),
+           "95% CI": f"({0.83-1.96*se:.3f}, {0.83+1.96*se:.3f})",
+           "Margin of error": round(1.96*se, 3),
+           "0.80 inside?": bool(0.83-1.96*se <= 0.80),
+           "0.85 inside?": bool(0.83+1.96*se >= 0.85)}).to_string()
+```
+
+## Exercise C.40
+
+**Home Field Advantage in Baseball.** $\hat p = 0.549$, $n = 2430$:
+$SE = \sqrt{0.549(0.451)/2430} = 0.0101$; 90% CI $0.549 \pm 1.645(0.0101) = $ **(0.532,
+0.566)** — we are 90% sure MLB home teams win between about 53.2% and 56.6% of all games.
+
+```{python}
+#| echo: false
+se = np.sqrt(0.549*0.451/2430)
+pd.Series({"90% CI": (round(0.549-1.645*se, 4), round(0.549+1.645*se, 4))}).to_string()
+```
+
+## Exercise C.41
+
+**Size of the Tip** (`RestaurantTips` output: $n = 157$, $\bar x = 3.849$, $s = 2.421$, SE Mean
+0.193).
+
+- **(a)** **157** tips; mean **\$3.849**; SD **\$2.421**.
+- **(b)** $SE = s/\sqrt{n} = 2.421/\sqrt{157} = $ **0.193** — matches the output's "SE Mean".
+- **(c)** 95% t-interval (df = 156): $3.849 \pm 1.9755(0.193) = $ **(\$3.467, \$4.231)**.
+  *(Key: 3.466 to 4.232 — round-off only.)*
+- **(d)** Minitab's interval (3.468, 4.231) is **the same up to round-off** — the summary
+  statistics carry all the information a t-interval needs.
+- **(e)** We are 95% sure the average tip at this bistro is between about **\$3.47 and
+  \$4.23**.
+
+```{python}
+#| echo: false
+se = 2.421/np.sqrt(157)
+tc = st.t.ppf(0.975, 156)
+pd.Series({"(b) SE": round(se, 4),
+           "(c) 95% t-interval": (round(3.849 - tc*se, 3), round(3.849 + tc*se, 3))}).to_string()
+```
+
+## Exercise C.42
+
+**Number of Walks** (`BaseballHits2019`: $n = 30$, $\bar x = 529.83$, $s = 71.66$, SE Mean
+13.08).
+
+- **(a)** **30** teams; mean **529.83** walks; SD **71.66**.
+- **(b)** $SE = 71.66/\sqrt{30} = $ **13.08** — matches the output.
+- **(c)** 95% t-interval (df = 29): $529.83 \pm 2.045(13.08) = $ **(503.08, 556.59)** —
+  identical to Minitab's interval.
+- **(e)** We are 95% sure the mean number of walks per MLB team per season is between about
+  **503 and 557**.
+
+```{python}
+#| echo: false
+se = 71.66/np.sqrt(30)
+tc = st.t.ppf(0.975, 29)
+pd.Series({"(b) SE": round(se, 3),
+           "(c) 95% t-interval": (round(529.83 - tc*se, 2), round(529.83 + tc*se, 2))}).to_string()
+```
+
+## Exercise C.43
+
+**The Chips Ahoy! Challenge.** $n = 42$, $\bar x = 1261.6$, $s = 117.6$.
+
+- **(a)** Bags from all over the country make the sample **representative** (avoid sampling
+  bias from one factory/region's stock), so conclusions generalize to all bags.
+- **(b)** Test $H_0: \mu = 1000$ vs $H_a: \mu > 1000$ (df = 41): $t = \frac{1261.6-1000}{117.6/\sqrt{42}}
+  = \frac{261.6}{18.15} = $ **14.4, p ≈ 0 → reject $H_0$** — average chips per bag is far above
+  1000. *(Key: t = 14.4, p ≈ 0.)*
+- **(c) No.** The test speaks to the **mean**, not to every bag: with $s = 117.6$, plenty of
+  individual bags fall below 1000 chips. The evidence does not confirm Nabisco's "at least
+  1000 in *every* bag" claim.
+
+```{python}
+#| echo: false
+t = (1261.6 - 1000)/(117.6/np.sqrt(42))
+pd.Series({"SE": round(117.6/np.sqrt(42), 2),
+           "t-statistic": round(t, 1),
+           "One-tail p-value": float(st.t.sf(t, 41))}).to_string()
+```
+
+## Exercise C.44
+
+**Social Networking Sites.** $n = 2255$ adults; 1787 use the Internet regularly; 1054 use a
+social networking site. 95% CIs:
+
+- **(a)** Internet use: $1787/2255 = 0.7925 \pm 1.96(0.0085) = $ **(0.776, 0.809)** — between
+  78% and 81% of US adults use the Internet regularly.
+- **(b)** SNS use among Internet users: $1054/1787 = 0.590 \pm 1.96(0.0116) = $ **(0.567,
+  0.613)**.
+- **(c)** SNS use among all adults: $1054/2255 = 0.467 \pm 1.96(0.0105) = $ **(0.447, 0.488)**.
+  **0.50 is outside the interval** — it is **not plausible** that half of all US adults use a
+  social networking site; fewer than half do.
+
+```{python}
+#| echo: false
+def ci1p(x, n):
+    p = x/n; se = np.sqrt(p*(1-p)/n)
+    return round(p, 4), f"({p-1.96*se:.4f}, {p+1.96*se:.4f})"
+pd.Series({"(a) internet / n = 2255": ci1p(1787, 2255),
+           "(b) SNS / internet users": ci1p(1054, 1787),
+           "(c) SNS / all adults": ci1p(1054, 2255)}).to_string()
+```
+
+## Exercise C.45
+
+**What Do People Do on Facebook?** $n = 970$ Facebook users. 95% CIs ($SE =
+\sqrt{\hat p(1-\hat p)/970}$):
+
+- **(a)** Update status (15%): **(0.128, 0.172)**; comment on a post (22%): **(0.194,
+  0.246)**; comment on a photo (20%): **(0.175, 0.225)**; "like" content (26%): **(0.232,
+  0.287)**; send a private message (10%): **(0.081, 0.119)**. *(All match the key.)*
+- **(b)** Commenting (0.194–0.246) vs updating (0.128–0.172): the intervals **do not
+  overlap**, so it is **not plausible** the two proportions are the same (a two-proportion
+  test gives $z = 3.99$, p < 0.0001). *(Key: No; intervals do not overlap.)*
+
+```{python}
+#| echo: false
+acts = {"update 15%": 0.15, "comment 22%": 0.22, "photo 20%": 0.20, "like 26%": 0.26, "pm 10%": 0.10}
+out = {k: ci1p(int(round(v*970)), 970) for k, v in acts.items()}
+z = (0.22-0.15)/np.sqrt(0.15*0.85/970 + 0.22*0.78/970)
+out["(b) z for 22% vs 15%"] = round(z, 2)
+pd.Series(out).to_string()
+```
+
+## Exercise C.46
+
+**Capital Punishment over Time.** 1974: 937/1410 = 0.664; 2006: 1945/2815 = 0.691. Change
+(2006 − 1974) $= 0.0264$; $SE = \sqrt{0.664(0.336)/1410 + 0.691(0.309)/2815} = 0.0153$; 95% CI
+$0.0264 \pm 1.96(0.0153) = $ **(−0.004, 0.056)**. The interval **contains 0** → yes, it is
+**plausible that support has not changed** (though the point estimates hint at a small
+increase).
+
+```{python}
+#| echo: false
+p74, p06 = 937/1410, 1945/2815
+d = p06 - p74
+se = np.sqrt(p74*(1-p74)/1410 + p06*(1-p06)/2815)
+pd.Series({"1974 p-hat": round(p74, 4), "2006 p-hat": round(p06, 4),
+           "Change": round(d, 4),
+           "95% CI for change": f"({d-1.96*se:.4f}, {d+1.96*se:.4f})",
+           "0 inside?": bool(d-1.96*se <= 0 <= d+1.96*se)}).to_string()
+```
+
+## Exercise C.47
+
+**Who Is More Trusting?** Internet users: 807/1754 = **0.460**; non-users: 130/483 =
+**0.269**.
+
+- **(a)** **Internet users** are more trusting in the sample (46% vs 27%).
+- **(b)** Test $H_0: p_U = p_N$ vs $H_a: p_U \ne p_N$ (pooled $\hat p = 937/2237 = 0.419$):
+  $z = 0.191/0.0254 = $ **7.53, p ≈ 0 → reject $H_0$** — the trust difference generalizes to
+  the populations. *(Key: z = 7.49, p ≈ 0.)* A 95% CI for the difference is **(0.145, 0.237)**.
+- **(c) No** — this is an observational comparison; nothing was randomized, so Internet use
+  is not established as the *cause* of greater trust.
+- **(d) Yes** — education plausibly increases both trust and Internet use, a classic
+  **confounding variable** that could account for the association.
+
+```{python}
+#| echo: false
+u1, n1c, u2, n2c = 807, 1754, 130, 483
+d = u1/n1c - u2/n2c
+pp = (u1+u2)/(n1c+n2c)
+z = d/np.sqrt(pp*(1-pp)*(1/n1c + 1/n2c))
+se = np.sqrt((u1/n1c)*(1-u1/n1c)/n1c + (u2/n2c)*(1-u2/n2c)/n2c)
+pd.Series({"Users, non-users": (round(u1/n1c, 3), round(u2/n2c, 3)),
+           "z-statistic": round(z, 2),
+           "Two-tail p-value": float(st.norm.sf(abs(z))*2),
+           "95% CI for difference": f"({d-1.96*se:.3f}, {d+1.96*se:.3f})"}).to_string()
+```
+
+## Exercise C.48
+
+**Democrat or Republican? 2011.** $n = 15{,}000$; $\hat p_D = 0.353$, $\hat p_R = 0.340$.
+Margins of error ($1.96\sqrt{\hat p(1-\hat p)/n}$): **±0.0076 for Democrats, ±0.0076 for
+Republicans**. The 1.3-point gap is only about 1.7 standard errors of the difference (95% CI
+for $p_D - p_R$: **(0.002, 0.024)**), and the two individual intervals overlap slightly — so
+the evidence that more adults identified as Democratic is **real but marginal** (a
+two-proportion test gives p ≈ 0.018): comfortable only if we insist on the difference CI,
+honest analysts would call it too close to call at 95% confidence.
+
+## Exercise C.49
+
+**Democrat or Republican? 2015.** $n = 12{,}000$; $\hat p_D = 0.290$, $\hat p_R = 0.260$.
+Margins of error: **±0.0081 for Democrats, ±0.0078 for Republicans** *(matching the key)*.
+The 3.0-point gap is over 5 standard errors of the difference (95% CI for $p_D - p_R$:
+**(0.019, 0.041)**, $z = 5.2$) — **yes**, we can comfortably conclude that in 2015 more
+American adults self-identified as Democrats than as Republicans. *(Key: 0.0081; 0.0078; Yes.)*
+
+```{python}
+#| echo: false
+se48 = np.sqrt(0.353*0.647/15000 + 0.34*0.66/15000)
+se49 = np.sqrt(0.29*0.71/12000 + 0.26*0.74/12000)
+z49 = 0.03/se49
+pd.Series({"C.48 MoE D, R": (round(1.96*np.sqrt(0.353*0.647/15000), 4), round(1.96*np.sqrt(0.34*0.66/15000), 4)),
+           "C.48 95% CI for difference": f"({0.013-1.96*se48:.4f}, {0.013+1.96*se48:.4f})",
+           "C.49 MoE D, R": (round(1.96*np.sqrt(0.29*0.71/12000), 4), round(1.96*np.sqrt(0.26*0.74/12000), 4)),
+           "C.49 95% CI for difference": f"({0.03-1.96*se49:.4f}, {0.03+1.96*se49:.4f})",
+           "C.49 z": round(z49, 2)}).to_string()
+```
+
+## Exercise C.50
+
+**Homes for Sale: California.** $n = 30$, $\bar x = 535.4$, $s = 269.2$ (thousands of dollars).
+95% t-interval (df = 29): $535.4 \pm 2.045(269.2/\sqrt{30}) = 535.4 \pm 100.5 = $ **(434.9,
+635.9)** thousand — we are 95% sure the mean price of a home for sale in California is between
+about \$435,000 and \$636,000. (With data this skewed, a bootstrap interval would be a
+defensible alternative.)
+
+```{python}
+#| echo: false
+se = 269.2/np.sqrt(30); tc = st.t.ppf(0.975, 29)
+pd.Series({"95% t-interval (k$)": (round(535.4 - tc*se, 1), round(535.4 + tc*se, 1))}).to_string()
+```
+
+## Exercise C.51
+
+**California − New York.** Difference $= 535.4 - 365.3 = 170.1$; $SE = \sqrt{269.2^2/30 +
+317.8^2/30} = 76.0$. 90% CI: with Welch $df \approx 57$, **(42.9, 297.3)**; with the book's
+conservative $df = 29$ ($t^* = 1.699$), **(40.9, 299.3)** *(the key's values)*. Either way the
+interval lies **entirely above 0**: California's mean listing price is substantially higher
+than New York's.
+
+```{python}
+#| echo: false
+d = 535.4 - 365.3; se = np.sqrt(269.2**2/30 + 317.8**2/30)
+pd.Series({"Difference (k$)": d,
+           "90% CI (Welch df = 56.5)": (round(d - st.t.ppf(0.95, 56.5)*se, 1), round(d + st.t.ppf(0.95, 56.5)*se, 1)),
+           "90% CI (df = 29)": (round(d - st.t.ppf(0.95, 29)*se, 1), round(d + st.t.ppf(0.95, 29)*se, 1))}).to_string()
+```
+
+## Exercise C.52
+
+**New Jersey − Pennsylvania.** Difference $= 328.5 - 265.6 = 62.9$; $SE = \sqrt{158.0^2/30 +
+137.1^2/30} = 38.2$. 99% CI: with Welch $df \approx 57$, **(−38.9, 164.7)**; with $df = 29$
+($t^* = 2.756$), **(−42.4, 168.2)**. The interval **contains 0** — no conclusive difference
+between New Jersey and Pennsylvania mean listing prices at 99% confidence.
+
+```{python}
+#| echo: false
+d = 328.5 - 265.6; se = np.sqrt(158.0**2/30 + 137.1**2/30)
+pd.Series({"Difference (k$)": d,
+           "99% CI (Welch df = 56.9)": (round(d - st.t.ppf(0.995, 56.9)*se, 1), round(d + st.t.ppf(0.995, 56.9)*se, 1)),
+           "99% CI (df = 29)": (round(d - st.t.ppf(0.995, 29)*se, 1), round(d + st.t.ppf(0.995, 29)*se, 1))}).to_string()
+```
+
+## Exercise C.53
+
+**New York − New Jersey.** Difference $= 365.3 - 328.5 = 36.8$; $SE = \sqrt{317.8^2/30 +
+158.0^2/30} = 64.8$. 95% CI: with Welch $df \approx 43$, **(−93.9, 167.5)**; with the book's
+$df = 29$ ($t^* = 2.045$), **(−95.7, 169.3)** *(the key's values)*. **0 is in the interval** —
+despite New York's higher sample mean, the huge within-state spread means no conclusive NY–NJ
+difference.
+
+```{python}
+#| echo: false
+d = 365.3 - 328.5; se = np.sqrt(317.8**2/30 + 158.0**2/30)
+pd.Series({"Difference (k$)": d,
+           "95% CI (Welch df = 42.5)": (round(d - st.t.ppf(0.975, 42.5)*se, 1), round(d + st.t.ppf(0.975, 42.5)*se, 1)),
+           "95% CI (df = 29)": (round(d - st.t.ppf(0.975, 29)*se, 1), round(d + st.t.ppf(0.975, 29)*se, 1))}).to_string()
+```
+
+## Exercise C.54
+
+**Handedness and Earnings.** Right-handed: $n = 2027$, $\bar x = 13.10$; left-handed: $n =
+268$, $\bar x = 13.40$; $s = 7.90$ both. Test $H_0: \mu_L = \mu_R$ vs $H_a: \mu_L \ne \mu_R$:
+$SE = 7.9\sqrt{1/2027 + 1/268} = 0.514$, $t = 0.30/0.514 = $ **0.58, p = 0.56 → do not reject
+$H_0$** — no evidence that average earnings differ by handedness (the 30-cent gap is well
+within chance for SDs near \$8).
+
+```{python}
+#| echo: false
+se = 7.9*np.sqrt(1/2027 + 1/268)
+t = (13.40 - 13.10)/se
+pd.Series({"SE": round(se, 3), "t-statistic": round(t, 2),
+           "Two-tail p-value": round(st.t.sf(abs(t), 340)*2, 3)}).to_string()
+```
+
+## Exercise C.55
+
+**Comparing Weight Loss Methods.** Continuous: $n = 54$, $\bar x = 14.1$, $s = 13.2$;
+intermittent: $n = 53$, $\bar x = 12.2$, $s = 10.6$. Test $H_0: \mu_C = \mu_I$ vs $H_a:
+\mu_C \ne \mu_I$: $SE = \sqrt{13.2^2/54 + 10.6^2/53} = 2.312$, $t = 1.9/2.312 = $ **0.82,
+p = 0.41 → do not reject $H_0$** — no evidence of a difference in mean weight loss between
+the two calorie-cutting methods. *(Key: t = 0.82, p = 0.416.)*
+
+```{python}
+#| echo: false
+se = np.sqrt(13.2**2/54 + 10.6**2/53)
+df = se**4/((13.2**2/54)**2/53 + (10.6**2/53)**2/52)
+t = (14.1 - 12.2)/se
+pd.Series({"SE": round(se, 3), "t-statistic": round(t, 2),
+           "Two-tail p-value": round(st.t.sf(abs(t), df)*2, 3)}).to_string()
+```
+
+## Exercise C.56
+
+**Sex and Gun Control.** Men: 318/520 = 0.612; women: 379/460 = 0.824. Difference (men −
+women) $= -0.212$; $SE = \sqrt{0.612(0.388)/520 + 0.824(0.176)/460} = 0.0278$. 90% CI:
+$-0.212 \pm 1.645(0.0278) = $ **(−0.258, −0.167)** — we are 90% sure the proportion of women
+favoring the waiting period exceeds the proportion of men by between about 17 and 26
+percentage points.
+
+```{python}
+#| echo: false
+d = 318/520 - 379/460
+se = np.sqrt((318/520)*(202/520)/520 + (379/460)*(81/460)/460)
+pd.Series({"Difference": round(d, 4),
+           "90% CI": f"({d-1.645*se:.4f}, {d+1.645*se:.4f})"}).to_string()
+```
+
+## Exercise C.57
+
+**Do Ovulating Women Affect Men's Speech?** $\hat p_F = 30/62 = 0.484$, $\hat p_L = 38/61 =
+0.623$; pooled $\hat p = 68/123 = 0.553$. Test $H_0: p_F = p_L$ vs $H_a: p_F < p_L$:
+$SE = \sqrt{0.553(0.447)(1/62 + 1/61)} = 0.0897$, $z = -0.139/0.0897 = $ **−1.55,
+p = 0.0606 → do not reject $H_0$ at the 5% level** — suggestive (as the randomization test in
+Exercise B.25 agreed, p ≈ 0.085) but short of significance. *(Key: z = −1.55, p = 0.0606.)*
+
+```{python}
+#| echo: false
+pp = 68/123
+z = (30/62 - 38/61)/np.sqrt(pp*(1-pp)*(1/62 + 1/61))
+pd.Series({"z-statistic": round(z, 2),
+           "One-tail p-value": round(st.norm.cdf(z), 4)}).to_string()
+```
+
+## Exercise C.58
+
+**Radiation from Cell Phones and Brain Activity.** Matched pairs: $n = 47$,
+$\bar x_d = 2.4$, $s_d = 6.3$ (on − off, μmol/100 g per minute). $SE = 6.3/\sqrt{47} = 0.919$;
+95% CI: $2.4 \pm t^*_{0.975, 46}(0.919) = 2.4 \pm 2.013(0.919) = $ **(0.55, 4.25)** — we are
+95% sure mean brain glucose metabolism is between about 0.55 and 4.25 units **higher** when a
+cell phone is on at the ear.
+
+```{python}
+#| echo: false
+se = 6.3/np.sqrt(47); tc = st.t.ppf(0.975, 46)
+pd.Series({"SE": round(se, 3),
+           "95% CI": (round(2.4 - tc*se, 2), round(2.4 + tc*se, 2))}).to_string()
+```
+
+## Exercise C.59
+
+**Testing the effect.** $H_0: \mu_d = 0$ vs $H_a: \mu_d > 0$ (metabolism higher with phone
+on): $t = 2.4/0.919 = $ **2.61, df = 46, p = 0.006 → reject $H_0$** — cell-phone radiation is
+associated with increased mean brain glucose metabolism. (Consistent with the CI in C.58
+excluding 0.) *(Key: t = 2.61, p = 0.006.)*
+
+```{python}
+#| echo: false
+se = 6.3/np.sqrt(47)
+pd.Series({"t-statistic": round(2.4/se, 2),
+           "One-tail p-value": round(st.t.sf(2.4/se, 46), 4)}).to_string()
+```
+
+## Exercise C.60
+
+**Store Brands Are Gaining.** $n \approx 27{,}000$.
+
+- **(a)** Sample: the ~27,000 consumers with Internet access, across 53 countries, who
+  responded (with age/sex quotas, weighted). Population: **consumers with Internet access**
+  worldwide (the online population — not all consumers).
+- **(b)** 61% bought more store brands: $0.61 \pm 2.576\sqrt{0.61(0.39)/27000} = 0.61 \pm
+  0.008 =$ **(0.602, 0.618)** — we are 99% sure the proportion is between 60.2% and 61.8%.
+- **(c)** 91% kept buying the same number: $0.91 \pm 2.576(0.00174) = $ **(0.9055, 0.9145)**
+  — between 90.6% and 91.4%.
+
+```{python}
+#| echo: false
+pd.Series({"(b) 99% CI for 0.61": (round(0.61 - 2.576*np.sqrt(0.61*0.39/27000), 4),
+                                   round(0.61 + 2.576*np.sqrt(0.61*0.39/27000), 4)),
+           "(c) 99% CI for 0.91": (round(0.91 - 2.576*np.sqrt(0.91*0.09/27000), 4),
+                                   round(0.91 + 2.576*np.sqrt(0.91*0.09/27000), 4))}).to_string()
+```
+
+## Exercise C.61
+
+**Congressional Approval.** $\hat p = 0.17$, $n = 1016$.
+
+- **(a)** Estimate: 17% approve. 99% margin of error: $2.576\sqrt{0.17(0.83)/1016} = $
+  **0.030** → 99% CI roughly (0.14, 0.20).
+- **(b)** For ±1% at 99% confidence: $n = \frac{2.576^2(0.17)(0.83)}{0.01^2} = 9363.5$, so
+  **n ≥ 9364** respondents. *(Key: n ≥ 9364.)*
+
+```{python}
+#| echo: false
+pd.Series({"(a) 99% margin of error": round(2.576*np.sqrt(0.17*0.83/1016), 4),
+           "(b) required n": int(np.ceil(2.576**2*0.17*0.83/0.01**2))}).to_string()
+```
+
+## Exercise C.62
+
+**Which Award?** $73/169 = \hat p = 0.432$ of female students chose the Olympic gold medal.
+Test $H_0: p = 1/3$ vs $H_a: p \ne 1/3$: $SE = \sqrt{(1/3)(2/3)/169} = 0.0363$,
+$z = (0.432 - 0.333)/0.0363 = $ **2.72, p = 0.007 → reject $H_0$** (exact binomial two-tail
+p = 0.009) — the proportion of female students choosing Olympic gold is **not** 1/3; the gold
+medal is more popular than an even split would predict.
+
+```{python}
+#| echo: false
+z = (73/169 - 1/3)/np.sqrt((1/3)*(2/3)/169)
+pd.Series({"Sample proportion": round(73/169, 3),
+           "z-statistic": round(z, 2),
+           "Two-tail normal p-value": round(st.norm.sf(abs(z))*2, 4),
+           "Two-tail exact binomial p-value": round(st.binomtest(73, 169, 1/3).pvalue, 4)}).to_string()
+```
+
+## Exercise C.63
+
+**Quebec vs Texas Secession.** Quebec: 0.28 of 800 = **224** people; Texas: 0.18 of 500 =
+**90** people.
+
+- **(b)** Pooled: $(224 + 90)/1300 = 314/1300 = $ **0.242**.
+- **(c)** Test $H_0: p_Q = p_T$ vs $H_a: p_Q \ne p_T$: $SE = \sqrt{0.242(0.758)(1/800 +
+  1/500)} = 0.0244$, $z = 0.10/0.0244 = $ **4.10, p < 0.0001 → reject $H_0$** — the two
+  population proportions differ: secessionist sentiment is significantly higher among
+  Quebecers than Texans. *(Key: 224; 90; pooled 0.24; z = 4.10.)*
+
+```{python}
+#| echo: false
+pp = 314/1300
+z = (0.28 - 0.18)/np.sqrt(pp*(1-pp)*(1/800 + 1/500))
+pd.Series({"Quebec count, Texas count": (224, 90),
+           "Pooled proportion": round(pp, 4),
+           "z-statistic": round(z, 2),
+           "Two-tail p-value": float(st.norm.sf(abs(z))*2)}).to_string()
+```
+
+## Exercise C.64
+
+**Does Red Increase Men's Attraction?** Red: $n = 15$, $\bar x = 7.2$, $s = 0.6$; white:
+$n = 12$, $\bar x = 6.1$, $s = 0.4$. Difference $= 1.1$; $SE = \sqrt{0.36/15 + 0.16/12} =
+0.193$ (Welch $df \approx 24$); 90% CI: $1.1 \pm 1.709(0.193) = $ **(0.77, 1.43)** — we are
+90% sure the red background raises men's mean attractiveness rating by between about 0.8 and
+1.4 points on the 1–9 scale; the interval excludes 0, so the red effect is significant.
+
+```{python}
+#| echo: false
+se = np.sqrt(0.6**2/15 + 0.4**2/12)
+df = se**4/((0.36/15)**2/14 + (0.16/12)**2/11)
+d = 7.2 - 6.1
+pd.Series({"SE": round(se, 3), "Welch df": round(df, 1),
+           "90% CI": (round(d - st.t.ppf(0.95, df)*se, 2), round(d + st.t.ppf(0.95, df)*se, 2))}).to_string()
+```
+
+## Exercise C.65
+
+**HRT and Cardiovascular Disease.** HRT: 164/8506 = 0.0193; placebo: 122/8102 = 0.0151.
+Difference (HRT − placebo) $= 0.0042$; $SE = \sqrt{0.0193(0.9807)/8506 + 0.0151(0.9849)/8102}
+= 0.00201$; 95% CI: $0.0042 \pm 1.96(0.00201) = $ **(0.0003, 0.0082)** *(key: 0.0003 to
+0.0081 — round-off)*. The interval **barely excludes 0**: women taking HRT have a higher
+probability of cardiovascular disease (about 0.3–0.8 percentage points higher) — exactly the
+kind of finding that led the Women's Health Initiative to stop the trial early on ethical
+grounds.
+
+```{python}
+#| echo: false
+d = 164/8506 - 122/8102
+se = np.sqrt((164/8506)*(1-164/8506)/8506 + (122/8102)*(1-122/8102)/8102)
+pd.Series({"HRT proportion": round(164/8506, 4),
+           "Placebo proportion": round(122/8102, 4),
+           "Difference": round(d, 5),
+           "95% CI": f"({d-1.96*se:.4f}, {d+1.96*se:.4f})",
+           "0 inside?": bool(d-1.96*se <= 0 <= d+1.96*se)}).to_string()
+```
+
+:::
