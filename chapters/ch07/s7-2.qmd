@@ -1,0 +1,1052 @@
+---
+execute-dir: project
+title: "Chapter 7 · Section 7.2"
+subtitle: "Testing for an Association between Two Categorical Variables — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 7.2 moves the chi-square machinery to the **two-way table**: when each
+unit is classified by *two* categorical variables, the question is whether the
+variables are **associated**. The null hypothesis says there is *no*
+association — in a homogeneity setting, that several populations share the same
+distribution of one categorical variable; in an independence setting, that one
+sample's two categorical variables are unrelated — and the alternative says the
+variables are related. Under $H_0$ each cell's **expected count** is
+$$E=\frac{\text{row total}\times\text{column total}}{\text{grand total}},$$
+and the **chi-square statistic** accumulates squared gaps over every cell,
+$$\chi^2=\sum\frac{(O-E)^2}{E},$$
+to be read against a $\chi^2$ distribution with
+$df=(r-1)(c-1)$ degrees of freedom for an $r\times c$ table; the **p-value is
+the area to the right** of the statistic (big $\chi^2$ means observed counts
+far from expected). The conditions are a random sample (or random
+assignment) and **all expected counts at least 5**. Two cross-checks appear
+throughout: for a $2\times2$ table the $\chi^2$ statistic is the *square* of
+the two-proportion $z$-statistic with a matching two-tailed p-value, and for
+tables with modest counts **Fisher's exact test** provides a small-sample
+backup. Every test below is computed with `scipy.stats.chi2_contingency` (no
+continuity correction, matching the book) and verified against a
+**randomization distribution** of 10000 shuffles of one categorical column
+(seed 2026); exercises 7.37–7.40 practice expected counts and cell
+contributions, 7.41–7.44 degrees of freedom, and the applied exercises
+7.45–7.67 run full tests — loading the real `StudentSurvey`, `PASeniors`, and
+`NutritionStudy` datasets where the book uses them
+(pp. 569–576).
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+from scipy import stats
+sns.set_theme(style="whitegrid")
+
+def chisq_parts(tab):
+    """Pearson chi-square decomposition of a two-way table (no continuity
+    correction): statistic, p-value, df, expected counts, cell contributions."""
+    tab = np.asarray(tab, float)
+    chi2, p, df, exp = stats.chi2_contingency(tab, correction=False)
+    contrib = (tab - exp) ** 2 / exp
+    return chi2, p, df, exp, contrib
+
+def fmt_p(p):
+    """Format a p-value, switching to scientific notation when tiny."""
+    return float(f"{p:.2e}") if p < 1e-4 else round(float(p), 4)
+
+def chisq_row(tab):
+    """One-row summary of a chi-square test of association."""
+    chi2, p, df, exp, _ = chisq_parts(tab)
+    return pd.Series({"Chi-square statistic": round(float(chi2), 3),
+                      "df": int(df),
+                      "p-value": fmt_p(p),
+                      "Smallest expected count": round(float(exp.min()), 2)})
+
+def obs_exp(tab, rows, cols):
+    """Two-way table displaying observed count with expected count in parentheses."""
+    _, _, _, exp, _ = chisq_parts(tab)
+    disp = pd.DataFrame([[f"{o:.0f} ({e:.1f})" for o, e in zip(ro, re_)]
+                         for ro, re_ in zip(np.asarray(tab, float), exp)],
+                        index=rows, columns=cols)
+    disp.index.name = "Observed (expected)"
+    return disp
+
+def obs_exp_contrib(tab, rows, cols):
+    """Two-way table displaying observed (expected) [contribution] per cell."""
+    _, _, _, exp, contrib = chisq_parts(tab)
+    disp = pd.DataFrame([[f"{o:.0f} ({e:.1f}) [{c:.2f}]" for o, e, c in zip(ro, re_, rc)]
+                         for ro, re_, rc in zip(np.asarray(tab, float), exp, contrib)],
+                        index=rows, columns=cols)
+    disp.index.name = "Observed (expected) [contribution]"
+    return disp
+
+def rand_chisq(tab, reps=10000, seed=2026):
+    """Randomization distribution of the chi-square statistic obtained by
+    shuffling one categorical column against the other: with both sets of
+    marginal totals held fixed this is a sequential hypergeometric re-deal of
+    each row's counts from the column totals (vectorized across replicates)."""
+    rng = np.random.default_rng(seed)
+    tab = np.asarray(tab, np.int64)
+    nrows, ncols = tab.shape
+    sims = np.empty((reps, nrows, ncols), np.int64)
+    pool = np.tile(tab.sum(axis=0), (reps, 1))   # remaining column counts per replicate
+    for i in range(nrows):
+        rem = int(tab[i].sum())
+        for j in range(ncols - 1):
+            pop = pool[:, j:].sum(axis=1)   # population: not-yet-processed columns
+            draw = rng.hypergeometric(pool[:, j], pop - pool[:, j], rem)
+            sims[:, i, j] = draw
+            pool[:, j] -= draw
+            rem -= draw
+        sims[:, i, -1] = rem
+        pool[:, -1] -= rem
+    exp = np.outer(tab.sum(axis=1), tab.sum(axis=0)) / tab.sum()
+    flat = sims.reshape(reps, -1)
+    return ((flat - exp.ravel()) ** 2 / exp.ravel()).sum(axis=1)
+
+def rand_p(sims, observed):
+    """Randomization p-value: share of simulated statistics at or beyond the observed."""
+    p = float((np.asarray(sims) >= observed).mean())
+    return "< 0.0001" if p == 0 else round(p, 4)
+
+def chisq_tail(sims, observed, xlabel="Randomization chi-square statistics",
+               bins=40, figsize=(6, 2.8)):
+    """Histogram of simulated chi-square statistics with the p-value tail shaded."""
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.histplot(x=sims, bins=bins, ax=ax, color="#4c72b0")
+    m = np.asarray(sims) >= observed
+    if m.any():
+        sns.histplot(x=sims[m], bins=bins, ax=ax, color="#c44e52")
+    ax.axvline(observed, color="black", lw=1.5)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Simulated statistics")
+    plt.tight_layout()
+    plt.show()
+```
+
+::: {.panel-tabset}
+
+## Exercise 7.37
+
+*(Skill Builder 1)* Find the expected count and the contribution to the
+chi-square statistic for the **(Group 3, Yes)** cell of the $3\times2$ table.
+
+```{python}
+#| echo: false
+tab = np.array([[56, 44], [132, 68], [72, 28]])   # rows: Groups 1-3, cols: Yes/No
+chi2, p, df, exp, contrib = chisq_parts(tab)
+pd.Series({"Expected count (Group 3, Yes)": round(float(exp[2, 0]), 1),
+           "Contribution to chi-square": round(float(contrib[2, 0]), 3)}).to_string()
+```
+
+Expected $=\dfrac{100\cdot260}{400}=65$ and the contribution is
+$\dfrac{(72-65)^2}{65}=49/65\approx$ **0.75**.
+
+## Exercise 7.38
+
+*(Skill Builder 1)* Expected count and chi-square contribution for the
+**(B, E)** cell of the $3\times4$ table.
+
+```{python}
+#| echo: false
+tab = np.array([[39, 34, 43, 34], [78, 89, 70, 93], [23, 37, 27, 33]])  # rows A-C, cols D-G
+chi2, p, df, exp, contrib = chisq_parts(tab)
+pd.Series({"Expected count (B, E)": round(float(exp[1, 1]), 1),
+           "Contribution to chi-square": round(float(contrib[1, 1]), 4)}).to_string()
+```
+
+Expected $=\dfrac{330\cdot160}{600}=88$ and the contribution is
+$\dfrac{(89-88)^2}{88}=\dfrac{1}{88}\approx$ **0.011** — a cell that sits
+almost exactly where $H_0$ expects it.
+
+## Exercise 7.39
+
+*(Skill Builder 1)* Expected count and chi-square contribution for the
+**(Control, Disagree)** cell of the $2\times5$ table.
+
+```{python}
+#| echo: false
+tab = np.array([[40, 50, 5, 15, 10], [60, 45, 10, 5, 0]])  # cols: Strongly Agree...Strongly Disagree
+chi2, p, df, exp, contrib = chisq_parts(tab)
+pd.Series({"Expected count (Control, Disagree)": round(float(exp[0, 3]), 1),
+           "Contribution to chi-square": round(float(contrib[0, 3]), 2)}).to_string()
+```
+
+The Disagree column holds $15+5=20$ of the $240$ responses and the Control row
+holds $120$, so expected $=\dfrac{120\cdot20}{240}=10$ and the contribution is
+$\dfrac{(15-10)^2}{10}=$ **2.5** — controls disagree somewhat more often than
+$H_0$ predicts.
+
+## Exercise 7.40
+
+*(Skill Builder 1)* Expected count and chi-square contribution for the
+**(Group 2, No)** cell of the $2\times2$ table.
+
+```{python}
+#| echo: false
+tab = np.array([[720, 280], [1180, 320]])
+chi2, p, df, exp, contrib = chisq_parts(tab)
+pd.Series({"Expected count (Group 2, No)": round(float(exp[1, 1]), 1),
+           "Contribution to chi-square": round(float(contrib[1, 1]), 3)}).to_string()
+```
+
+Expected $=\dfrac{1500\cdot600}{2500}=360$ and the contribution is
+$\dfrac{(320-360)^2}{360}=\dfrac{1600}{360}\approx$ **4.44**.
+
+## Exercise 7.41
+
+*(Skill Builder 2)* Degrees of freedom for the chi-square test on the table in
+Exercise 7.37.
+
+```{python}
+#| echo: false
+pd.Series({"Table size": "3 x 2", "df = (r-1)(c-1)": (3 - 1) * (2 - 1)}).to_string()
+```
+
+$df=(3-1)(2-1)=$ **2**.
+
+## Exercise 7.42
+
+*(Skill Builder 2)* Degrees of freedom for the table in Exercise 7.38.
+
+```{python}
+#| echo: false
+pd.Series({"Table size": "3 x 4", "df = (r-1)(c-1)": (3 - 1) * (4 - 1)}).to_string()
+```
+
+$df=(3-1)(4-1)=$ **6**.
+
+## Exercise 7.43
+
+*(Skill Builder 2)* Degrees of freedom for the table in Exercise 7.39.
+
+```{python}
+#| echo: false
+pd.Series({"Table size": "2 x 5", "df = (r-1)(c-1)": (2 - 1) * (5 - 1)}).to_string()
+```
+
+$df=(2-1)(5-1)=$ **4**.
+
+## Exercise 7.44
+
+*(Skill Builder 2)* Degrees of freedom for the table in Exercise 7.40.
+
+```{python}
+#| echo: false
+pd.Series({"Table size": "2 x 2", "df = (r-1)(c-1)": (2 - 1) * (2 - 1)}).to_string()
+```
+
+$df=(2-1)(2-1)=$ **1** — the $2\times2$ case, where $\chi^2=z^2$ for the
+equivalent two-proportion test.
+
+## Exercise 7.45
+
+**Household Income and College Plans.** A representative sample of 920 US
+teens (ages 13–17) cross-classified by household income and whether they plan
+to attend a four-year college. Test for an association.
+
+```{python}
+#| echo: false
+tab = np.array([[88, 122], [170, 156], [276, 108]])
+obs_exp(tab, ["Under $30,000", "$30,000-$75,000", "Over $75,000"],
+        ["4-yr college", "Not 4-yr"]).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of chi-square statistics for the income by college-plans table, observed value 57.28 marked
+chisq_row(tab).to_string()
+sims = rand_chisq(tab)
+pd.Series({"Share planning 4-yr college, under $30k": round(88 / 210, 3),
+           "Share planning 4-yr college, $30k-$75k": round(170 / 326, 3),
+           "Share planning 4-yr college, over $75k": round(276 / 384, 3),
+           "Randomization p-value": rand_p(sims, 57.2796)}).to_string()
+chisq_tail(sims, 57.2796)
+```
+
+$\chi^2=57.28$ on $df=2$, **p-value $\approx 3.7\times10^{-13}$** (none of
+10000 shuffles comes close). We reject $H_0$: household income and college
+plans are strongly associated, with the share planning a four-year college
+climbing steadily from **42%** (under \$30k) to **52%** (\$30k–75k) to
+**72%** (over \$75k).
+
+## Exercise 7.46
+
+**Social Media Use and ADHD.** Teens aged 15–16 without ADHD symptoms were
+rated for frequency of digital social media use and followed for two years.
+(a) Test for association at the 5% level; (b) find the biggest cell
+contribution; (c) can we conclude that higher use *increases* the likelihood
+of an ADHD diagnosis?
+
+```{python}
+#| echo: false
+tab = np.array([[16, 149], [23, 472]])
+obs_exp_contrib(tab, ["High frequency", "Low frequency"], ["ADHD", "No ADHD"]).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of chi-square statistics for social media use and ADHD, observed value 5.68 marked
+chi2, p, df, exp, contrib = chisq_parts(tab)
+odds, pf = stats.fisher_exact(tab)
+sims = rand_chisq(tab)
+pd.Series({"(a) p-value (chi-square)": round(float(p), 4),
+           "(a) Randomization p-value": rand_p(sims, 5.6774),
+           "(a) Fisher exact p-value": round(float(pf), 4),
+           "(b) Largest contribution": round(float(contrib.max()), 3),
+           "(b) In that cell, observed vs expected": f"{16} vs {exp[0, 0]:.2f}"}).to_string()
+chisq_tail(sims, 5.6774)
+```
+
+- **(a)** $\chi^2=5.68$ on $df=1$, **p-value ≈ 0.017** — below 0.05, so we
+  reject $H_0$ and conclude that social media use frequency and subsequent
+  ADHD diagnosis are associated (Fisher's exact test agrees at 0.022).
+- **(b)** The **(High frequency, ADHD)** cell contributes the most (≈ 4.0 of
+  the 5.68): the observed count 16 is *greater* than the expected 9.75 —
+  high-frequency users show up among ADHD diagnoses more often than chance
+  would predict.
+- **(c)** **No.** This is an observational (cohort) study — teens chose their
+  own media use — so confounding variables could explain the association; we
+  cannot conclude that social media use *causes* ADHD.
+
+## Exercise 7.47
+
+**Sex and Award Preference.** Students in the `StudentSurvey` data chose
+between an Academy Award, a Nobel Prize, and an Olympic gold medal. Test
+whether sex and preferred award are associated.
+
+*Data:* `data/ch01/StudentSurvey.csv`, from
+<https://www.lock5stat.com/datasets3e/StudentSurvey.csv> — the crosstab
+reproduces Table 7.35 exactly:
+
+```{python}
+#| echo: false
+ss = pd.read_csv("data/ch01/StudentSurvey.csv")
+ct = pd.crosstab(ss.Sex, ss.Award)
+tab = ct.values
+obs_exp(tab, list(ct.index), list(ct.columns)).to_string()
+```
+
+```{python}
+#| echo: false
+chisq_row(tab).to_string()
+sims = rand_chisq(tab)
+pd.Series({"Randomization p-value": rand_p(sims, 8.2392),
+           "Female: % choosing Nobel": round(76 / 169, 3),
+           "Male: % choosing Nobel": round(73 / 193, 3),
+           "Female: % choosing Olympic": round(73 / 169, 3),
+           "Male: % choosing Olympic": round(109 / 193, 3)}).to_string()
+```
+
+$\chi^2=8.24$ on $df=2$, **p-value ≈ 0.016** (randomization agrees). We
+reject $H_0$: sex and preferred award are associated. Comparing counts to
+expectations shows the pattern — females choose the Nobel Prize relatively
+more often (45% vs 38% of males) while males lean toward the Olympic gold
+medal (56% vs 43% of females).
+
+## Exercise 7.48
+
+**One True Love by Educational Level.** Respondents aged 18+ were asked
+whether they agree there is one true love for each person, cross-classified
+by education (HS / Some college / College). Is belief related to education?
+
+```{python}
+#| echo: false
+tab = np.array([[363, 176, 196], [557, 466, 789], [20, 26, 32]])
+obs_exp(tab, ["Agree", "Disagree", "Don't know"],
+        ["HS", "Some college", "College"]).to_string()
+```
+
+```{python}
+#| echo: false
+chisq_row(tab).to_string()
+sims = rand_chisq(tab)
+pd.Series({"% agreeing, HS": round(363 / 940, 3),
+           "% agreeing, some college": round(176 / 668, 3),
+           "% agreeing, college": round(196 / 1017, 3),
+           "Randomization p-value": rand_p(sims, 94.2590)}).to_string()
+```
+
+$\chi^2=94.26$ on $df=4$, **p-value $\approx 1.6\times10^{-19}$** —
+overwhelming evidence of an association. The relationship is clear and
+monotone: agreement with "one true love" **decreases as education increases**,
+from 38.6% among those with a high-school education or less, to 26.3% with
+some college, to 19.3% among college graduates.
+
+## Exercise 7.49
+
+**Metal Tags on Penguins.** Penguin chicks were tagged with metal or
+electronic tags; after ten years, 10 of 50 metal-tagged penguins had survived
+versus 18 of 50 electronic-tagged. (a) Build the two-way table; (b) state the
+hypotheses; (c) find expected counts; (d) compute $\chi^2$; (e) conclude at
+the 5% level.
+
+```{python}
+#| echo: false
+tab = np.array([[10, 40], [18, 32]])
+obs_exp(tab, ["Metal tag", "Electronic tag"], ["Survived", "Died"]).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of chi-square statistics for the penguin tag table, observed value 3.17 marked
+chi2, p, df, exp, contrib = chisq_parts(tab)
+odds, pf = stats.fisher_exact(tab)
+sims = rand_chisq(tab)
+pd.Series({"(d) Chi-square statistic": round(float(chi2), 3),
+           "(e) p-value (chi-square)": round(float(p), 4),
+           "(e) Randomization p-value": rand_p(sims, 3.1746),
+           "Fisher exact p-value (two-sided)": round(float(pf), 4),
+           "Check: z from Ex 6.160 squared": round((-0.16 / 0.0898) ** 2, 3)}).to_string()
+chisq_tail(sims, 3.1746)
+```
+
+- **(a)** The table above: 10/40 vs 18/32 survivors.
+- **(b)** $H_0$: tag type and ten-year survival are not associated (the
+  survival rate is the same for metal and electronic tags); $H_a$: they are
+  associated.
+- **(c)** Expected counts: $50\cdot28/100=$ **14 survive** and **36 die** in
+  *each* row (shown in parentheses).
+- **(d)** $\chi^2=\frac{(10-14)^2}{14}+\frac{(40-36)^2}{36}+
+  \frac{(18-14)^2}{14}+\frac{(32-36)^2}{36}=$ **3.17** (which is exactly the
+  square of the $z=-1.78$ from the two-proportion test in Exercise 6.160).
+- **(e)** **p-value ≈ 0.075** on $\chi^2_1$ — *not* below 0.05, so we fail to
+  reject $H_0$: even though metal-tagged penguins survived notably less often
+  (20% vs 36%), a gap this size is not unusual by random chance alone. (The
+  exact test is even more conservative, p ≈ 0.118.)
+
+## Exercise 7.50
+
+**Treatment for Cocaine Addiction.** Seventy-two addicts were randomized,
+double-blind, to desipramine, lithium, or placebo; relapse after six weeks is
+recorded. (a) Build the table; (b) expected counts and appropriateness; (c)
+full chi-square test; (d) which drug is most effective, and can we conclude
+causation?
+
+```{python}
+#| echo: false
+tab = np.array([[10, 14], [18, 6], [20, 4]])
+obs_exp(tab, ["Desipramine", "Lithium", "Placebo"], ["Relapse", "No relapse"]).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of chi-square statistics for the cocaine treatment table, observed value 10.5 marked
+chisq_row(tab).to_string()
+sims = rand_chisq(tab)
+pd.Series({"Relapse rate, desipramine": round(10 / 24, 3),
+           "Relapse rate, lithium": round(18 / 24, 3),
+           "Relapse rate, placebo": round(20 / 24, 3),
+           "Randomization p-value": rand_p(sims, 10.5)}).to_string()
+chisq_tail(sims, 10.5)
+```
+
+- **(a)** The table above.
+- **(b)** Every expected count is 16 (relapse) or 8 (no relapse) — all at
+  least 5, so a chi-square test is appropriate.
+- **(c)** $H_0$: relapse is not associated with treatment group; $H_a$: they
+  are associated. $\chi^2=10.5$ on $df=2$, **p-value ≈ 0.005** — reject
+  $H_0$: relapse rates genuinely differ across the three drugs.
+- **(d)** **Desipramine** is most effective (42% relapse, versus 75% on
+  lithium and 83% on placebo). Because subjects were *randomly assigned*
+  under double-blind conditions, yes — we can conclude that the choice of
+  drug *causes* a change in relapse likelihood.
+
+## Exercise 7.51
+
+**Painkillers and Miscarriage.** 1009 women were interviewed about painkiller
+use around conception / early pregnancy and whether the pregnancy was carried
+to term. Is there an association — and can we conclude painkillers increase
+miscarriage risk?
+
+```{python}
+#| echo: false
+tab = np.array([[18, 57], [24, 148], [103, 659]])
+obs_exp(tab, ["NSAIDs", "Acetaminophen", "No painkiller"],
+        ["Miscarriage", "No miscarriage"]).to_string()
+```
+
+```{python}
+#| echo: false
+chisq_row(tab).to_string()
+sims = rand_chisq(tab)
+pd.Series({"Miscarriage rate, NSAIDs": round(18 / 75, 3),
+           "Miscarriage rate, acetaminophen": round(24 / 172, 3),
+           "Miscarriage rate, no painkiller": round(103 / 762, 3),
+           "Randomization p-value": rand_p(sims, 6.1269)}).to_string()
+```
+
+$\chi^2=6.13$ on $df=2$, **p-value ≈ 0.047** — just under 0.05, so there is
+(marginal) evidence of an association: NSAID users show a **24%** miscarriage
+rate versus 14% (acetaminophen) and 13.5% (no painkiller), with the observed
+NSAID/miscarriage count 18 exceeding its expected 10.8. But this is an
+**observational** study — women chose their own painkiller use — so
+confounders (for example, underlying conditions that both prompt painkiller
+use and threaten the pregnancy) could produce the pattern; we **cannot**
+conclude that painkillers themselves increase miscarriage risk.
+
+## Exercise 7.52
+
+**Binge Drinking.** The ACHA-NCHA survey (Fall 2011, 27268 students) asked
+how many times in the last two weeks respondents had five or more drinks at a
+sitting. Is there a significant difference in drinking habits between males
+and females?
+
+```{python}
+#| echo: false
+tab = np.array([[5402, 2147, 912, 495], [13310, 3678, 966, 358]])
+obs_exp(tab, ["Male", "Female"],
+        ["0 times", "1-2 times", "3-4 times", "5+ times"]).to_string()
+```
+
+```{python}
+#| echo: false
+chisq_row(tab).to_string()
+sims = rand_chisq(tab)
+pd.Series({"Male distribution (0 / 1-2 / 3-4 / 5+)": [round(a / 8956, 3) for a in [5402, 2147, 912, 495]],
+           "Female distribution (0 / 1-2 / 3-4 / 5+)": [round(a / 18312, 3) for a in [13310, 3678, 966, 358]],
+           "Randomization p-value": rand_p(sims, 632.2765)}).to_string()
+```
+
+$\chi^2=632.3$ on $df=3$ and **p-value $\approx 10^{-136}$** — no shuffle of
+10000 comes anywhere near. There is a highly significant association between
+sex and binge drinking. Reading observed against expected counts: **fewer**
+men than expected report zero drinking episodes (5402 vs 6144 expected) and
+**more** men than expected land in every drinking category — most strikingly
+495 men report 5+ episodes versus only 280 expected (5.5% of men vs 2.0% of
+women). With $n$ this large, even small differences in drinking habits become
+highly significant.
+
+## Exercise 7.53
+
+**Which Is More Important: Grades, Sports, or Popularity?** 478 Michigan
+middle-schoolers (grades 4–6) named the single goal — good grades, athletic
+ability, or popularity — most important to them; the table breaks this down
+by sex. (a) Are the three goals equally valued overall? (b) Do boys and girls
+differ in priorities?
+
+```{python}
+#| echo: false
+tab = np.array([[117, 60, 50], [130, 30, 91]])
+obs_exp(tab, ["Boy", "Girl"], ["Grades", "Sports", "Popular"]).to_string()
+```
+
+```{python}
+#| echo: false
+chi_gof, p_gof = stats.chisquare([247, 90, 141])   # (a) one-sample chi-square
+chi2, p, df, exp, contrib = chisq_parts(tab)       # (b) association test
+r = np.random.default_rng(2026)
+gof_sims = r.multinomial(478, [1 / 3] * 3, 10000)
+gof_stat = ((gof_sims - 478 / 3) ** 2 / (478 / 3)).sum(axis=1)
+assoc_sims = rand_chisq(tab)
+pd.Series({"(a) Chi-square (goodness-of-fit)": round(float(chi_gof), 3),
+           "(a) df": 2,
+           "(a) p-value": fmt_p(p_gof),
+           "(a) Randomization p-value": rand_p(gof_stat, 80.5153),
+           "(b) Chi-square (association)": round(float(chi2), 3),
+           "(b) df": int(df),
+           "(b) p-value": fmt_p(p),
+           "(b) Randomization p-value": rand_p(assoc_sims, 21.4553)}).to_string()
+```
+
+- **(a)** Pooling the sexes, the counts are Grades 247, Sports 90, Popular
+  141 against an equal-split expectation of 159.3 each:
+  $\chi^2=80.5$ on $df=2$, **p-value $\approx 3\times10^{-18}$** — the three
+  goals are *not* equally valued; good grades is by far the most common
+  choice (52%), while athletic ability (19%) trails popularity (30%).
+- **(b)** $H_0$: sex and priorities are not associated; $H_a$: they are.
+  $\chi^2=21.46$ on $df=2$, **p-value $\approx 2\times10^{-5}$** — reject:
+  priorities *do* differ by sex, with boys over-represented on sports
+  (60 observed vs 42.7 expected) and girls over-represented on popularity
+  (91 observed vs 74.1 expected).
+
+## Exercise 7.54
+
+**Juvenile Diabetes Treatment.** 76 children at high risk for juvenile
+diabetes were randomly assigned to the drug teplizumab or a control; the
+table shows who later developed diabetes. Conduct a $\chi^2$ test for
+association at the 5% level.
+
+```{python}
+#| echo: false
+tab = np.array([[16, 22], [26, 12]])
+obs_exp(tab, ["Teplizumab", "Control"], ["Diabetes", "No diabetes"]).to_string()
+```
+
+```{python}
+#| echo: false
+chi2, p, df, exp, contrib = chisq_parts(tab)
+odds, pf = stats.fisher_exact(tab)
+sims = rand_chisq(tab)
+pd.Series({"p-value (chi-square)": round(float(p), 4),
+           "Randomization p-value": rand_p(sims, 5.3221),
+           "Fisher exact p-value (two-sided)": round(float(pf), 4),
+           "Diabetes rate, teplizumab": round(16 / 38, 3),
+           "Diabetes rate, control": round(26 / 38, 3)}).to_string()
+```
+
+$H_0$: treatment and diabetes outcome are not associated; $H_a$: they are.
+Expected counts are 21 and 17 per row (all $\ge 5$), and
+$\chi^2=\frac{(16-21)^2}{21}+\frac{(22-17)^2}{17}+\frac{(26-21)^2}{21}+\frac{(12-17)^2}{17}=5.32$
+on $df=1$, **p-value ≈ 0.021** (randomization agrees; Fisher's exact test
+gives 0.037). Since $0.021 < 0.05$ we reject $H_0$: treatment and outcome are
+associated — children on teplizumab developed juvenile diabetes significantly
+less often (42% vs 68% in the control group).
+
+## Exercise 7.55
+
+**Favorite Skittles Flavor?** Two polls asked people to pick a favorite
+Skittles type — one by *color* (66 people), one by actual *flavor* (91
+people). (a) Hypotheses; (b) expected counts; (c) are they large enough; (d)
+df; (e) $\chi^2$; (f) p-value and conclusion.
+
+```{python}
+#| echo: false
+tab = np.array([[18, 9, 15, 13, 11], [13, 16, 19, 34, 9]])
+obs_exp(tab, ["By color", "By flavor"],
+        ["Green (Lime)", "Orange", "Purple (Grape)", "Red (Strawberry)", "Yellow (Lemon)"]).to_string()
+```
+
+```{python}
+#| echo: false
+chi2, p, df, exp, contrib = chisq_parts(tab)
+sims = rand_chisq(tab)
+pd.Series({"(c) Smallest expected count": round(float(exp.min()), 2),
+           "(d) df = (2-1)(5-1)": (2 - 1) * (5 - 1),
+           "(e) Chi-square statistic": round(float(chi2), 3),
+           "(f) p-value": round(float(p), 4),
+           "(f) Randomization p-value": rand_p(sims, 9.0691)}).to_string()
+```
+
+- **(a)** $H_0$: how the question is asked (by color vs by flavor) is not
+  related to which type is chosen; $H_a$: the method of choice is related to
+  the type chosen.
+- **(b)** Expected counts shown in parentheses — e.g. Green (Lime):
+  $66\cdot31/157=13.0$ by color.
+- **(c)** Yes — the smallest expected count is 8.4, comfortably above 5.
+- **(d)** $df=(2-1)(5-1)=$ **4**.
+- **(e)** $\chi^2=$ **9.07**.
+- **(f)** **p-value ≈ 0.059** — not below 0.05, so we do *not* find
+  convincing evidence that the method of choice affects which type is chosen.
+  (The largest gap is Red/Strawberry: 13 of 66 color-pickers but 34 of 91
+  flavor-pickers — suggestive, but short of significance.)
+
+## Exercise 7.56
+
+**Handedness and Occupation.** A sample of Americans from five professions
+reported being left-handed, right-handed, or ambidextrous. (a) Which
+profession has the greatest proportion left-handed, and which right-handed?
+(b) Test for association; (c) conclusions at the 5% and 1% levels.
+
+```{python}
+#| echo: false
+tab = np.array([[101, 10, 7], [115, 26, 7], [121, 5, 6], [83, 16, 6], [116, 10, 6]])
+rows = ["Psychiatrist", "Architect", "Orthopedic surgeon", "Lawyer", "Dentist"]
+obs_exp(tab, rows, ["Right", "Left", "Ambidextrous"]).to_string()
+```
+
+```{python}
+#| echo: false
+chi2, p, df, exp, contrib = chisq_parts(tab)
+sims = rand_chisq(tab)
+pd.Series({"Greatest % left-handed": f"Architect ({26/148:.3f})",
+           "Greatest % right-handed": f"Orthopedic surgeon ({121/132:.3f})",
+           "(b) Chi-square statistic": round(float(chi2), 3),
+           "(b) df": int(df),
+           "(b) p-value": round(float(p), 4),
+           "(b) Randomization p-value": rand_p(sims, 19.0191),
+           "Smallest expected count": round(float(exp.min()), 2)}).to_string()
+```
+
+- **(a)** **Architects** have the greatest share of left-handers (26/148 =
+  17.6%); **orthopedic surgeons** the greatest share of right-handers
+  (121/132 = 91.7%).
+- **(b)** $H_0$: handedness and career are not associated; $H_a$: they are.
+  $\chi^2=19.02$ on $df=8$, **p-value ≈ 0.015**. (The smallest expected
+  count, 5.3 for the lawyer/ambidextrous cell, just clears the condition.)
+- **(c)** At the **5%** level we reject $H_0$ — handedness and profession are
+  associated (architects over-represented among left-handers: 26 observed vs
+  15.6 expected; surgeons over-represented among right-handers). At the
+  **1%** level, however, $0.015 > 0.01$, so we would *not* reject — the
+  evidence is suggestive but not overwhelming.
+
+## Exercise 7.57
+
+**Testing Genotypes for Fast-Twitch Muscles.** The ACTN3 study
+cross-classifies elite sprinters, elite endurance athletes, and non-athlete
+controls by genotype (RR / RX / XX). The book's computer output shows
+observed, expected, and per-cell contributions; verify the output and answer
+(a)–(e).
+
+```{python}
+#| echo: false
+tab = np.array([[130, 226, 80], [53, 48, 6], [60, 88, 46]])
+rows = ["Control", "Sprint", "Endurance"]
+obs_exp_contrib(tab, rows, ["RR", "RX", "XX"]).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of chi-square statistics for the ACTN3 genotype by group table, observed value 24.805 marked
+chi2, p, df, exp, contrib = chisq_parts(tab)
+sims = rand_chisq(tab)
+imax = np.unravel_index(contrib.argmax(), contrib.shape)
+pd.Series({"(a) Expected, endurance XX": round(float(exp[2, 2]), 2),
+           "(a) Contribution, endurance XX": round(float(contrib[2, 2]), 3),
+           "(b) df = (3-1)(3-1)": (3 - 1) * (3 - 1),
+           "(c) Chi-square statistic": round(float(chi2), 3),
+           "(c) p-value": fmt_p(p),
+           "(c) Randomization p-value": rand_p(sims, 24.8049),
+           "(d) Largest contribution (cell)": f"{rows[imax[0]]} x XX ({contrib.max():.3f})",
+           "(d) There, observed vs expected": f"{tab[imax]} vs {exp[imax]:.2f}",
+           "Sprint RR: observed vs expected": f"{53} vs {exp[1, 0]:.2f}"}).to_string()
+chisq_tail(sims, 24.8049)
+```
+
+- **(a)** Expected for endurance athletes with $XX$:
+  $194\cdot132/737=$ **34.75**, contributing
+  $\frac{(46-34.75)^2}{34.75}=$ **3.645** — both match the output.
+- **(b)** $df=(3-1)(3-1)=$ **4** — matches.
+- **(c)** $\chi^2=$ **24.805** with **p-value $\approx 5.5\times10^{-5}$**;
+  reject $H_0$: genotype and athlete group are strongly associated.
+- **(d)** The **(Sprint, XX)** cell contributes the most (**9.043**): the
+  observed count 6 is *less* than the expected 19.16 — far fewer sprinters
+  carry the XX genotype than $H_0$ predicts.
+- **(e)** **RR** is over-represented in sprinters (53 observed vs 35.28
+  expected); **XX** is over-represented in endurance athletes (46 observed vs
+  34.75 expected).
+
+## Exercise 7.58
+
+**Testing Genetic Alleles for Fast-Twitch Muscles.** Same study, now
+classifying participants by allele (R or X) and group. Answer (a)–(f) from
+the computer output.
+
+```{python}
+#| echo: false
+tab = np.array([[244, 192], [77, 30], [104, 90]])
+rows = ["Control", "Sprint", "Endurance"]
+obs_exp_contrib(tab, rows, ["R", "X"]).to_string()
+```
+
+```{python}
+#| echo: false
+chi2, p, df, exp, contrib = chisq_parts(tab)
+sims = rand_chisq(tab)
+imax = np.unravel_index(contrib.argmax(), contrib.shape)
+pd.Series({"(a) Endurance athletes": int(tab[2].sum()),
+           "(b) Expected, sprint R": round(float(exp[1, 0]), 2),
+           "(b) Contribution, sprint R": round(float(contrib[1, 0]), 3),
+           "(c) df = (3-1)(2-1)": (3 - 1) * (2 - 1),
+           "(d) Chi-square statistic": round(float(chi2), 3),
+           "(d) p-value": round(float(p), 4),
+           "(d) Randomization p-value": rand_p(sims, 10.7849),
+           "(e) Largest contribution (cell)": f"{rows[imax[0]]} x X ({contrib.max():.3f})",
+           "(e) There, observed vs expected": f"{tab[imax]} vs {exp[imax]:.2f}",
+           "% R allele, sprint / endurance / control": f"{77/107:.3f} / {104/194:.3f} / {244/436:.3f}"}).to_string()
+```
+
+- **(a)** **194** endurance athletes (104 + 90).
+- **(b)** Expected for sprinters with the R allele:
+  $107\cdot425/737=$ **61.70**, contributing
+  $\frac{(77-61.70)^2}{61.70}=$ **3.792** — both match the output.
+- **(c)** $df=(3-1)(2-1)=$ **2** — matches.
+- **(d)** $\chi^2=$ **10.785** with **p-value ≈ 0.005**; reject $H_0$:
+  allele and group are associated.
+- **(e)** The **(Sprint, X)** cell contributes the most (**5.166**): the
+  observed count 30 is *less* than the expected 45.30.
+- **(f)** The **R** allele is over-represented in sprinters (72.0%, versus
+  53.6% for endurance and 56.0% for controls); the **X** allele is
+  correspondingly over-represented in endurance athletes (46.4%).
+
+## Exercise 7.59
+
+**Sex and ACTN3 Genotype.** Within the control group, is genotype (RR / RX /
+XX) associated with sex? What is the p-value and conclusion — is sex
+associated with having a "sprinting gene"?
+
+```{python}
+#| echo: false
+tab = np.array([[40, 73, 21], [88, 147, 57]])
+obs_exp(tab, ["Male", "Female"], ["RR", "RX", "XX"]).to_string()
+```
+
+```{python}
+#| echo: false
+chi2, p, df, exp, contrib = chisq_parts(tab)
+sims = rand_chisq(tab)
+pd.Series({"Chi-square statistic": round(float(chi2), 3),
+           "df": int(df),
+           "p-value": round(float(p), 3),
+           "Randomization p-value": rand_p(sims, 1.0498)}).to_string()
+```
+
+$\chi^2=1.05$ on $df=2$ with **p-value = 0.592** (the randomization test
+agrees) — nowhere near significance, so we fail to reject $H_0$: within the
+control group there is **no evidence** that sex is associated with ACTN3
+genotype; males and females are equally likely to carry the "sprinting gene"
+versions RR / R.
+
+## Exercise 7.60
+
+**PA Seniors: Superpowers by Gender.** Pennsylvania high-school seniors
+picked which of five superpowers they would most want, tabulated by gender.
+(a) Test whether the distribution of preferences differs by sex; (b) which
+cells contribute most?
+
+*Data:* `data/ch01/PASeniors.csv` (variables `Superpower` and `Gender`) — the
+crosstab reproduces Table 7.42:
+
+```{python}
+#| echo: false
+pa = pd.read_csv("data/ch01/PASeniors.csv")
+ct = pd.crosstab(pa.Superpower, pa.Gender)
+tab = ct.values
+obs_exp_contrib(tab, list(ct.index), list(ct.columns)).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of chi-square statistics for the superpower by gender table, observed value 17.219 marked
+chisq_row(tab).to_string()
+sims = rand_chisq(tab)
+pd.Series({"Randomization p-value": rand_p(sims, 17.2187)}).to_string()
+chisq_tail(sims, 17.2187)
+```
+
+- **(a)** $\chi^2=17.22$ on $df=4$, **p-value ≈ 0.0018** — reject $H_0$: the
+  distribution of superpower preferences differs between males and females.
+- **(b)** The **Telepathy** cells contribute the most (5.48 female, 5.23
+  male): 68 females chose telepathy versus 51.2 expected, while only 37 males
+  did versus 53.8 expected. The **Super strength** cells come next (1.97 and
+  1.87): super strength skews male — 14 observed versus 9.7 expected for
+  males, and only 5 versus 9.3 for females.
+
+## Exercise 7.61
+
+**PA Seniors: Preference by Gender.** Seniors chose whether they would prefer
+to be Famous, Happy, Healthy, or Rich, tabulated by gender. (a) Test for a
+difference in distributions; (b) which two choices contribute most?
+
+*Data:* `data/ch01/PASeniors.csv` (variables `Preference` and `Gender`) —
+matches Table 7.43:
+
+```{python}
+#| echo: false
+pa = pd.read_csv("data/ch01/PASeniors.csv")
+ct = pd.crosstab(pa.Preference, pa.Gender)
+tab = ct.values
+obs_exp_contrib(tab, list(ct.index), list(ct.columns)).to_string()
+```
+
+```{python}
+#| echo: false
+chisq_row(tab).to_string()
+sims = rand_chisq(tab)
+pd.Series({"Randomization p-value": rand_p(sims, 36.0402)}).to_string()
+```
+
+- **(a)** $\chi^2=36.04$ on $df=3$, **p-value $\approx 7\times10^{-8}$** —
+  strongly reject $H_0$: preferences differ by gender.
+- **(b)** The two biggest contributors are **Rich** (9.16 female / 8.80
+  male) — 66 males chose rich versus 45.9 expected while only 24 females did
+  versus 44.1 expected — and **Healthy** (6.07 / 5.84), which skews the other
+  way: 33 females versus 21.6 expected, and just 11 males versus 22.4
+  expected.
+
+## Exercise 7.62
+
+**PA Seniors: Preference by Allergies.** The same Famous / Happy / Healthy /
+Rich preference, now broken down by whether the student has allergies. Test
+whether the distribution of preferences differs between students with and
+without allergies.
+
+*Data:* `data/ch01/PASeniors.csv` (variables `Preference` and `Allergies`) —
+matches Table 7.44:
+
+```{python}
+#| echo: false
+pa = pd.read_csv("data/ch01/PASeniors.csv")
+ct = pd.crosstab(pa.Preference, pa.Allergies)
+tab = ct.values
+obs_exp(tab, list(ct.index), list(ct.columns)).to_string()
+```
+
+```{python}
+#| echo: false
+chisq_row(tab).to_string()
+sims = rand_chisq(tab)
+pd.Series({"Randomization p-value": rand_p(sims, 1.1157)}).to_string()
+```
+
+$\chi^2=1.12$ on $df=3$, **p-value ≈ 0.773** — far from significance, so we
+fail to reject $H_0$: the distribution of preferences is essentially the same
+for students with and without allergies. (Every observed count sits close to
+its expected value, e.g. Happy: 167 vs 164.5 for no-allergy students.)
+
+## Exercise 7.63
+
+**PA Seniors: Favorite Season by Gender.** Seniors named their favorite
+season, tabulated by gender. (a) Test for a difference at the 5% level; (b)
+which cells contribute most?
+
+*Data:* `data/ch01/PASeniors.csv` (variables `Season` and `Gender`) — matches
+Table 7.45:
+
+```{python}
+#| echo: false
+pa = pd.read_csv("data/ch01/PASeniors.csv")
+ct = pd.crosstab(pa.Season, pa.Gender)
+tab = ct.values
+obs_exp_contrib(tab, list(ct.index), list(ct.columns)).to_string()
+```
+
+```{python}
+#| echo: false
+chisq_row(tab).to_string()
+sims = rand_chisq(tab)
+pd.Series({"Randomization p-value": rand_p(sims, 11.0131)}).to_string()
+```
+
+- **(a)** $\chi^2=11.01$ on $df=3$, **p-value ≈ 0.012** — below 0.05, so we
+  reject $H_0$: favorite season differs between males and females.
+- **(b)** The **Fall** cells contribute the most (3.43 female, 3.31 male):
+  95 females picked fall versus 78.6 expected, while only 65 males did versus
+  81.4 expected. The **Winter** cells come next (1.24 / 1.20), skewing male —
+  36 observed versus 30.0 expected.
+
+## Exercise 7.64
+
+**PA Seniors: Favorite Way to Communicate by Gender.** Seniors named their
+favorite way to communicate (app, in person, phone, text), tabulated by
+gender. (a) Test at the 5% level; (b) which cells contribute most?
+
+*Data:* `data/ch01/PASeniors.csv` (variables `Communicate` and `Gender`,
+dropping one respondent with a blank answer) — matches Table 7.46:
+
+```{python}
+#| echo: false
+pa = pd.read_csv("data/ch01/PASeniors.csv")
+d = pa[pa.Communicate.notna() & (pa.Communicate.astype(str).str.strip() != "")]
+ct = pd.crosstab(d.Communicate, d.Gender)
+tab = ct.values
+obs_exp_contrib(tab, list(ct.index), list(ct.columns)).to_string()
+```
+
+```{python}
+#| echo: false
+chisq_row(tab).to_string()
+sims = rand_chisq(tab)
+pd.Series({"Randomization p-value": rand_p(sims, 8.0653)}).to_string()
+```
+
+- **(a)** $\chi^2=8.07$ on $df=3$, **p-value ≈ 0.045** — just under 0.05, so
+  at the 5% level we reject $H_0$ (barely): communication preferences differ
+  by gender.
+- **(b)** The **App** cells dominate (3.22 female, 3.19 male): 44 males
+  prefer an app versus 33.6 expected, while only 23 females do versus 33.4
+  expected. Phone shows a smaller reversal (21 females vs 17.9 expected).
+
+## Exercise 7.65
+
+**Another Test for Cocaine Addiction.** Exercise 7.50 gave $\chi^2=10.5$ and
+p ≈ 0.005 for the cocaine-treatment table. (a) How would you build a
+randomization sample with cards? (b) Out of 1000 randomization samples,
+roughly how many would have $\chi^2\ge 10.5$?
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of chi-square statistics from re-dealing the 72 cocaine-study cards, observed value 10.5 marked
+tab = np.array([[10, 14], [18, 6], [20, 4]])
+sims = rand_chisq(tab, reps=10000)
+share = float((sims >= 10.5).mean())
+pd.Series({"Expected number of 1000 samples at or above 10.5": round(1000 * share, 1),
+           "Simulated p-value": round(share, 4),
+           "Chi-square p-value for comparison": round(float(stats.chi2.sf(10.5, 2)), 4)}).to_string()
+chisq_tail(sims, 10.5)
+```
+
+- **(a)** Write **Relapse** on 48 cards and **No relapse** on 24 cards
+  (matching the original margins), shuffle all 72, and deal them into three
+  piles of 24 labeled desipramine / lithium / placebo; tabulate the resulting
+  $3\times2$ table and compute its $\chi^2$ statistic. Repeat many times.
+- **(b)** Since $P(\chi^2\ge10.5)\approx0.0053$ under $H_0$, we expect about
+  $1000\times0.0053\approx$ **5** of the 1000 randomization samples to reach
+  or beat 10.5 — the simulation above (10000 re-deals, of which 0.53% exceed
+  10.5) confirms it.
+
+## Exercise 7.66
+
+**Who Is More Likely to Take Vitamins: Males or Females?** Use the
+`NutritionStudy` data and a chi-square test on `VitaminUse` and `Sex`.
+
+*Data:* `data/ch02/NutritionStudy.csv`, from
+<https://www.lock5stat.com/datasets3e/NutritionStudy.csv>:
+
+```{python}
+#| echo: false
+ns = pd.read_csv("data/ch02/NutritionStudy.csv")
+ct = pd.crosstab(ns.VitaminUse, ns.Sex)
+tab = ct.values
+obs_exp(tab, list(ct.index), list(ct.columns)).to_string()
+```
+
+```{python}
+#| echo: false
+chisq_row(tab).to_string()
+sims = rand_chisq(tab)
+chi2, p, df, exp, contrib = chisq_parts(tab)
+pd.Series({"Randomization p-value": rand_p(sims, 11.0709),
+           "% regular users, female": round(109 / 273, 3),
+           "% regular users, male": round(13 / 42, 3),
+           "% no vitamins, female": round(87 / 273, 3),
+           "% no vitamins, male": round(24 / 42, 3)}).to_string()
+```
+
+$\chi^2=11.07$ on $df=2$, **p-value ≈ 0.004** (all expected counts $\ge 5$;
+the randomization test agrees) — there is a significant association between
+vitamin use and sex. **Females are more likely to take vitamins**: 39.9% of
+women are regular users versus 31.0% of men, and 57.1% of men take no
+vitamins at all versus 31.9% of women.
+
+## Exercise 7.67
+
+**Who Is More Likely to Smoke: Males or Females?** Use `PriorSmoke` (coded
+1 = never, 2 = prior, 3 = current smoker) and `Sex` from `NutritionStudy` for
+a chi-square analysis.
+
+*Data:* `data/ch02/NutritionStudy.csv`:
+
+```{python}
+#| echo: false
+ns = pd.read_csv("data/ch02/NutritionStudy.csv")
+d = ns.assign(PriorSmoke=ns.PriorSmoke.map({1: "Never", 2: "Prior", 3: "Current"}))
+ct = pd.crosstab(d.PriorSmoke, d.Sex)
+tab = ct.values
+obs_exp(tab, list(ct.index), list(ct.columns)).to_string()
+```
+
+```{python}
+#| echo: false
+chisq_row(tab).to_string()
+sims = rand_chisq(tab)
+chi2, p, df, exp, contrib = chisq_parts(tab)
+pd.Series({"Randomization p-value": rand_p(sims, 7.1368),
+           "% female, never smoked": round(144 / 157, 3),
+           "% female, prior smoker": round(93 / 115, 3),
+           "% female, current smoker": round(36 / 43, 3)}).to_string()
+```
+
+$\chi^2=7.14$ on $df=2$, **p-value ≈ 0.028** (the smallest expected count,
+5.7, still satisfies the condition; the randomization test agrees) — smoking
+history and sex are significantly associated. **Men are more likely than
+women to have smoked**: only 8.3% of never-smokers are male, but 19.1% of
+prior smokers and 16.3% of current smokers are male; put the other way, 52.4%
+of the men in the study were prior smokers versus 34.1% of the women.
+
+:::

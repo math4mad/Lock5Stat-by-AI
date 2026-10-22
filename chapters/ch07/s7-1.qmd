@@ -1,0 +1,1240 @@
+---
+execute-dir: project
+title: "Chapter 7 · Section 7.1"
+subtitle: "Testing Goodness of Fit for a Single Categorical Variable — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 7.1 of Lock⁵ leaves the normal curve behind: when the variable is
+**categorical**, the natural test compares **observed counts** in each
+category with the counts we would **expect** if a null hypothesis were true.
+The **chi-square goodness-of-fit statistic** summarizes all the mismatches
+at once,
+$$\chi^2=\sum\frac{(O-E)^2}{E},$$
+summed over the $k$ categories, and — provided every **expected count is at
+least 5**, the condition for the approximation — its null distribution is a
+**chi-square distribution with $k-1$ degrees of freedom**. The **p-value is
+the area in the upper tail** beyond the observed $\chi^2$: big deviations
+between observed and expected counts in *any* category push the statistic
+into the tail, and each cell's piece of the sum, $(O-E)^2/E$, shows exactly
+*where* the data depart from $H_0$. Below we compute every statistic and
+p-value exactly with `scipy.stats.chisquare`, and, for the applied
+exercises, verify each distribution-based answer with a randomization
+simulation (10000 multinomial resamples under $H_0$, seed 2026 — if $H_0$
+is true, each sample is just $n$ draws from the null proportions).
+The exercises are from *Statistics: Unlocking the Power of Data* (Lock⁵,
+3rd ed., pp. 555–562): Skill Builders 7.1–7.4 find expected counts,
+7.5–7.8 compute $\chi^2$ from small tables, and 7.9–7.12 dissect a single
+category's contribution and the degrees of freedom; the applied exercises
+7.13–7.36 test food-delivery apps, Skittles flavors, rock-paper-scissors,
+grills and sleep positions, ADHD and relative age, elite-hockey and
+Australian-football birthdates, James Bond actors, $ACTN3$ genotypes, the
+Pennsylvania-senior surveys, Benford's law (including a fraud audit), and
+how well students — and the government — generate random digits.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+from scipy import stats
+sns.set_theme(style="whitegrid")
+
+def expected_counts(n, probs=None, k=None):
+    """Expected counts under H0: n times each null proportion (equal if none given)."""
+    p = np.ones(k) / k if probs is None else np.asarray(probs, float)
+    return n * p
+
+def gof(observed, probs=None, expected=None):
+    """Goodness-of-fit test: returns (contribution table, summary Series)."""
+    obs = np.asarray(observed, float)
+    n = obs.sum()
+    exp = np.asarray(expected, float) if expected is not None \
+        else expected_counts(n, probs, len(obs))
+    tab = pd.DataFrame({"Observed": obs.astype(int),
+                        "Expected": np.round(exp, 2),
+                        "Contribution to chi-sq": np.round((obs - exp) ** 2 / exp, 3)},
+                       index=range(1, len(obs) + 1))
+    res = stats.chisquare(obs, exp)
+    p = res.pvalue
+    s = pd.Series({"Chi-square statistic": round(float(res.statistic), 3),
+                   "df": len(obs) - 1,
+                   "p-value": float(f"{p:.3g}") if p < 1e-4 else round(float(p), 4)})
+    return tab, s
+
+def gof_sim(observed, probs=None, reps=10000, seed=2026):
+    """Randomization check: `reps` multinomial resamples under H0; returns
+    (simulated chi-square statistics, randomization p-value)."""
+    obs = np.asarray(observed, float)
+    n = int(obs.sum())
+    p = np.ones(len(obs)) / len(obs) if probs is None else np.asarray(probs, float)
+    p = p / p.sum()
+    r = np.random.default_rng(seed)
+    sims = r.multinomial(n, p, size=reps)
+    exp = n * p
+    chi2s = ((sims - exp) ** 2 / exp).sum(axis=1)
+    return chi2s, float((chi2s >= ((obs - exp) ** 2 / exp).sum()).mean())
+
+def chi2_curve(stat, df, figsize=(6, 2.6)):
+    """Chi-square density with the upper-tail p-value beyond stat shaded."""
+    xmax = max(float(stats.chi2.ppf(0.999, df)), stat * 1.1)
+    x = np.linspace(0, xmax, 600)
+    y = stats.chi2.pdf(x, df)
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.plot(x, y, color="#4c72b0", lw=2)
+    mask = x >= stat
+    if mask.any():
+        ax.fill_between(x[mask], y[mask], color="#c44e52", alpha=0.65)
+    ax.axvline(stat, color="black", lw=1)
+    ax.set_xlabel(f"Chi-square statistic (df = {df})")
+    ax.set_ylabel("Density")
+    plt.tight_layout()
+    plt.show()
+
+def sim_hist(sims, stat, xlabel="Simulated chi-square statistics",
+             bins=40, figsize=(6, 3)):
+    """Histogram of simulated chi-square statistics with the observed one marked."""
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.histplot(x=sims, bins=bins, ax=ax, color="#4c72b0")
+    mask = sims >= stat
+    if mask.any():
+        sns.histplot(x=sims[mask], bins=bins, ax=ax, color="#c44e52")
+    ax.axvline(stat, color="black", lw=1.5)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Simulated statistics")
+    plt.tight_layout()
+    plt.show()
+
+def contrib_bar(labels, contributions, xlabel=None, figsize=(6, 2.8)):
+    """Bar chart of each category's contribution to the chi-square statistic."""
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.bar(labels, contributions, color="#4c72b0")
+    ax.set_ylabel("Contribution to chi-sq")
+    if xlabel:
+        ax.set_xlabel(xlabel)
+    plt.tight_layout()
+    plt.show()
+
+def oe_bar(labels, observed, expected, xlabel=None, figsize=(6.5, 3)):
+    """Observed vs expected counts side by side for each category."""
+    x = np.arange(len(labels))
+    w = 0.38
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.bar(x - w / 2, observed, w, label="Observed", color="#4c72b0")
+    ax.bar(x + w / 2, expected, w, label="Expected", color="#dd8452")
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, fontsize=9)
+    ax.set_ylabel("Count")
+    if xlabel:
+        ax.set_xlabel(xlabel)
+    ax.legend()
+    plt.tight_layout()
+    plt.show()
+```
+
+::: {.panel-tabset}
+
+## Exercise 7.1
+
+*(Skill Builder 1)* Expected counts when
+$H_0\colon p_1 = p_2 = p_3 = p_4 = 0.25$ and $n = 500$.
+
+```{python}
+#| echo: false
+pd.Series({f"Category {i}": expected_counts(500, [0.25] * 4)[i - 1] for i in range(1, 5)}).to_string()
+```
+
+**125 in each category** — multiply the sample size by each null
+proportion: $500(0.25) = 125$.
+
+## Exercise 7.2
+
+*(Skill Builder 1)* Expected counts when $H_0$ says the three categories
+$A$, $B$, $C$ are equally likely and $n = 1200$.
+
+```{python}
+#| echo: false
+pd.Series({"Category A": 400, "Category B": 400, "Category C": 400}).to_string()
+```
+
+**400 in each category** — equal likelihood means $p_A = p_B = p_C = 1/3$,
+so each expected count is $1200/3 = 400$.
+
+## Exercise 7.3
+
+*(Skill Builder 1)* Expected counts when
+$H_0\colon p_A = 0.50,\ p_B = 0.25,\ p_C = 0.25$ and $n = 200$.
+
+```{python}
+#| echo: false
+pd.Series({"Category A": 100, "Category B": 50, "Category C": 50}).to_string()
+```
+
+**A: 100, B: 50, C: 50** — the null proportions are unequal, so the
+expected counts are too: $200(0.50)$, $200(0.25)$, $200(0.25)$.
+
+## Exercise 7.4
+
+*(Skill Builder 1)* Expected counts when
+$H_0\colon p_1 = 0.7,\ p_2 = p_3 = p_4 = 0.1$ and $n = 400$.
+
+```{python}
+#| echo: false
+pd.Series({f"Category {i}": e for i, e in
+           zip(range(1, 5), expected_counts(400, [0.7, 0.1, 0.1, 0.1]))}).to_string()
+```
+
+**Category 1: 280; Categories 2–4: 40 each** — $400(0.7)$ and $400(0.1)$.
+
+## Exercise 7.5
+
+*(Skill Builder 2)* Categories $A, B, C$ with observed counts 35, 32, 53
+and expected counts 40, 40, 40. Compute $\chi^2$ and the p-value.
+
+```{python}
+#| echo: false
+tab, s = gof([35, 32, 53], expected=[40, 40, 40])
+tab.to_string()
+```
+
+```{python}
+#| echo: false
+s.to_string()
+```
+
+$$\chi^2=\frac{(35-40)^2}{40}+\frac{(32-40)^2}{40}+\frac{(53-40)^2}{40}
+=0.625+1.600+4.225=6.45$$
+With $df = 3-1 = 2$, **p-value ≈ 0.040** — the area above 6.45 on a
+$\chi^2$ curve with 2 degrees of freedom.
+
+## Exercise 7.6
+
+*(Skill Builder 2)* Observed 61, 35, 54 against expected 50, 50, 50.
+
+```{python}
+#| echo: false
+tab, s = gof([61, 35, 54], expected=[50, 50, 50])
+tab.to_string()
+```
+
+```{python}
+#| echo: false
+s.to_string()
+```
+
+$$\chi^2=2.42+4.50+0.32=7.24$$ With $df = 2$, **p-value ≈ 0.027**.
+
+## Exercise 7.7
+
+*(Skill Builder 2)* Observed 132, 181, 45, 42 against expected
+160, 160, 40, 40.
+
+```{python}
+#| echo: false
+tab, s = gof([132, 181, 45, 42], expected=[160, 160, 40, 40])
+tab.to_string()
+```
+
+```{python}
+#| echo: false
+s.to_string()
+```
+
+$$\chi^2=4.900+2.756+0.625+0.100=8.381$$ With $df = 4-1 = 3$,
+**p-value ≈ 0.039**.
+
+## Exercise 7.8
+
+*(Skill Builder 2)* Observed 38, 55, 79, 128 against expected
+30, 60, 90, 120.
+
+```{python}
+#| echo: false
+tab, s = gof([38, 55, 79, 128], expected=[30, 60, 90, 120])
+tab.to_string()
+```
+
+```{python}
+#| echo: false
+s.to_string()
+```
+
+$$\chi^2=2.133+0.417+1.344+0.533=4.428$$ With $df = 3$,
+**p-value ≈ 0.219** — despite the visible mismatches in individual cells,
+the overall fit is not unusual for a 4-category table.
+
+## Exercise 7.9
+
+*(Skill Builder 3)* $H_0\colon p_a = p_b = p_c = p_d = 0.25$ with counts
+40, 36, 49, 35 (total 160). Find (a) the expected count for category B,
+(b) B's contribution to $\chi^2$, and (c) the degrees of freedom.
+
+```{python}
+#| echo: false
+e_b = 160 * 0.25
+pd.Series({"(a) Expected count for B": e_b,
+           "(b) Contribution of B": round((36 - e_b) ** 2 / e_b, 3),
+           "(c) Degrees of freedom": 3}).to_string()
+```
+
+- **(a)** $160(0.25) = $ **40**.
+- **(b)** $\dfrac{(36-40)^2}{40} = $ **0.4**.
+- **(c)** $df = 4 - 1 = $ **3**.
+
+## Exercise 7.10
+
+*(Skill Builder 3)* Same $H_0$, counts 120, 148, 105, 127 (total 500).
+
+```{python}
+#| echo: false
+e_b = 500 * 0.25
+pd.Series({"(a) Expected count for B": e_b,
+           "(b) Contribution of B": round((148 - e_b) ** 2 / e_b, 3),
+           "(c) Degrees of freedom": 3}).to_string()
+```
+
+- **(a)** $500(0.25) = $ **125**.
+- **(b)** $\dfrac{(148-125)^2}{125} = $ **4.232**.
+- **(c)** $df = $ **3**.
+
+## Exercise 7.11
+
+*(Skill Builder 3)* $H_0\colon p_a = 0.1,\ p_b = 0.35,\ p_c = 0.2,\
+p_d = 0.05,\ p_e = 0.1,\ p_f = 0.2$; counts 210, 732, 396, 125, 213, 324
+(total 2000).
+
+```{python}
+#| echo: false
+e_b = 2000 * 0.35
+pd.Series({"(a) Expected count for B": e_b,
+           "(b) Contribution of B": round((732 - e_b) ** 2 / e_b, 3),
+           "(c) Degrees of freedom": 5}).to_string()
+```
+
+- **(a)** $2000(0.35) = $ **700**.
+- **(b)** $\dfrac{(732-700)^2}{700} \approx $ **1.463**.
+- **(c)** $df = 6 - 1 = $ **5**.
+
+## Exercise 7.12
+
+*(Skill Builder 3)* $H_0\colon p_a = 0.2,\ p_b = 0.80$; counts 132, 468
+(total 600).
+
+```{python}
+#| echo: false
+e_b = 600 * 0.80
+pd.Series({"(a) Expected count for B": e_b,
+           "(b) Contribution of B": round((468 - e_b) ** 2 / e_b, 3),
+           "(c) Degrees of freedom": 1}).to_string()
+```
+
+- **(a)** $600(0.80) = $ **480**.
+- **(b)** $\dfrac{(468-480)^2}{480} = $ **0.3**.
+- **(c)** $df = 2 - 1 = $ **1**.
+
+## Exercise 7.13
+
+**Are Food Delivery Apps Equally Popular?** Of 160 US adults who
+regularly use a food delivery app, 44 used DoorDash most recently, 43
+Grubhub, 40 UberEats, and 33 Other. Test whether the four options are
+equally likely.
+
+```{python}
+#| echo: false
+apps = [44, 43, 40, 33]
+tab, s = gof(apps)
+tab.index = ["DoorDash", "Grubhub", "UberEats", "Other"]
+tab.to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of chi-square statistics under the equal-popularity null, observed 1.85 marked
+sims, p_sim = gof_sim(apps)
+sim_hist(sims, float(s["Chi-square statistic"]))
+s.to_string()
+```
+
+If all four options were equally likely we would expect $160/4 = 40$ in
+each. The fit is excellent: $\chi^2 = 1.85$ with $df = 3$ and
+**p-value ≈ 0.604** — the randomization simulation above agrees (about 60%
+of resamples land as far from equal as the real data). Since
+$0.604 > 0.05$ we fail to reject $H_0$: the data provide **no evidence**
+that the four delivery apps differ in popularity.
+
+## Exercise 7.14
+
+**College Students and Paying Jobs.** Of 5204 first-year full-time
+students, 1436 work on campus, 1119 work off campus, and 2649 do not work,
+against assumed proportions 0.25, 0.25, 0.50.
+
+```{python}
+#| echo: false
+jobs = [1436, 1119, 2649]
+tab, s = gof(jobs, expected=[5204 * 0.25, 5204 * 0.25, 5204 * 0.50])
+tab.index = ["Works on campus", "Works off campus", "Does not work"]
+tab.to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Contribution of each job category to the chi-square statistic
+_, p_sim = gof_sim(jobs, [0.25, 0.25, 0.50])
+contrib_bar(["On campus", "Off campus", "Does not work"],
+            tab["Contribution to chi-sq"])
+pd.Series({"Chi-square statistic": s["Chi-square statistic"], "df": s["df"],
+           "p-value": s["p-value"],
+           "Randomization p-value": round(p_sim, 5)}).to_string()
+```
+
+**(a)** Expected counts are $5204(0.25) = 1301$, $1301$, and
+$5204(0.50) = 2602$. The chi-square statistic is $\chi^2 = 40.32$ with
+$df = 2$ and **p-value ≈ $2\times10^{-9}$** (simulation agrees). We
+decisively **reject** the assumed proportions: the data contradict them.
+
+**(b)** **Works off campus** contributes the most (25.47 of the 40.32) —
+and there the observed count (1119) is **less** than expected (1301):
+far fewer first-year students hold off-campus jobs than the 25% assumption
+predicts, while on-campus work (1436 vs 1301) runs higher.
+
+## Exercise 7.15
+
+**Favorite Skittles Flavor.** A sample of 66 people chose their favorite
+of five flavors: green 18, orange 9, purple 15, red 13, yellow 11.
+
+```{python}
+#| echo: false
+sk = [18, 9, 15, 13, 11]
+tab, s = gof(sk)
+tab.index = ["Green", "Orange", "Purple", "Red", "Yellow"]
+tab.to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Chi-square distribution with 4 degrees of freedom, upper tail beyond 3.70 shaded
+sims, p_sim = gof_sim(sk)
+chi2_curve(float(s["Chi-square statistic"]), 4)
+pd.Series({"(d) Chi-square statistic": s["Chi-square statistic"], "df": s["df"],
+           "(e) p-value": s["p-value"],
+           "Randomization p-value": round(p_sim, 4)}).to_string()
+```
+
+- **(a)** $H_0\colon p_g = p_o = p_p = p_r = p_y = 0.2$ (the flavors are
+  equally popular) vs $H_a\colon$ some $p_i \ne 0.2$.
+- **(b)** If all were equally popular we would expect $66/5 = $ **13.2**
+  people to choose each flavor.
+- **(c)** $df = 5 - 1 = $ **4**.
+- **(d)** $\chi^2 = 3.70$.
+- **(e)** **p-value ≈ 0.449**, so we fail to reject $H_0$: there is
+  **no evidence** that Skittles flavors differ in popularity — even the
+  biggest gap (orange, 9 vs 13.2) is well within random-chance range for a
+  sample of 66.
+
+## Exercise 7.16
+
+**Rock-Paper-Scissors.** First-turn choices of 119 players: rock 66,
+paper 39, scissors 14. Is any proportion different from $1/3$?
+
+```{python}
+#| echo: false
+rps = [66, 39, 14]
+tab, s = gof(rps)
+tab.index = ["Rock", "Paper", "Scissors"]
+tab.to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of chi-square statistics when all three choices are equally likely, observed 34.10 far in the tail
+sims, p_sim = gof_sim(rps)
+sim_hist(sims, float(s["Chi-square statistic"]))
+pd.Series({"Chi-square statistic": s["Chi-square statistic"], "df": s["df"],
+           "p-value": s["p-value"],
+           "Randomization p-value": round(p_sim, 5)}).to_string()
+```
+
+Expected counts are $119/3 = 39.67$ each. The mismatch is enormous:
+$\chi^2 = 34.10$ with $df = 2$ and **p-value ≈ $3.9\times10^{-8}$** — under
+$H_0$ none of 10000 simulated samples came close (randomization p-value
+0). We **reject** $H_0$: first-turn choices are far from equal. Players
+throw **rock** much more than $1/3$ ($66/119 \approx 0.55$) and **scissors**
+much less ($14/119 \approx 0.12$) — so a savvy opponent should open with
+paper.
+
+## Exercise 7.17
+
+**Gas, Charcoal, or Wood Pellets?** Of 114 staffers tasting chicken
+cooked on gas, charcoal, and wood-pellet grills, 41 preferred gas, 39
+charcoal, and 34 wood pellets. Is one grill type preferred?
+
+```{python}
+#| echo: false
+#| fig-cap: Chi-square distribution with 2 degrees of freedom, upper tail beyond 0.68 shaded
+gr = [41, 39, 34]
+tab, s = gof(gr)
+tab.index = ["Gas", "Charcoal", "Wood pellets"]
+sims, p_sim = gof_sim(gr)
+chi2_curve(float(s["Chi-square statistic"]), 2)
+tab.to_string()
+```
+
+```{python}
+#| echo: false
+pd.Series({"Chi-square statistic": s["Chi-square statistic"], "df": s["df"],
+           "p-value": s["p-value"],
+           "Randomization p-value": round(p_sim, 4)}).to_string()
+```
+
+Expected counts are $114/3 = 38$ each and the observed counts hug them:
+$\chi^2 = 0.68$ with $df = 2$ and **p-value ≈ 0.710**. We fail to reject
+$H_0$ — this provides **no evidence** that one type of grill heat is
+preferred over another; the small differences are entirely consistent
+with random chance.
+
+## Exercise 7.18
+
+**What Is Your Sleep Position?** A website claims 41% start in the fetal
+position, 28% on the side with legs straight, 13% on the back, 7% on the
+stomach, and 11% have no standard position. A random sample of 1000
+people gives the counts in the table. Doubt the website? (5% level.)
+
+```{python}
+#| echo: false
+sl = [391, 257, 156, 89, 107]
+probs = [0.41, 0.28, 0.13, 0.07, 0.11]
+tab, s = gof(sl, probs=probs)
+tab.index = ["Fetal", "Side", "Back", "Stomach", "None"]
+tab.to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Chi-square distribution with 4 degrees of freedom, upper tail beyond 13.21 shaded
+sims, p_sim = gof_sim(sl, probs)
+chi2_curve(float(s["Chi-square statistic"]), 4)
+pd.Series({"Chi-square statistic": s["Chi-square statistic"], "df": s["df"],
+           "p-value": s["p-value"],
+           "Randomization p-value": round(p_sim, 4)}).to_string()
+```
+
+Expected counts: $410,\ 280,\ 130,\ 70,\ 110$. The deviations are largest
+for **back** (156 vs 130) and **stomach** (89 vs 70) sleepers — both more
+common in the sample than the website claims. Overall
+$\chi^2 = 13.21$ with $df = 4$ and **p-value ≈ 0.010** (simulation
+agrees). Since $0.010 < 0.05$ we **reject** $H_0$: yes, we should doubt
+the proportions given on the website — the sample distribution of sleep
+positions differs from them, mainly via more back and stomach sleepers
+than advertised.
+
+## Exercise 7.19
+
+**Boys: ADHD or Just Young?** ADHD diagnoses for 32968 boys by birth
+quarter, against the overall proportion of boys born in each quarter.
+
+```{python}
+#| echo: false
+boys = [6880, 7982, 9161, 8945]
+probs = [0.244, 0.258, 0.257, 0.241]
+tab, s = gof(boys, probs=probs)
+tab.index = ["Jan-Mar", "Apr-Jun", "Jul-Sep", "Oct-Dec"]
+tab.to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Contribution of each birth quarter to the boys chi-square statistic
+_, p_sim = gof_sim(boys, probs)
+contrib_bar(["Jan-Mar (oldest)", "Apr-Jun", "Jul-Sep", "Oct-Dec (youngest)"],
+            tab["Contribution to chi-sq"], figsize=(6, 2.8))
+pd.Series({"(a) Total diagnosed": sum(boys),
+           "(c) Chi-square statistic": s["Chi-square statistic"],
+           "(d) df": s["df"], "(d) p-value": s["p-value"],
+           "Randomization p-value": round(p_sim, 5)}).to_string()
+```
+
+- **(a)** $6880 + 7982 + 9161 + 8945 = $ **32968** boys diagnosed.
+- **(b)** Expected counts under the birth-proportion null:
+  **8044.2, 8505.7, 8472.8, 7945.3**.
+- **(c)** $\chi^2 = 382.4$.
+- **(d)** $df = 3$ and **p-value ≈ 0** (far below $10^{-100}$; the
+  randomization p-value is 0 as well).
+- **(e)** We overwhelmingly **reject** $H_0$. Diagnoses run **below**
+  expectation for boys born Jan–Mar (the oldest in their grade,
+  contribution 168.5) and **above** expectation for boys born Oct–Dec
+  (the youngest, contribution 125.8). In school, relative age matters:
+  the youngest children in a grade are diagnosed with ADHD more often
+  than their birth-quarter share would predict — a caution that some of
+  those diagnoses may reflect immaturity relative to classmates rather
+  than the underlying condition.
+
+## Exercise 7.20
+
+**Girls: ADHD or Just Young?** The same analysis for 10081 girls
+diagnosed with ADHD, using the proportions of girls born in each quarter.
+
+```{python}
+#| echo: false
+girls = [1960, 2358, 2859, 2904]
+probs = [0.243, 0.258, 0.257, 0.242]
+tab, s = gof(girls, probs=probs)
+tab.index = ["Jan-Mar", "Apr-Jun", "Jul-Sep", "Oct-Dec"]
+tab.to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Contribution of each birth quarter to the girls chi-square statistic
+_, p_sim = gof_sim(girls, probs)
+contrib_bar(["Jan-Mar (oldest)", "Apr-Jun", "Jul-Sep", "Oct-Dec (youngest)"],
+            tab["Contribution to chi-sq"], figsize=(6, 2.8))
+pd.Series({"Chi-square statistic": s["Chi-square statistic"], "df": s["df"],
+           "p-value": s["p-value"],
+           "Randomization p-value": round(p_sim, 5)}).to_string()
+```
+
+Expected counts: **2449.7, 2600.9, 2590.8, 2439.6**. The pattern mirrors
+the boys: $\chi^2 = 236.7$ with $df = 3$ and **p-value ≈ 0** — a decisive
+**rejection** of $H_0$. Diagnoses run below expectation for the oldest
+girls (Jan–Mar, contribution 97.9) and above expectation for the youngest
+(Oct–Dec, contribution 88.4). So the relative-age effect in ADHD
+diagnosis holds for girls too, even though girls are diagnosed less
+often overall.
+
+## Exercise 7.21
+
+**Birth Date and Canadian Ice Hockey.** Birth quarters of 359 Ontario
+Hockey League players (147, 110, 52, 50) against the national
+distribution of Canadian births (23.7%, 25.9%, 25.9%, 24.5%).
+
+```{python}
+#| echo: false
+#| fig-cap: Chi-square distribution with 3 degrees of freedom, upper tail beyond 82.61 shaded
+ohl = [147, 110, 52, 50]
+probs = [0.237, 0.259, 0.259, 0.245]
+tab, s = gof(ohl, probs=probs)
+tab.index = ["Qtr 1", "Qtr 2", "Qtr 3", "Qtr 4"]
+sims, p_sim = gof_sim(ohl, probs)
+chi2_curve(float(s["Chi-square statistic"]), 3)
+tab.to_string()
+```
+
+```{python}
+#| echo: false
+pd.Series({"Chi-square statistic": s["Chi-square statistic"], "df": s["df"],
+           "p-value": s["p-value"],
+           "Randomization p-value": round(p_sim, 5)}).to_string()
+```
+
+$H_0\colon$ OHL birthdates follow the national birth distribution vs
+$H_a\colon$ they differ. Expected counts are $85.1,\ 93.0,\ 93.0,\ 88.0$.
+The fit is terrible: $\chi^2 = 82.61$ with $df = 3$ and **p-value ≈
+$10^{-17}$** (simulation: 0). We **reject** $H_0$ — the birthdate
+distribution of elite hockey players differs hugely from the national
+one: players born Jan–Mar (147 vs 85 expected) are vastly
+over-represented, those born later in the year under-represented. The
+January 1st age cutoff in youth hockey gives early-year children a
+lasting advantage, exactly the relative-age effect Gladwell describes in
+*Outliers*.
+
+## Exercise 7.22
+
+**Birthdate and Australian Football.** Birth quarters of 617 Australian-
+born 2009 AFL players (196, 162, 137, 122) against national birth
+proportions (0.248, 0.251, 0.254, 0.247).
+
+```{python}
+#| echo: false
+afl = [196, 162, 137, 122]
+probs = [0.248, 0.251, 0.254, 0.247]
+tab, s = gof(afl, probs=probs)
+tab.index = ["Jan-Mar", "Apr-Jun", "Jul-Sep", "Oct-Dec"]
+tab.to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Observed and expected AFL players by birth quarter
+_, p_sim = gof_sim(afl, probs)
+oe_bar(["Jan-Mar", "Apr-Jun", "Jul-Sep", "Oct-Dec"], afl,
+       tab["Expected"], xlabel="Birth quarter")
+pd.Series({"Chi-square statistic": s["Chi-square statistic"], "df": s["df"],
+           "p-value": s["p-value"],
+           "Randomization p-value": round(p_sim, 5)}).to_string()
+```
+
+Expected counts: **153.0, 154.9, 156.7, 152.4**. The **higher-than-
+expected** part of the year is **Jan–Mar** (196 vs 153) — the same
+January 1st cutoff as Canada; the **lower-than-expected** parts are
+Jul–Sep (137 vs 157) and especially Oct–Dec (122 vs 152). Overall
+$\chi^2 = 20.95$ with $df = 3$ and **p-value ≈ 0.0001**, so there **is**
+evidence that AFL birthdates do not match the national distribution. The
+categories contributing most to the sum are **Jan–Mar** (12.08) and
+**Oct–Dec** (6.06): the relative-age advantage at the start of the year
+and the corresponding deficit at its end.
+
+## Exercise 7.23
+
+**Are Hospitals Deadlier in July?** A study finds that deaths from
+medication errors spike in July, when new residents arrive at teaching
+hospitals.
+
+- **(a)** A **chi-square goodness-of-fit test**: compare the observed
+  counts of medication-error deaths by month with the counts expected if
+  deaths were spread evenly (or according to historical rates) across
+  months.
+- **(b)** The $\chi^2$ statistic would be **relatively large** — the
+  July spike makes the observed counts deviate far from expected.
+- **(c)** The p-value would be **relatively small** — a large statistic
+  sits far in the upper tail of the $\chi^2$ distribution.
+- **(d)** The categorical variable records the **month** in which the
+  medication-error death occurred.
+- **(e)** The **July** cell contributes the most to $\chi^2$.
+- **(f)** In July the **observed** count is higher than the expected
+  count — that positive gap, squared and scaled, is what makes the cell's
+  contribution so large.
+
+## Exercise 7.24
+
+**Can People Delay Death?** Deaths among 1200 elderly Californians of
+Chinese descent around the Harvest Moon Festival: 33 deaths in the week
+*before* the festival (50.82 expected) and 70 in the week *after* (52
+expected).
+
+```{python}
+#| echo: false
+obs = np.array([33, 70.0])
+exp = np.array([50.82, 52.0])
+contrib = (obs - exp) ** 2 / exp
+chi2 = contrib.sum()
+p = stats.chi2.sf(chi2, 1)
+pd.DataFrame({"Observed": obs.astype(int), "Expected": exp,
+              "Contribution": np.round(contrib, 3)},
+             index=["Week before", "Week after"]).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Chi-square distribution with 1 degree of freedom, upper tail beyond 12.48 shaded
+chi2_curve(chi2, 1)
+pd.Series({"Chi-square statistic": round(chi2, 3), "df": 1,
+           "p-value": float(f"{p:.2e}")}).to_string()
+```
+
+- **(a)** The $\chi^2$ statistic is **relatively large** — both weeks
+  deviate far from their expected counts.
+- **(b)** The p-value is **relatively small**.
+- **(c)** Week before: observed (33) is **lower** than expected (50.82).
+  Elderly people of Chinese descent appear to postpone death briefly to
+  reach the symbolically meaningful occasion.
+- **(d)** Contribution: $\dfrac{(33-50.82)^2}{50.82} \approx $ **6.25**.
+- **(e)** Week after: observed (70) is **higher** than expected (52) —
+  consistent with deaths that were held back before the festival
+  occurring shortly after it.
+- **(f)** Contribution: $\dfrac{(70-52)^2}{52} \approx $ **6.23**.
+- **(g)** The control group (elderly Californians **not** of Chinese
+  descent) rules out alternative explanations — seasonal effects, weather,
+  or any calendar artifact shared by everyone. The pattern appears only
+  in the group for whom the festival has cultural meaning, pointing to
+  the symbolic occasion itself rather than something happening that time
+  of year for all elderly people.
+- Totals: $\chi^2 = 12.48$ with $df = 1$ and **p-value ≈ 0.0004** (the
+  book's expected counts are estimates, so we sum the two contributions
+  directly).
+
+## Exercise 7.25
+
+**Favorite James Bond Actor?** A fan-site poll: Connery 98, Lazenby 5,
+Moore 23, Dalton 9, Brosnan 25, Craig 51 (total 211).
+
+```{python}
+#| echo: false
+bond6 = [98, 5, 23, 9, 25, 51]
+tab, s = gof(bond6)
+tab.index = ["Connery", "Lazenby", "Moore", "Dalton", "Brosnan", "Craig"]
+tab.to_string()
+```
+
+```{python}
+#| echo: false
+bond5 = [98, 23, 9, 25, 51]
+tab5, s5 = gof(bond5)
+tab5.index = ["Connery", "Moore", "Dalton", "Brosnan", "Craig"]
+_, p_sim = gof_sim(bond6)
+pd.DataFrame({"(a) Six actors": [s["Chi-square statistic"], s["df"], s["p-value"], ""],
+              "(b) Five actors": [s5["Chi-square statistic"], s5["df"], s5["p-value"],
+                                  round(p_sim, 5)]},
+             index=["Chi-square statistic", "df", "p-value",
+                    "Randomization p-value"]).to_string()
+```
+
+- **(a)** Under equal popularity we expect $211/6 = 35.17$ votes per
+  actor. $\chi^2 = 171.9$ with $df = 5$ and **p-value ≈ $10^{-36}$**: a
+  decisive **rejection** — there is overwhelming evidence of a
+  difference in popularity (Connery far above expectation at 98 vs 35.2;
+  Lazenby, Dalton, and Brosnan far below).
+- **(b)** Dropping Lazenby: $206/5 = 41.2$ expected each, and
+  $\chi^2 = 120.2$ with $df = 4$, **p-value ≈ $10^{-25}$** — still
+  wildly significant. The fans' preferences do not hinge on the
+  one-film incumbent.
+- **(c)** **No.** These data come from a self-selected poll on a James
+  Bond fan site: respondents are enthusiasts who visit and bother to
+  vote, so the sample is not representative of the movie-watching
+  population. Where the data come from still matters — the test says the
+  *poll's* respondents differ strongly among the actors, not that all
+  moviegoers do.
+
+## Exercise 7.26
+
+**Genetic Variation in Fast-Twitch Muscles.** Computer output tests
+whether ACTN3 genotype proportions are 0.25 (RR), 0.50 (RX), 0.25 (XX)
+in $n = 436$ Australians. The book's output is reproduced and verified
+below.
+
+```{python}
+#| echo: false
+actn = [130, 226, 80]
+exp = [109, 218, 109]
+res = stats.chisquare(actn, exp)
+pd.DataFrame({"Observed": actn, "Null proportion": [0.25, 0.50, 0.25],
+              "Expected": exp,
+              "Contribution to chi-sq": np.round((np.array(actn) - np.array(exp)) ** 2 / np.array(exp), 5)},
+             index=["RR", "RX", "XX"]).to_string()
+```
+
+```{python}
+#| echo: false
+pd.Series({"N": 436, "DF": 2, "Chi-Sq": round(float(res.statistic), 4),
+           "P-Value": round(float(res.pvalue), 3)}).to_string()
+```
+
+- **(a)** The sample size is $N = $ **436**.
+- **(b)** For RR the observed count is **130**; under $H_0$ the expected
+  count is $436(0.25) = $ **109**.
+- **(c)** **XX** contributes the most (7.716 of the 12.055) — and there
+  the observed count (80) is **less** than expected (109).
+- **(d)** $DF = 3 - 1 = $ **2**.
+- **(e)** **p-value = 0.002.** Since $0.002 < 0.05$ we reject $H_0$: the
+  genotype proportions in this Australian sample differ from the 0.25 /
+  0.50 / 0.25 model — specifically with fewer XX homozygotes (and more
+  RR) than that model predicts. (Our recomputation matches the book's
+  output: $\chi^2 = 12.055$, $p = 0.002$.)
+
+## Exercise 7.27
+
+**Examining Genetic Alleles in Fast-Twitch Muscles.** Same study, allele
+counts: 244 classified R and 192 classified X among the 436 people.
+
+```{python}
+#| echo: false
+#| fig-cap: Chi-square distribution with 1 degree of freedom, upper tail beyond 6.20 shaded
+alleles = [244, 192]
+tab, s = gof(alleles)
+tab.index = ["R", "X"]
+z = (244 / 436 - 0.5) / np.sqrt(0.5 * 0.5 / 436)
+chi2_curve(float(s["Chi-square statistic"]), 1)
+pd.DataFrame({"(a) Chi-square test": [s["Chi-square statistic"], s["df"], s["p-value"]],
+              "(b) Proportion test (z)": [z ** 2, 1, 2 * stats.norm.sf(z)]},
+             index=["Test statistic", "df", "p-value"]).to_string()
+```
+
+- **(a)** Chi-square goodness-of-fit test: $H_0\colon p_R = p_X = 0.5$
+  vs $H_a\colon$ the alleles are not equally likely. Expected counts are
+  $436/2 = 218$ each. $\chi^2 = (244-218)^2/218 + (192-218)^2/218 = 6.20$
+  with $df = 1$ and **p-value ≈ 0.013**. All expected counts exceed 5, so
+  the $\chi^2$ procedure is appropriate; we **reject** $H_0$ and conclude
+  the R and X alleles are not equally frequent in this sample.
+- **(b)** Test for a proportion: $H_0\colon p = 0.5$ (proportion
+  classified R) vs $H_a\colon p \ne 0.5$. With
+  $\hat p = 244/436 = 0.560$ and
+  $SE = \sqrt{0.5(0.5)/436} = 0.0239$, the z-statistic is
+  $z = 0.0596/0.0239 = 2.49$, giving a two-tailed **p-value ≈ 0.013**.
+- **(c)** The p-values are **identical** — as they always are for a
+  two-category goodness-of-fit test and the corresponding two-tailed
+  proportion test, because $\chi^2 = z^2$ ($6.20 = 2.49^2$) and the upper
+  tail of $\chi^2_1$ matches both tails of the standard normal. Same
+  conclusion either way: evidence that the alleles are not equally
+  likely.
+
+## Exercise 7.28
+
+**PA Seniors Superpowers.** Which of five superpowers 453 Pennsylvania
+high-school seniors would most want: Fly 120, Freeze time 129,
+Invisibility 80, Super strength 19, Telepathy 105. Test for equal
+popularity.
+
+*Data:* `data/ch02/PASeniors.csv`, variable `Superpower`:
+
+```{python}
+#| echo: false
+pa = pd.read_csv("data/ch02/PASeniors.csv")
+sp = pa.Superpower.value_counts().reindex(["Fly", "Freeze time", "Invisibility",
+                                           "Super strength", "Telepathy"])
+tab, s = gof(sp.values)
+tab.index = sp.index
+tab.to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Contribution of each superpower to the chi-square statistic
+_, p_sim = gof_sim(sp.values)
+contrib_bar(["Fly", "Freeze time", "Invisibility", "Super strength", "Telepathy"],
+            tab["Contribution to chi-sq"], figsize=(6.5, 2.8))
+pd.Series({"Chi-square statistic": s["Chi-square statistic"], "df": s["df"],
+           "p-value": s["p-value"],
+           "Randomization p-value": round(p_sim, 5)}).to_string()
+```
+
+Expected counts are $453/5 = 90.6$ each. $\chi^2 = 85.93$ with $df = 4$
+and **p-value ≈ $10^{-17}$** (simulation: 0) — we **reject** $H_0$: the
+superpowers are not equally popular. The disparity is driven almost
+entirely by **Super strength** (19 vs 90.6 expected, contribution 56.6):
+today's seniors have no interest in brute force, while freezing time and
+flying run well above expectation.
+
+## Exercise 7.29
+
+**PA Seniors Favorite Season.** Favorite season of 454 seniors:
+Winter 59, Spring 78, Summer 157, Fall 160. Test for equal popularity.
+
+*Data:* `data/ch02/PASeniors.csv`, variable `Season`:
+
+```{python}
+#| echo: false
+se = pa.Season.value_counts().reindex(["Winter", "Spring", "Summer", "Fall"])
+tab, s = gof(se.values)
+tab.index = se.index
+tab.to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Contribution of each season to the chi-square statistic
+_, p_sim = gof_sim(se.values)
+contrib_bar(["Winter", "Spring", "Summer", "Fall"],
+            tab["Contribution to chi-sq"])
+pd.Series({"Chi-square statistic": s["Chi-square statistic"], "df": s["df"],
+           "p-value": s["p-value"],
+           "Randomization p-value": round(p_sim, 5)}).to_string()
+```
+
+Expected counts are $454/4 = 113.5$ each. $\chi^2 = 73.0$ with $df = 3$
+and **p-value ≈ $10^{-15}$** — a decisive **rejection** of equal
+popularity. **Winter** is the least popular by far (59 vs 113.5,
+contribution 26.2) and **Fall** the most (160 vs 113.5, contribution
+19.1), with Summer also above expectation. Pennsylvania seniors would
+much rather have fall or summer than winter.
+
+## Exercise 7.30
+
+**PA Seniors Want to Be Happy!** If they could pick only one: Famous 19,
+Happy 298, Healthy 44, Rich 90 ($n = 451$). Past preferences suggest
+70% happy and 10% each for the others.
+
+*Data:* `data/ch02/PASeniors.csv`, variable `Preference`:
+
+```{python}
+#| echo: false
+pr = pa.Preference.value_counts().reindex(["Famous", "Happy", "Healthy", "Rich"])
+tab, s = gof(pr.values, probs=[0.10, 0.70, 0.10, 0.10])
+tab.index = pr.index
+tab.to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Observed and expected preference counts under the 70-10-10-10 assumption
+_, p_sim = gof_sim(pr.values, [0.10, 0.70, 0.10, 0.10])
+oe_bar(["Famous", "Happy", "Healthy", "Rich"], pr.values, tab["Expected"])
+pd.Series({"Chi-square statistic": s["Chi-square statistic"], "df": s["df"],
+           "p-value": s["p-value"],
+           "Randomization p-value": round(p_sim, 5)}).to_string()
+```
+
+**(a)** Expected counts: $45.1,\ 315.7,\ 45.1,\ 45.1$. $\chi^2 = 60.8$
+with $df = 3$ and **p-value ≈ $10^{-12}$** (simulation: 0) — we
+**reject** the assumed proportions.
+
+**(b)** The mismatches are concentrated at the extremes of the
+preference list: **Rich** is chosen by 90 students where only 45.1 are
+expected — more than double the assumed 10% — while **Famous** is chosen
+by only 19 vs 45.1 expected. **Happy** is fairly close to its assumed
+share ($298/451 = 66.1\%$ vs 70%) and **Healthy** right on it. In short:
+this generation still wants to be happy, but would much rather be rich
+— and much less famous — than past preferences predicted.
+
+## Exercise 7.31
+
+**PA Seniors Feel Stressed about School.** Amount of pressure felt from
+schoolwork: A lot 184, Some 200, Very little 55, None 16 ($n = 455$).
+Past results suggest 40% A lot, 40% Some, 10% each Very little and None.
+
+*Data:* `data/ch02/PASeniors.csv`, variable `SchoolPressure`:
+
+```{python}
+#| echo: false
+#| fig-cap: Contribution of each pressure level to the chi-square statistic
+scp = pd.read_csv("data/ch02/PASeniors.csv", keep_default_na=False)["SchoolPressure"]
+scp = scp[scp != ""].value_counts().reindex(["A lot", "Some", "Very little", "None"])
+tab, s = gof(scp.values, probs=[0.40, 0.40, 0.10, 0.10])
+tab.index = scp.index
+sims, p_sim = gof_sim(scp.values, [0.40, 0.40, 0.10, 0.10])
+contrib_bar(["A lot", "Some", "Very little", "None"],
+            tab["Contribution to chi-sq"])
+tab.to_string()
+```
+
+```{python}
+#| echo: false
+pd.Series({"Chi-square statistic": s["Chi-square statistic"], "df": s["df"],
+           "p-value": s["p-value"],
+           "Randomization p-value": round(p_sim, 5)}).to_string()
+```
+
+**(a)** Expected counts: $182,\ 182,\ 45.5,\ 45.5$. $\chi^2 = 22.91$ with
+$df = 3$ and **p-value ≈ $4\times10^{-5}$** (simulation: 0) — we
+**reject** the assumed proportions.
+
+**(b)** **None** contributes the most (19.13 of the 22.91) — and there
+the observed count (16) is **less** than the expected count (45.5).
+Seniors report school pressure at about the historically expected rates
+for A lot and Some, and even slightly above for Very little, but almost
+nobody feels *no* pressure at all: 16 students versus the 45.5 the past
+pattern predicts.
+
+## Exercise 7.32
+
+**Benford's Law.** Under Benford's law the leading digit $d$ appears
+with probability $\log_{10}(1 + 1/d)$. For 1188 street addresses
+collected in Professor Cleary's lectures (data in `Address`), test the
+counts against Benford's proportions.
+
+*Data:* `data/ch07/Benford.csv`, from
+<https://www.lock5stat.com/datasets3e/Benford.csv>:
+
+```{python}
+#| echo: false
+ben = pd.read_csv("data/ch07/Benford.csv")
+tab, s = gof(ben.Address.values, probs=ben.BenfordP.values)
+tab.index = [f"Digit {d}" for d in ben.Digit]
+tab.to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Observed and expected leading-digit counts for 1188 addresses
+_, p_sim = gof_sim(ben.Address.values, ben.BenfordP.values)
+oe_bar([str(d) for d in ben.Digit], ben.Address.values, tab["Expected"],
+       xlabel="Leading digit")
+pd.Series({"Chi-square statistic": s["Chi-square statistic"], "df": s["df"],
+           "p-value": s["p-value"],
+           "Randomization p-value": round(p_sim, 4)}).to_string()
+```
+
+Expected counts run from $1188(0.301) = 357.6$ for digit 1 down to 54.4
+for digit 9. The fit is remarkably good: $\chi^2 = 8.24$ with $df = 8$
+and **p-value ≈ 0.410** (simulation agrees). We fail to reject $H_0$ —
+the leading digits of these street addresses are entirely **consistent
+with Benford's law**, with no individual digit contributing an unusual
+share of the statistic (largest: digit 3, at 3.14).
+
+## Exercise 7.33
+
+**Auditing a Company with Benford's Law.** Leading digits of 7273
+invoice amounts from one company (data in `Invoices`). Departures from
+Benford's law can signal fraud, so auditors test them.
+
+*Data:* `data/ch07/Benford.csv`, variable `Invoices`:
+
+```{python}
+#| echo: false
+tab, s = gof(ben.Invoices.values, probs=ben.BenfordP.values)
+tab.index = [f"Digit {d}" for d in ben.Digit]
+tab.to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Observed and expected leading-digit counts for 7273 invoices
+_, p_sim = gof_sim(ben.Invoices.values, ben.BenfordP.values)
+oe_bar([str(d) for d in ben.Digit], ben.Invoices.values, tab["Expected"],
+       xlabel="Leading digit")
+pd.Series({"Chi-square statistic": s["Chi-square statistic"], "df": s["df"],
+           "p-value": s["p-value"],
+           "Randomization p-value": round(p_sim, 5)}).to_string()
+```
+
+Expected counts run from $7273(0.301) = 2189.4$ down to 332.8. Here the
+fit is **poor**: $\chi^2 = 26.66$ with $df = 8$ and **p-value ≈ 0.0008**
+(simulation agrees) — we **reject** $H_0$: these invoice digits are
+inconsistent with Benford's law. The largest contributors are **digit 5**
+(655 observed vs 575.9 expected — far too many, contribution 10.87) and
+**digit 4** (639 vs 704.8 — too few, contribution 6.15). A pile-up of
+mid-range leading digits like this is exactly the kind of pattern that
+would lead auditors to examine those claims more closely — round-number
+invoices just under thresholds, for instance, are a classic red flag.
+
+## Exercise 7.34
+
+**Private, Profit, or Public?** Table 7.25 gives the type of Control for
+all 6141 US post-secondary schools in `CollegeScores` (29.8% Private,
+38.0% Profit, 32.2% Public). `SampColleges` is supposed to be a random
+sample of 50 schools. Test its Control counts against the population
+proportions.
+
+*Data:* `data/ch07/SampColleges.csv`, from
+<https://www.lock5stat.com/datasets3e/SampColleges.csv>; population
+proportions verified from `data/ch01/CollegeScores.csv`:
+
+```{python}
+#| echo: false
+cs = pd.read_csv("data/ch01/CollegeScores.csv")
+pop = (cs.Control.value_counts(normalize=True) * 100).round(2)
+sc = pd.read_csv("data/ch07/SampColleges.csv")
+counts = sc.Control.value_counts().reindex(["Private", "Profit", "Public"])
+tab, s = gof(counts.values, probs=[0.298, 0.380, 0.322])
+tab.index = counts.index
+tab.to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Observed and expected counts of control type in the 50 sampled colleges
+_, p_sim = gof_sim(counts.values, [0.298, 0.380, 0.322])
+oe_bar(list(counts.index), counts.values, tab["Expected"], xlabel="Type of control")
+pd.Series({"Population proportions (CollegeScores, pct)": dict(pop),
+           "Chi-square statistic": s["Chi-square statistic"], "df": s["df"],
+           "p-value": s["p-value"],
+           "Randomization p-value": round(p_sim, 4)}).to_string()
+```
+
+Null hypothesis: the Control distribution in `SampColleges` matches the
+population proportions 0.298, 0.380, 0.322 (which our copy of
+`CollegeScores` confirms: 29.83 / 37.99 / 32.18 over 6141 schools).
+Expected counts in the sample of 50 are $14.9,\ 19.0,\ 16.1$ — all above
+5, so the $\chi^2$ test is appropriate. The statistic is $\chi^2 = 7.26$
+with $df = 2$ and **p-value ≈ 0.027** (simulation agrees). At the 5%
+level we **reject** $H_0$: the sample's control counts are not
+consistent with the population proportions — it contains too many
+Public schools (25 vs 16.1 expected) and too few Profit schools (14 vs
+19.0). Either the sampling was not truly random or random chance handed
+us an unusual sample; at a 1% level we would not reject, so this result
+is borderline.
+
+## Exercise 7.35
+
+**Random Digits in Students' Random Numbers?** 150 students wrote down a
+"random" four-digit number (data in `Digits`, variables `RND1`–`RND4`).
+
+*Data:* `data/ch07/Digits.csv`, from
+<https://www.lock5stat.com/datasets3e/Digits.csv>:
+
+```{python}
+#| echo: false
+dig = pd.read_csv("data/ch07/Digits.csv")
+rnd4 = dig.RND4.value_counts().reindex(range(10), fill_value=0)
+rnd1 = dig.RND1.value_counts().reindex(range(10), fill_value=0).drop(0)
+tab4, s4 = gof(rnd4.values)
+tab1, s1 = gof(rnd1.values)
+print("Last digit (RND4):")
+print(tab4.rename(index={i: f"Digit {i}" for i in tab4.index}).to_string())
+print("\nFirst digit (RND1):")
+print(tab1.rename(index={i: f"Digit {i}" for i in tab1.index}).to_string())
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Distribution of the first and last digits of the students' random numbers
+_, p_sim4 = gof_sim(rnd4.values)
+_, p_sim1 = gof_sim(rnd1.values)
+fig, axes = plt.subplots(1, 2, figsize=(7, 3))
+for ax, (v, t, title) in zip(axes, [(rnd4, s4, "Last digit (RND4)"),
+                                    (rnd1, s1, "First digit (RND1)")]):
+    ax.bar([str(d) for d in v.index], v.values, color="#4c72b0")
+    ax.axhline(len(dig) / len(v), color="#c44e52", lw=1.5,
+               label="Expected under H0")
+    ax.set_title(title, fontsize=10)
+    ax.set_xlabel("Digit")
+    ax.set_ylabel("Count")
+    ax.legend(fontsize=8)
+plt.tight_layout()
+plt.show()
+pd.DataFrame({"(a) Last digit RND4": [s4["Chi-square statistic"], s4["df"], s4["p-value"],
+                                      round(p_sim4, 4)],
+              "(b) First digit RND1": [s1["Chi-square statistic"], s1["df"], s1["p-value"],
+                                       round(p_sim1, 5)]},
+             index=["Chi-square statistic", "df", "p-value",
+                    "Randomization p-value"]).to_string()
+```
+
+- **(a)** Last digit: $H_0\colon p_0 = p_1 = \cdots = p_9 = 0.10$, with
+  expected count 15 per digit. $\chi^2 = 17.87$ with $df = 9$ and
+  **p-value ≈ 0.037** — significant at the 5% level (though not by
+  much). The mismatch is dominated by **digit 6**, chosen 27 times vs 15
+  expected (contribution 9.6): students over-use 6 as a last digit.
+  Even a task people think is trivially random shows measurable bias.
+- **(b)** First digit: only nine categories (no zero), expected
+  $150/9 = 16.67$ each. $\chi^2 = 61.68$ with $df = 8$ and **p-value ≈
+  $2\times10^{-10}$** — overwhelming evidence that the first digits are
+  **not** being chosen at random. Fully **44 of 150 students** started
+  their "random" number with 1 (contribution 44.8) and only 5 with 9:
+  people shy away from extremes and lean hard on small, salient digits.
+
+## Exercise 7.36
+
+**Random Digits in Social Security Numbers?** Same 150 students gave the
+last two digits of their nine-digit SSN (`SSN8`, `SSN9`). Does the
+government assign digits more randomly than students generate them?
+
+*Data:* `data/ch07/Digits.csv`, variables `SSN8` and `SSN9`:
+
+```{python}
+#| echo: false
+ssn8 = dig.SSN8.value_counts().reindex(range(10), fill_value=0)
+ssn9 = dig.SSN9.value_counts().reindex(range(10), fill_value=0)
+tab8, s8 = gof(ssn8.values)
+tab9, s9 = gof(ssn9.values)
+_, p_sim8 = gof_sim(ssn8.values)
+_, p_sim9 = gof_sim(ssn9.values)
+fig, axes = plt.subplots(1, 2, figsize=(7, 3))
+for ax, (v, t) in zip(axes, [(ssn8, "SSN 8th digit"), (ssn9, "SSN 9th digit")]):
+    ax.bar([str(d) for d in v.index], v.values, color="#4c72b0")
+    ax.axhline(15, color="#c44e52", lw=1.5, label="Expected under H0")
+    ax.set_title(t, fontsize=10)
+    ax.set_xlabel("Digit")
+    ax.set_ylabel("Count")
+    ax.legend(fontsize=8)
+plt.tight_layout()
+plt.show()
+pd.DataFrame({"SSN8": [s8["Chi-square statistic"], s8["df"], s8["p-value"],
+                       round(p_sim8, 3)],
+              "SSN9": [s9["Chi-square statistic"], s9["df"], s9["p-value"],
+                       round(p_sim9, 4)]},
+             index=["Chi-square statistic", "df", "p-value",
+                    "Randomization p-value"]).to_string()
+```
+
+Testing $H_a\colon$ some $p_i \ne 0.10$ with expected count 15 per digit:
+
+- **SSN8:** $\chi^2 = 1.60$ with $df = 9$ and **p-value ≈ 0.996** — the
+  observed counts (13 to 18) barely budge from uniform.
+- **SSN9:** $\chi^2 = 13.87$ with $df = 9$ and **p-value ≈ 0.127** —
+  still no significant departure, though digit 7 appears 27 times
+  (contribution 9.6), a wobble consistent with chance at this sample
+  size.
+
+**Conclusion:** for either column we fail to reject $H_0$ — there is no
+evidence that the government's digit assignments are anything but equally
+likely. The contrast with Exercise 7.35 is striking: the SSA assigns
+digits at random far better than students *try* to produce them at
+random.
+
+:::

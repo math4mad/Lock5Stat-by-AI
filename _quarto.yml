@@ -111,6 +111,10 @@ website:
             text: "Ch. 6 · Section 6.4"
           - href: chapters/ch06/s6-5.qmd
             text: "Ch. 6 · Section 6.5"
+          - href: chapters/ch07/s7-1.qmd
+            text: "Ch. 7 · Section 7.1"
+          - href: chapters/ch07/s7-2.qmd
+            text: "Ch. 7 · Section 7.2"
 
 format:
   html:
