@@ -1,0 +1,1172 @@
+---
+execute-dir: project
+title: "Chapter 10 · Section 10.1"
+subtitle: "Multiple Predictors — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Multiple regression extends the simple linear model to **$p$ predictors**:
+$$Y = \beta_0 + \beta_1 X_1 + \cdots + \beta_p X_p + \epsilon,$$
+fitted by least squares. Each coefficient $b_i$ is interpreted with the other
+predictors **held constant**: a one-unit increase in $X_i$ changes the
+predicted response by $b_i$. Individual predictors are tested with
+$t = b_i/SE$ on **$n-p-1$ error degrees of freedom**, and the whole model is
+tested with the ANOVA **F-statistic** $F = (SSModel/p)/(SSE/(n-p-1))$ on
+$p$ and $n-p-1$ df, with $H_0\colon\beta_1=\cdots=\beta_p=0$ (model
+ineffective) vs $H_a\colon$ at least one $\beta_i \neq 0$ (model effective).
+**$R^2 = SSModel/SSTotal$** is the percent of response variability explained
+by all predictors together, and **adjusted $R^2$** $=1-(1-R^2)\frac{n-1}{n-p-1}$
+penalizes model size. Binary categorical predictors enter as **indicator
+(dummy) variables** coded 0/1, giving parallel lines. All fits below use
+numpy least squares via the helper `multi_reg` (coefficient table with
+standard errors, t- and p-values, plus the full ANOVA table), and — per this
+project's convention — every parametric F-test on real data is re-checked
+with a **randomization test** (`perm_F`: shuffle the response, refit, recompute
+$F$; 10000 shuffles, seed 2026). Exercises are from *Statistics: Unlocking
+the Power of Data* (Lock⁵, 3rd ed., pp. 662–670): Skill Builders 10.1–10.22
+dissect two printed multiple-regression outputs; the applied exercises
+10.23–10.59 cover forest-fire damage, clinical depression scores, hours
+hanging out with friends, home prices, calories, life expectancy, binary
+predictors, race horses, hantavirus, golf scores, memory and texting, car
+mileage, arm spans, mouse weight gain, NBA winning percentages, Mustang
+prices, and a randomization test for the printer model.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+from scipy import stats
+sns.set_theme(style="whitegrid")
+
+def multi_reg(X_df, y, names):
+    """Least-squares multiple regression with numpy only.
+    Returns dict: coefficient table, ANOVA table, summary, beta vector."""
+    y = np.asarray(y, float)
+    X = np.column_stack([np.ones(len(y)), np.asarray(X_df, float)])
+    n, k = X.shape
+    p = k - 1                       # number of predictors
+    dfe = n - p - 1                 # error df
+    beta, *_ = np.linalg.lstsq(X, y, rcond=None)
+    resid = y - X @ beta
+    sse = float(resid @ resid)
+    sst = float(((y - y.mean()) ** 2).sum())
+    ssm = sst - sse
+    s_e = float(np.sqrt(sse / dfe))
+    se = np.sqrt(np.diag((sse / dfe) * np.linalg.inv(X.T @ X)))
+    t = beta / se
+    pval = 2 * stats.t.sf(np.abs(t), dfe)
+    F = (ssm / p) / (sse / dfe)
+    pF = float(stats.f.sf(F, p, dfe))
+    R2 = ssm / sst
+    adj = 1 - (1 - R2) * (n - 1) / dfe
+    coef = pd.DataFrame({"Term": ["Intercept"] + list(names),
+                         "Coef": np.round(beta, 4), "SE": np.round(se, 4),
+                         "t": np.round(t, 3),
+                         "p-value": [float(f"{v:.3g}") for v in pval]})
+    anova = pd.DataFrame({"Source": ["Model", "Error", "Total"],
+                          "df": [p, dfe, n - 1],
+                          "SS": [round(ssm, 2), round(sse, 2), round(sst, 2)],
+                          "MS": [round(ssm / p, 2), round(sse / dfe, 2), ""],
+                          "F": [round(float(F), 3), "", ""],
+                          "p-value": [float(f"{pF:.3g}"), "", ""]
+                          }).set_index("Source")
+    summ = pd.Series({"n": n, "predictors": p, "s_e": round(s_e, 4),
+                      "R2": round(R2, 4), "adjR2": round(adj, 4),
+                      "F": round(float(F), 3), "p-value": float(f"{pF:.3g}")})
+    return {"coef": coef, "anova": anova, "summ": summ, "beta": beta,
+            "s_e": s_e, "R2": R2, "n": n}
+
+def perm_F(X_df, y, reps=10000, seed=2026):
+    """Randomization F-test: shuffle the response, refit the model,
+    recompute F each time. (Refitting by least squares is equivalent to
+    applying the hat matrix H = X(X'X)^-1 X' to the shuffled response.)"""
+    y = np.asarray(y, float)
+    X = np.column_stack([np.ones(len(y)), np.asarray(X_df, float)])
+    n, k = X.shape
+    p = k - 1
+    dfe = n - p - 1
+    H = X @ np.linalg.inv(X.T @ X) @ X.T
+    def F_of(yy):
+        sse = float(((yy - H @ yy) ** 2).sum())
+        sst = float(((yy - yy.mean()) ** 2).sum())
+        return ((sst - sse) / p) / (sse / dfe)
+    Fobs = F_of(y)
+    rng = np.random.default_rng(seed)
+    sims = np.empty(reps)
+    for i in range(reps):
+        sims[i] = F_of(rng.permutation(y))
+    return sims, float(Fobs), float((sims >= Fobs).mean())
+
+def sim_hist(sims, obs, xlabel="Simulated F-statistics", bins=40,
+             figsize=(6, 3)):
+    """Histogram of simulated statistics with the observed one marked."""
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.histplot(x=sims, bins=bins, ax=ax, color="#4c72b0")
+    mask = sims >= obs
+    if mask.any():
+        sns.histplot(x=sims[mask], bins=bins, ax=ax, color="#c44e52")
+    ax.axvline(obs, color="black", lw=1.5)
+    ax.set_xlabel(xlabel); ax.set_ylabel("Simulated statistics")
+    plt.tight_layout(); plt.show()
+```
+
+::: {.panel-tabset}
+
+## Exercise 10.1
+
+*(Skill Builder 1)* The output (reproduced below) fits
+$Y = 43.4 - 6.82X_1 + 1.70X_2 + 1.70X_3 + 0.442X_4$ on $n=11$ cases.
+
+```{python}
+#| echo: false
+sb1 = pd.DataFrame({"Term": ["Constant", "X1", "X2", "X3", "X4"],
+                    "Coef": [43.43, -6.820, 1.704, 1.7009, 0.4417],
+                    "SE": [18.76, 1.059, 1.189, 0.6014, 0.1466],
+                    "T": [2.31, -6.44, 1.43, 2.83, 3.01],
+                    "P": [0.060, 0.001, 0.202, 0.030, 0.024]})
+print(sb1.to_string(index=False))
+print("\nS = 2.05347   R-Sq = 99.8%   R-Sq(adj) = 99.6%")
+print("ANOVA: Reg df=4 SS=10974.7 MS=2743.7 F=650.66 P=0.000 | "
+      "Error df=6 SS=25.3 MS=4.2 | Total df=10 SS=11000.0")
+```
+
+**Explanatory variables:** $X_1, X_2, X_3, X_4$ (four predictors).
+**Response variable:** $Y$.
+
+## Exercise 10.2
+
+*(Skill Builder 1)* One case has $Y=30$, $X_1=8$, $X_2=6$, $X_3=4$, $X_4=50$:
+
+```{python}
+#| echo: false
+yhat = 43.43 - 6.820*8 + 1.704*6 + 1.7009*4 + 0.4417*50
+print(f"predicted = {yhat:.2f},  residual = {30 - yhat:.2f}")
+```
+
+**Predicted response $\hat y = 27.98$**; residual $= 30 - 27.98 =$ **2.02**.
+
+## Exercise 10.3
+
+*(Skill Builder 1)* One case has $Y=60$, $X_1=5$, $X_2=7$, $X_3=5$, $X_4=75$:
+
+```{python}
+#| echo: false
+yhat = 43.43 - 6.820*5 + 1.704*7 + 1.7009*5 + 0.4417*75
+print(f"predicted = {yhat:.2f},  residual = {60 - yhat:.2f}")
+```
+
+**Predicted response $\hat y = 62.89$**; residual $= 60 - 62.89 =$ **$-2.89$**.
+
+## Exercise 10.4
+
+*(Skill Builder 1)* The coefficient of $X_2$ is **1.704**; the p-value for
+testing $H_0\colon\beta_2=0$ is **0.202**.
+
+## Exercise 10.5
+
+*(Skill Builder 1)* The coefficient of $X_1$ is **$-6.820$**; the p-value for
+testing $H_0\colon\beta_1=0$ is **0.001**.
+
+## Exercise 10.6
+
+*(Skill Builder 1)* Significant at the 5% level (p-value $< 0.05$):
+**$X_1$** (0.001), **$X_3$** (0.030) and **$X_4$** (0.024). $X_2$
+(p = 0.202) is not.
+
+## Exercise 10.7
+
+*(Skill Builder 1)* Significant at the 1% level (p-value $< 0.01$): only
+**$X_1$** (p = 0.001).
+
+## Exercise 10.8
+
+*(Skill Builder 1)* **$X_1$** is most significant — smallest p-value
+(0.001) and largest $|t| = 6.44$.
+
+## Exercise 10.9
+
+*(Skill Builder 1)* **$X_2$** is least significant — largest p-value
+(0.202).
+
+## Exercise 10.10
+
+*(Skill Builder 1)* The ANOVA test gives **F = 650.66** with df $(4, 6)$ and
+**P $\approx$ 0.000**:
+
+```{python}
+#| echo: false
+print(f"F-distribution p-value: {stats.f.sf(650.66, 4, 6):.2g}")
+```
+
+Since $p < 0.05$ we **reject $H_0$** and conclude the model is effective —
+at least one of the predictors is useful (in fact $R^2 = 99.8\%$).
+
+## Exercise 10.11
+
+*(Skill Builder 1)* **$R^2 = 99.8\%$**: 99.8% of the variation in $Y$ is
+explained by the model using the four predictors $X_1$–$X_4$ together
+(adjusted $R^2 = 99.6\%$).
+
+## Exercise 10.12
+
+*(Skill Builder 2)* The output (reproduced below) fits
+$Y = -61 + 4.71X_1 - 0.25X_2 + 6.46X_3 + 1.50X_4 - 1.32X_5$ on $n=20$ cases.
+
+```{python}
+#| echo: false
+sb2 = pd.DataFrame({"Term": ["Constant", "X1", "X2", "X3", "X4", "X5"],
+                    "Coef": [-60.7, 4.715, -0.253, 6.459, 1.5011, -1.3151],
+                    "SE": [105.7, 2.235, 1.178, 2.426, 0.4931, 0.8933],
+                    "T": [-0.57, 2.11, -0.21, 2.66, 3.04, -1.47],
+                    "P": [0.575, 0.053, 0.833, 0.019, 0.009, 0.163]})
+print(sb2.to_string(index=False))
+print("\nS = 32.4047   R-Sq = 77.9%   R-Sq(adj) = 70.0%")
+print("ANOVA: Reg df=5 SS=51799 MS=10360 F=9.87 P=0.000 | "
+      "Error df=14 SS=14701 MS=1050 | Total df=19 SS=66500")
+```
+
+**Explanatory variables:** $X_1, X_2, X_3, X_4, X_5$ (five predictors).
+**Response variable:** $Y$.
+
+## Exercise 10.13
+
+*(Skill Builder 2)* One case has $Y=20$, $X_1=15$, $X_2=40$, $X_3=10$,
+$X_4=50$, $X_5=95$:
+
+```{python}
+#| echo: false
+yhat = -60.7 + 4.715*15 - 0.253*40 + 6.459*10 + 1.5011*50 - 1.3151*95
+print(f"predicted = {yhat:.2f},  residual = {20 - yhat:.2f}")
+```
+
+**Predicted response $\hat y = 14.62$**; residual $= 20 - 14.62 =$ **5.38**.
+
+## Exercise 10.14
+
+*(Skill Builder 2)* One case has $Y=50$, $X_1=19$, $X_2=56$, $X_3=12$,
+$X_4=85$, $X_5=106$:
+
+```{python}
+#| echo: false
+yhat = -60.7 + 4.715*19 - 0.253*56 + 6.459*12 + 1.5011*85 - 1.3151*106
+print(f"predicted = {yhat:.2f},  residual = {50 - yhat:.2f}")
+```
+
+**Predicted response $\hat y = 80.42$**; residual $= 50 - 80.42 =$
+**$-30.42$**.
+
+## Exercise 10.15
+
+*(Skill Builder 2)* The coefficient of $X_1$ is **4.715**; its p-value is
+**0.053**.
+
+## Exercise 10.16
+
+*(Skill Builder 2)* The coefficient of $X_5$ is **$-1.3151$**; its p-value
+is **0.163**.
+
+## Exercise 10.17
+
+*(Skill Builder 2)* Significant at the 5% level: **$X_3$** (p = 0.019) and
+**$X_4$** (p = 0.009). ($X_1$ just misses at 0.053.)
+
+## Exercise 10.18
+
+*(Skill Builder 2)* Significant at the 1% level: only **$X_4$**
+(p = 0.009).
+
+## Exercise 10.19
+
+*(Skill Builder 2)* **$X_4$** is most significant — smallest p-value
+(0.009), largest $|t| = 3.04$.
+
+## Exercise 10.20
+
+*(Skill Builder 2)* **$X_2$** is least significant — largest p-value
+(0.833).
+
+## Exercise 10.21
+
+*(Skill Builder 2)* The ANOVA test gives **F = 9.87** with df $(5, 14)$ and
+**P $\approx$ 0.000**:
+
+```{python}
+#| echo: false
+print(f"F-distribution p-value: {stats.f.sf(9.87, 5, 14):.2g}")
+```
+
+$p < 0.05$: **reject $H_0$** — the model is effective.
+
+## Exercise 10.22
+
+*(Skill Builder 2)* **$R^2 = 77.9\%$**: the five predictors together explain
+77.9% of the variation in $Y$ (adjusted $R^2 = 70.0\%$).
+
+## Exercise 10.23
+
+*(Predicting Area Burned by a Forest Fire)* The model uses **ForestFires**
+($n = 517$ Portuguese fires) to predict burned area (hectares) from Wind,
+Temp, RH and Rain. Fitting live reproduces the book's output exactly
+($s_\epsilon = 63.53$, $R^2 = 1.17\%$, $F = 1.51$, p = 0.197):
+
+```{python}
+ff = pd.read_csv("data/ch10/ForestFires.csv")
+ff_fit = multi_reg(ff[["Wind", "Temp", "RH", "Rain"]], ff["Area"],
+                   ["Wind", "Temp", "RH", "Rain"])
+print(ff_fit["coef"].to_string(index=False)); print()
+print(ff_fit["anova"].to_string()); print()
+print(ff_fit["summ"].to_string())
+```
+
+**(a)** From the printed equation, a fire with Wind = 8.5 km/h, Temp =
+4.6°C, RH = 21%, Rain = 0:
+
+```{python}
+#| echo: false
+yhat = -6.4 + 1.28*8.5 + 1.010*4.6 - 0.110*21 - 2.83*0
+print(f"predicted area = {yhat:.2f} hectares")
+```
+
+**Predicted area burned $\approx$ 6.82 hectares.**
+**(b)** Residual $= 10.73 - 6.82 =$ **3.91 hectares** (this fire burned
+about 3.9 ha more than predicted).
+
+## Exercise 10.24
+
+*(Interpreting Coefficients for Area Burned)* Holding the other variables
+constant:
+
+**(a) Temp:** each additional degree Celsius is associated with **1.01 more
+hectares** of predicted burned area.
+
+**(b) RH:** each additional percentage point of relative humidity is
+associated with **0.11 fewer hectares** of predicted burned area.
+
+## Exercise 10.25
+
+*(Examining Variables to Predict Area Burned)*
+
+**(a)** Most significant: **Temp** ($t = 1.71$, p = 0.087).
+**(b)** Least significant: **Rain** (p = 0.769).
+**(c)** Significant at 5%: **none** of the four variables; at 10%: **one**
+(Temp, p = 0.087).
+
+## Exercise 10.26
+
+*(Is the Model Effective at Predicting Area Burned?)*
+
+**(a)** **F = 1.51** with df $(4, 512)$, **p-value = 0.197**.
+**(b)** Generic conclusion: the data do not give enough evidence to reject
+$H_0\colon\beta_1=\cdots=\beta_4=0$; in context, atmospheric conditions
+(wind, temperature, humidity, rain) show **no significant overall
+relationship** with area burned. Randomization check (10000 shuffles of the
+response, seed 2026) agrees:
+
+```{python}
+sims, Fobs, p_perm = perm_F(ff[["Wind", "Temp", "RH", "Rain"]], ff["Area"])
+print(f"observed F = {Fobs:.3f},  randomization p-value = {p_perm:.4f}")
+```
+
+**(c)** **No** — the model is not effective (p = 0.197, and $R^2$ is only
+1.17%).
+
+## Exercise 10.27
+
+*(Analyzing the Model Predicting Area Burned)* **$R^2 = 1.17\%$**: the four
+atmospheric variables together explain only **1.17%** of the variation in
+area burned by forest fires (adjusted $R^2 = 0.40\%$).
+
+## Exercise 10.28
+
+*(Predicting Depression Score)* The model uses **DietDepression** (day-1
+data, $n = 75$ complete cases) to predict CESD from DASS and BMI. Fitting
+live matches the book's output ($s_\epsilon = 10.37$, $R^2 = 49.52\%$,
+F = 35.32):
+
+```{python}
+dd = pd.read_csv("data/ch10/DietDepression.csv")
+ddsub = dd.dropna(subset=["CESD1", "DASS1", "BMI1"])
+dd_fit = multi_reg(ddsub[["DASS1", "BMI1"]], ddsub["CESD1"], ["DASS", "BMI"])
+print(dd_fit["coef"].to_string(index=False)); print()
+print(dd_fit["anova"].to_string()); print()
+print(dd_fit["summ"].to_string())
+```
+
+**(a)** For a person with CESD = 18, DASS = 23, BMI = 19.0:
+
+```{python}
+#| echo: false
+yhat = 13.81 + 0.7976*23 - 0.400*19.0
+print(f"predicted CESD = {yhat:.2f}")
+```
+
+**Predicted CESD $\approx$ 24.55.**
+**(b)** Residual $= 18 - 24.55 =$ **$-6.55$** (observed score is about 6.6
+points *below* predicted).
+
+## Exercise 10.29
+
+*(Interpreting Coefficients for Depression Score)* Holding the other
+variable constant:
+
+**(a) DASS:** each additional point on the self-reported DASS scale is
+associated with **0.80 more points** on the CESD clinical score.
+
+**(b) BMI:** each additional unit of body mass index is associated with
+**0.40 fewer points** on CESD (though this effect is not significant,
+p = 0.298).
+
+## Exercise 10.30
+
+*(Examining Variables to Predict Depression Score)*
+
+**(a)** Most significant: **DASS** ($t = 8.38$, p < 0.001).
+**(b)** Least significant: **BMI** (p = 0.298).
+**(c)** Significant at 5%: **one** variable (DASS); at 1%: **one**
+(DASS).
+
+## Exercise 10.31
+
+*(Is the Model Effective at Predicting Depression Score?)*
+
+**(a)** **F = 35.32** with df $(2, 72)$, **p-value $\approx$ 0.000**.
+**(b)** Generic: reject $H_0\colon\beta_1=\beta_2=0$; in context, DASS and
+BMI together are effective at predicting CESD depression scores.
+**(c)** **Yes** — an effective model ($R^2 = 49.5\%$). Randomization check:
+
+```{python}
+sims, Fobs, p_perm = perm_F(ddsub[["DASS1", "BMI1"]], ddsub["CESD1"])
+print(f"observed F = {Fobs:.3f},  randomization p-value = {p_perm:.4f}")
+```
+
+## Exercise 10.32
+
+*(Analyzing the Model Predicting CESD)* **$R^2 = 49.52\%$**: DASS and BMI
+together explain **49.5%** of the variation in CESD depression scores
+(adjusted $R^2 = 48.12\%$).
+
+## Exercise 10.33
+
+*(Predicting Hours Hanging Out with Friends)* The model uses **PASeniors**
+($n = 439$ students with complete data) to predict HangHours from six
+activity variables. Fitting live reproduces the book's output exactly
+($s_\epsilon = 9.96$, $R^2 = 13.43\%$, F = 11.17):
+
+```{python}
+ps = pd.read_csv("data/ch09/PASeniors.csv")
+hang_cols = ["HangHours", "HWHours", "SportsHours", "VideoGameHours",
+             "ComputerHours", "TVHours", "WorkHours"]
+hangsub = ps.dropna(subset=hang_cols)
+hang_fit = multi_reg(hangsub[hang_cols[1:]], hangsub["HangHours"],
+                     hang_cols[1:])
+print(hang_fit["coef"].to_string(index=False)); print()
+print(hang_fit["summ"].to_string())
+```
+
+Using the printed equation for the two cases in Table 10.1:
+
+```{python}
+#| echo: false
+for tag, hw, sp, vg, cp, tv, wk, obs in [("Case 1", 0.25, 6.0, 0.0, 2.0, 2.0, 8.0, 12.0),
+                                         ("Case 2", 21.0, 2.0, 0.0, 15.0, 3.0, 0.0, 2.0)]:
+    yhat = (5.84 - 0.1003*hw + 0.3305*sp + 0.0775*vg
+            + 0.0804*cp + 0.2177*tv + 0.0832*wk)
+    print(f"{tag}: predicted = {yhat:.2f},  residual = {obs - yhat:+.2f}")
+```
+
+**(a) Case 1:** predicted **9.06 hours**, residual $= 12 - 9.06 =$ **+2.94**.
+**(b) Case 2:** predicted **6.25 hours**, residual $= 2 - 6.25 =$ **$-4.25$**.
+
+## Exercise 10.34
+
+*(Interpreting Coefficients for Hours Hanging Out)* Holding the other
+activities constant:
+
+**(a) HWHours:** each additional hour per week of homework is associated
+with **0.10 fewer hours** per week hanging out with friends.
+
+**(b) VideoGameHours:** each additional hour per week of video games is
+associated with **0.08 more hours** per week hanging out with friends
+(this coefficient is not significant, p = 0.244).
+
+## Exercise 10.35
+
+*(Examining Variables to Predict Hours Hanging Out)*
+
+**(a)** Most significant two: **SportsHours** and **TVHours** (both
+p = 0.000).
+**(b)** Least significant: **VideoGameHours** (p = 0.244).
+**(c)** Significant at 5%: **four** (HW 0.047, Sports 0.000, Computer
+0.009, TV 0.000); at 1%: **three** (Sports, Computer, TV).
+
+## Exercise 10.36
+
+*(Is the Model Effective at Predicting Hours Hanging Out?)*
+
+**(a)** **F = 11.17** with df $(6, 432)$, **p-value $\approx$ 0.000**.
+**(b)** Generic: reject $H_0$ — at least one $\beta_i \neq 0$; in context,
+the six activity variables together are effective at predicting time spent
+hanging out with friends. Randomization check:
+
+```{python}
+sims, Fobs, p_perm = perm_F(hangsub[hang_cols[1:]], hangsub["HangHours"])
+print(f"observed F = {Fobs:.3f},  randomization p-value = {p_perm:.4f}")
+```
+
+**(c)** **Yes** — the model is effective, though it explains only 13.43%
+of the variability ($R^2$).
+
+## Exercise 10.37
+
+*(Analyzing the Model Predicting Hours Hanging Out)* **$R^2 = 13.43\%$**:
+the six activity variables together explain **13.4%** of the variation in
+weekly hours spent hanging out with friends (adjusted $R^2 = 12.23\%$).
+
+## Exercise 10.38
+
+*(Predicting Prices of Homes)* Output for **HomesForSale** ($n = 120$ homes
+from several states): $\text{Price} = 103.75 + 0.082\,\text{Size}
+- 25.81\,\text{Beds} + 84.96\,\text{Baths}$, with
+$s_\epsilon = 228.1$, $R^2 = 19.5\%$, adjusted $R^2 = 17.5\%$; ANOVA:
+Model df $= 3$, SS $= 1464285$, F $= 9.38$, P $= 0.00001$; Error df $= 116$.
+Price is in \$1000s, Size in square feet.
+
+**(a)** For 2500 sq ft, 4 bedrooms, 2.5 baths:
+
+```{python}
+#| echo: false
+yhat = 103.75 + 0.082*2500 - 25.81*4 + 84.96*2.5
+print(f"predicted price = {yhat:.2f} thousand dollars")
+```
+
+**Predicted price $\approx$ \$417.9 thousand (about \$418,000).**
+
+**(b)** Largest coefficient in magnitude: **Baths** (84.96).
+**(c)** Most important: **Baths** — it is the only predictor with a
+significant t-statistic ($t = 2.46$, p = 0.015). (Coefficient magnitudes
+cannot be compared directly: Size is per square foot while Beds/Baths are
+per room.)
+**(d)** Significant at 5%: **Baths only** (p = 0.015); Size just misses
+(p = 0.057) and Beds is not significant (p = 0.433).
+**(e)** Each additional square foot of size adds **0.082 thousand dollars
+(\$82)** to the predicted price, holding number of bedrooms and bathrooms
+constant.
+**(f)** The ANOVA F = 9.38 with p $\approx$ 0.00001: reject $H_0$ — the
+model **is effective**; size, bedrooms and bathrooms together help predict
+price.
+**(g)** **$R^2 = 19.5\%$**: the three predictors together explain 19.5% of
+the variation in home prices.
+
+## Exercise 10.39
+
+*(Predicting Calories Consumed)* Output for **NutritionStudy** ($n = 315$):
+$\text{Calories} = 513 + 16.3\,\text{Fat} + 0.421\,\text{Cholesterol}
+- 1.42\,\text{Age}$, with $s_\epsilon = 331.9$, $R^2 = 76.4\%$, adjusted
+$R^2 = 76.2\%$; ANOVA: Regression df $= 3$, SS $= 111082085$,
+F $= 336.12$, P $= 0.000$; Residual df $= 311$.
+
+**(a)** For a 35-year-old eating 40 g fat and 180 mg cholesterol:
+
+```{python}
+#| echo: false
+yhat = 512.95 + 16.2645*40 + 0.4208*180 - 1.420*35
+print(f"predicted calories = {yhat:.1f}")
+```
+
+**Predicted daily intake $\approx$ 1190 calories.**
+
+**(b)** Least significant: **Age** (p = 0.277); most significant: **Fat**
+(p = 0.000, $t = 20.5$).
+**(c)** Significant at 5%: **Fat** and **Cholesterol** (p = 0.038).
+**(d)** Each additional gram of fat consumed per day is associated with
+about **16 more calories** consumed, holding cholesterol and age constant.
+**(e)** Each additional year of age is associated with about **1.4 fewer
+calories** consumed per day, holding fat and cholesterol constant (not
+significant).
+**(f)** F = 336.12 with p $\approx$ 0.000: the model **is effective** —
+reject $H_0$; at least one of fat, cholesterol and age helps predict
+calorie consumption.
+**(g)** **$R^2 = 76.4\%$**: fat, cholesterol and age together explain
+76.4% of the variation in daily calories consumed.
+
+## Exercise 10.40
+
+*(Predicting Life Expectancy)* Adding Population, Internet and BirthRate to
+the SampCountries model. Fitting live on the current file (50 countries,
+complete data) reproduces Table 10.2 to rounding:
+
+```{python}
+sc = pd.read_csv("data/ch09/SampCountries.csv")
+scsub = sc.dropna(subset=["LifeExpectancy", "Health", "Population",
+                          "Internet", "BirthRate"])
+sc_fit = multi_reg(scsub[["Health", "Population", "Internet", "BirthRate"]],
+                   scsub["LifeExpectancy"],
+                   ["Health", "Population", "Internet", "BirthRate"])
+print(sc_fit["coef"].to_string(index=False)); print()
+print(sc_fit["summ"].to_string())
+```
+
+*Note:* the book fit the model with 49 countries because South Sudan's
+Internet value was missing at the time; the current file has 50 complete
+cases and the coefficients agree with Table 10.2 to the digits shown.
+
+**(a)** Significant at 5%: **Internet** (p = 0.030) and **BirthRate**
+(p = 0.000). Most significant: **BirthRate** ($|t| = 5.22$).
+**(b)** For Health = 15%, Population = 2.5 million, Internet = 75%,
+BirthRate = 30:
+
+```{python}
+#| echo: false
+yhat = 76.30 + 0.142*15 - 0.00031*2.5 + 0.0711*75 - 0.4445*30
+print(f"predicted life expectancy = {yhat:.2f} years")
+```
+
+**Predicted life expectancy $\approx$ 70.4 years.**
+**(c)** The coefficient of Internet is **+0.0711**: if the Internet rate is
+higher than assumed, predicted life expectancy **increases by 0.071 years
+for each additional percentage point** of Internet access, holding the
+other variables constant.
+
+## Exercise 10.41
+
+*(Binary Categorical Variables: Weight Based on Height and Sex)* Using
+**StudentSurvey** with CodedSex = 1 for females, 0 for males. Fitting live
+($n = 352$ students) matches the book's output exactly:
+
+```{python}
+ss = pd.read_csv("data/ch09/StudentSurvey.csv")
+sssub = ss.dropna(subset=["Weight", "Height", "Sex"]).copy()
+sssub["CodedSex"] = (sssub["Sex"] == "F").astype(int)
+ss_fit = multi_reg(sssub[["Height", "CodedSex"]], sssub["Weight"],
+                   ["Height", "CodedSex"])
+print(ss_fit["coef"].to_string(index=False)); print()
+print(ss_fit["summ"].to_string())
+```
+
+**(a)** For Height = 67 inches:
+
+```{python}
+#| echo: false
+print(f"male:   {-23.92 + 2.8589*67:.2f} lbs")
+print(f"female: {-23.92 + 2.8589*67 - 25.470:.2f} lbs")
+```
+
+**Male: $\approx$ 167.6 lbs; female: $\approx$ 142.2 lbs.**
+**(b)** Both predictors are significant at 5%: **Height** and **CodedSex**
+(both p = 0.000).
+**(c)** Among students of the same sex, each additional inch of height is
+associated with about **2.86 more pounds** of weight.
+**(d)** Since CodedSex = 1 for females, the coefficient means that at the
+same height, **females are predicted to weigh 25.5 pounds less than males**.
+**(e)** **$R^2 = 48.2\%$**: height and sex together explain 48.2% of the
+variation in student weights.
+
+## Exercise 10.42
+
+*(Binary Categorical Variables: Predicting Cognitive Score)* Output for the
+football study ($n = 44$ players, since Total df $= 43$):
+$\text{Cognition} = 100.6 - 3.07\,\text{Years} - 2.70\,\text{Concussion}$,
+$s_\epsilon = 25.78$, $R^2 = 13.56\%$, adjusted $R^2 = 9.35\%$; ANOVA:
+F = 3.22 with df $(2, 41)$, p = 0.050. Concussion is coded 1 = diagnosed,
+0 = not diagnosed.
+
+**(a)** Player with 9 years, no concussion, observed score 74:
+
+```{python}
+#| echo: false
+yhat = 100.6 - 3.07*9 - 2.70*0
+print(f"part (a): predicted = {yhat:.2f}, residual = {74 - yhat:.2f}")
+yhat = 100.6 - 3.07*7 - 2.70*1
+print(f"part (b): predicted = {yhat:.2f}, residual = {42 - yhat:.2f}")
+print(f"part (e): F-distribution p-value = {stats.f.sf(3.22, 2, 41):.4f}")
+```
+
+**Predicted 72.97, residual = 74 $-$ 72.97 = +1.03.**
+**(b)** **Predicted 76.41, residual = 42 $-$ 76.41 = $-34.41$** (a very
+poorly predicted player).
+**(c)** Coefficient of Years = **$-3.07$**: each additional year playing
+football is associated with 3.07 points lower predicted cognition score,
+holding concussion status constant.
+**(d)** Coefficient of Concussion = **$-2.70$**: players diagnosed with a
+concussion are predicted to score 2.70 points lower than similar players
+with the same years of play who were never diagnosed (coding: 1 =
+diagnosed, 0 = not).
+**(e)** At 10%: **yes, the model is effective** — the ANOVA gives
+F = 3.22 with p = 0.050 < 0.10 (it just misses significance at 5%).
+**(f)** Significant at 10%: **one** of the two variables (Years, p = 0.064);
+at 5%: **none** (0.064 > 0.05, Concussion p = 0.777).
+**(g)** **Years** is most significant ($t = -1.90$ vs $-0.29$).
+**(h)** **44 players** (Total df $= 43 = n - 1$).
+**(i)** **$R^2 = 13.56\%$**: years played and concussion history together
+explain only 13.6% of the variation in cognition scores.
+
+## Exercise 10.43
+
+*(Price of Race Horses)* The ANOVA table shows Regression df = 3, so the
+model has **3 predictors**.
+
+## Exercise 10.44
+
+Total df $= 46 = n - 1$, so the sample has **47 horses**.
+
+## Exercise 10.45
+
+```{python}
+#| echo: false
+print(f"R-squared = {4327.7/9999.1:.4f}")
+```
+
+**$R^2 = SSModel/SSTotal = 4327.7/9999.1 = 43.3\%$**: the three predictors
+together explain 43.3% of the variation in horse prices.
+
+## Exercise 10.46
+
+Hypotheses: $H_0\colon\beta_1=\beta_2=\beta_3=0$ (model ineffective) vs
+$H_a\colon$ at least one $\beta_i \neq 0$ (effective). The ANOVA gives
+**F = 10.94** with df $(3, 43)$ and p $\approx$ 0.000:
+
+```{python}
+#| echo: false
+print(f"F-distribution p-value: {stats.f.sf(10.94, 3, 43):.2g}")
+```
+
+**Reject $H_0$ — the model is effective** for predicting horse prices.
+
+## Exercise 10.47
+
+*(Hantavirus in Mice)*
+
+**(a)** The quantity being compared is **$R^2$**, the coefficient of
+determination — the percent of variability in prevalence explained by the
+predictors (79% with precipitation, 93% adding island area, 98% adding
+predator richness).
+**(b)** With $R^2 = 98\%$ the model explains almost all the variability,
+so $SSModel/SSTotal$ is huge relative to the error: the **F-statistic
+should be very large and the ANOVA p-value relatively small** — strong
+evidence that the three-predictor model is effective.
+
+## Exercise 10.48
+
+*(Fast-Food Diet and Depression)* The quotation "the model explained 50% of
+variance in depression" refers to **$R^2$, the coefficient of
+determination** ($R^2 = 50\%$).
+
+## Exercise 10.49
+
+*(Predicting Golf Scores with Par and Distance)* Using **GolfRound** (18
+holes):
+
+```{python}
+golf = pd.read_csv("data/ch09/GolfRound.csv")
+golf_fit = multi_reg(golf[["Distance", "Par"]], golf["Score"],
+                     ["Distance", "Par"])
+print(golf_fit["coef"].to_string(index=False)); print()
+print(golf_fit["summ"].to_string())
+print(f"\ncorrelation between Distance and Par: "
+      f"{np.corrcoef(golf['Distance'], golf['Par'])[0, 1]:.3f}")
+```
+
+Randomization check on the model F-statistic:
+
+```{python}
+sims, Fobs, p_perm = perm_F(golf[["Distance", "Par"]], golf["Score"])
+print(f"observed F = {Fobs:.3f},  randomization p-value = {p_perm:.4f}")
+```
+
+**(a)** Fitted equation: **Score $= 3.80 + 0.0111\,$Distance $- 0.645\,$Par**
+($R^2 = 36.7\%$, F = 4.35, p = 0.032; randomization p $\approx$ 0.030).
+**(b)** For the par-5, 476-yard 16th hole:
+
+```{python}
+#| echo: false
+b = golf_fit["beta"]
+print(f"predicted score = {b[0] + b[1]*476 + b[2]*5:.2f} strokes")
+```
+
+**Predicted score $\approx$ 5.85 strokes.** Note that Distance and Par are
+almost collinear ($r = 0.951$: par-3 holes are short, par-5 holes long),
+which is why neither coefficient is individually significant even though
+the model as a whole is effective.
+
+## Exercise 10.50
+
+*(Predicting Memory Score)* Using **PASeniors** to predict MemoryScore from
+ReactionTime, Sleep1 and Sleep2 ($n = 416$ students with complete data on
+all four variables):
+
+```{python}
+mem_cols = ["MemoryScore", "ReactionTime", "Sleep1", "Sleep2"]
+memsub = ps.dropna(subset=mem_cols)
+mem_fit = multi_reg(memsub[mem_cols[1:]], memsub["MemoryScore"],
+                    mem_cols[1:])
+print(mem_fit["coef"].to_string(index=False)); print()
+print(mem_fit["anova"].to_string()); print()
+print(mem_fit["summ"].to_string())
+```
+
+```{python}
+#| echo: false
+r0 = memsub.iloc[0]
+b = mem_fit["beta"]
+pred = b[0] + b[1]*r0["ReactionTime"] + b[2]*r0["Sleep1"] + b[3]*r0["Sleep2"]
+print(f"first case: observed {r0['MemoryScore']:.0f}, "
+      f"predicted {pred:.2f}, residual {r0['MemoryScore'] - pred:+.2f}")
+```
+
+Randomization check on the model F-statistic:
+
+```{python}
+sims, Fobs, p_perm = perm_F(memsub[mem_cols[1:]], memsub["MemoryScore"])
+print(f"observed F = {Fobs:.3f},  randomization p-value = {p_perm:.4f}")
+```
+
+**(a)** For the first case (ReactionTime = 0.388 s, Sleep1 = 8, Sleep2 = 8,
+observed MemoryScore = 50): **predicted 46.02, residual = +3.98**.
+**(b)** **416 students** are included in the analysis.
+**(c)** Most significant: **ReactionTime** (p = 0.016).
+**(d)** Least significant: **Sleep2** (p = 0.154).
+**(e)** Significant at 5%: **one** (ReactionTime); at 10%: **two**
+(ReactionTime and Sleep1, p = 0.068).
+**(f)** ANOVA: **F = 3.63** with df $(3, 412)$, **p = 0.013** — reject
+$H_0$ at 5%: reaction time and the two sleep variables together are
+effective (weakly) at predicting memory scores. Randomization p $\approx$
+0.014 agrees.
+**(g)** **$R^2 = 2.58\%$**: the model explains only 2.6% of the variation
+in memory scores — statistically detectable but of little practical
+predictive value.
+
+## Exercise 10.51
+
+*(Predicting Texts Sent per Week)* Using **PASeniors** to predict TextsSent
+from HangHours, ComputerHours and Occupants ($n = 438$ complete cases):
+
+```{python}
+tx_cols = ["TextsSent", "HangHours", "ComputerHours", "Occupants"]
+txsub = ps.dropna(subset=tx_cols)
+tx_fit = multi_reg(txsub[tx_cols[1:]], txsub["TextsSent"], tx_cols[1:])
+print(tx_fit["coef"].to_string(index=False)); print()
+print(tx_fit["summ"].to_string())
+```
+
+```{python}
+#| echo: false
+sims, Fobs, p_perm = perm_F(txsub[tx_cols[1:]], txsub["TextsSent"])
+print(f"observed F = {Fobs:.3f},  randomization p-value = {p_perm:.4f}")
+```
+
+**(a)** Most significant: **HangHours** (p = 0.056) — the only predictor
+even close to significance, and it does not reach 5%.
+**(b)** Least significant: **Occupants** (p = 0.914).
+**(c)** ANOVA: **F = 1.36** with df $(3, 434)$, **p = 0.255** — do not
+reject $H_0$: **no evidence that these three variables predict the number
+of texts sent** (randomization p $\approx$ 0.232 agrees). TextsSent is also
+heavily right-skewed and capped at 500/day, which weakens a linear model.
+
+## Exercise 10.52
+
+*(Predicting HwyMPG)* Using **Cars2020** ($n = 110$ cars), comparing three
+models for HwyMPG:
+
+```{python}
+cars = pd.read_csv("data/ch09/Cars2020.csv")
+cars_city = multi_reg(cars[["CityMPG"]], cars["HwyMPG"], ["CityMPG"])
+cars_weight = multi_reg(cars[["Weight"]], cars["HwyMPG"], ["Weight"])
+cars_both = multi_reg(cars[["CityMPG", "Weight"]], cars["HwyMPG"],
+                      ["CityMPG", "Weight"])
+print("R2, CityMPG alone:        ",
+      f"{cars_city['R2']:.3f}  (s_e = {cars_city['s_e']:.2f})")
+print("R2, Weight alone:         ",
+      f"{cars_weight['R2']:.3f}  (s_e = {cars_weight['s_e']:.2f})")
+print("R2, CityMPG + Weight:     ",
+      f"{cars_both['R2']:.3f}  (s_e = {cars_both['s_e']:.2f})")
+print()
+print(cars_both["coef"].to_string(index=False))
+```
+
+```{python}
+#| echo: false
+sims, Fobs, p_perm = perm_F(cars[["CityMPG", "Weight"]], cars["HwyMPG"])
+print(f"two-predictor model: observed F = {Fobs:.3f}, "
+      f"randomization p-value = {p_perm:.4f}")
+```
+
+**(a)** CityMPG alone explains **76.9%** of the variability in HwyMPG.
+**(b)** Weight alone explains **66.8%**.
+**(c)** Together they explain **78.3%** ($F = 192.9$; randomization p
+$< 0.001$).
+**(d)** Both coefficients remain significant in the two-predictor model
+(CityMPG $t = 7.53$, p < 0.001; Weight $t = -2.61$, p = 0.011), and adding
+Weight to CityMPG raises $R^2$ from 76.9% to 78.3% while cutting
+$s_\epsilon$ from 3.47 to 3.38 mpg — a real but **modest** gain, so
+CityMPG does most of the work and Weight adds only a little unique
+information (the two are strongly related: heavier cars get worse city
+mileage).
+
+## Exercise 10.53
+
+*(Predicting Arm Span)* Using **PASeniors** to predict Armspan from Height
+and Foot ($n = 401$ students with all three measurements):
+
+```{python}
+arm_cols = ["Armspan", "Height", "Foot"]
+armsub = ps.dropna(subset=arm_cols)
+arm_fit = multi_reg(armsub[arm_cols[1:]], armsub["Armspan"], arm_cols[1:])
+print(arm_fit["coef"].to_string(index=False)); print()
+print(arm_fit["summ"].to_string())
+```
+
+```{python}
+#| echo: false
+h_only = multi_reg(armsub[["Height"]], armsub["Armspan"], ["Height"])
+f_only = multi_reg(armsub[["Foot"]], armsub["Armspan"], ["Foot"])
+print(f"on these same 401 students: R2(Height) = {h_only['R2']:.3f}, "
+      f"R2(Foot) = {f_only['R2']:.3f}")
+```
+
+```{python}
+#| echo: false
+sims, Fobs, p_perm = perm_F(armsub[arm_cols[1:]], armsub["Armspan"])
+print(f"observed F = {Fobs:.3f},  randomization p-value = {p_perm:.4f}")
+```
+
+*Note:* the book's Exercise 9.53 values ($R^2 = 51.5\%$ for Height, 46.0%
+for Foot) come from slightly different complete-case samples; on the 401
+students used here the one-predictor $R^2$s are 57.8% and 45.8%.
+
+**(a)** For a student 180 cm tall with a 26 cm foot:
+
+```{python}
+#| echo: false
+b = arm_fit["beta"]
+print(f"predicted arm span = {b[0] + b[1]*180 + b[2]*26:.1f} cm")
+```
+
+**Predicted arm span $\approx$ 178.6 cm.**
+**(b)** **Yes, both are useful**: in the two-predictor model Height has
+$t = 12.87$ and Foot $t = 6.45$ (both p < 0.001), so each adds significant
+information beyond the other.
+**(c)** Together they explain **$R^2 = 61.8\%$** of the variability in arm
+span ($F = 321.3$, randomization p < 0.001).
+
+## Exercise 10.54
+
+*(Housing Prices in New York)* Using **HomesForSaleNY** ($n = 30$ listings)
+to predict Price (\$1000s) from Size (sq ft), Beds and Baths:
+
+```{python}
+ny = pd.read_csv("data/ch10/HomesForSaleNY.csv")
+ny_fit = multi_reg(ny[["Size", "Beds", "Baths"]], ny["Price"],
+                   ["Size", "Beds", "Baths"])
+print(ny_fit["coef"].to_string(index=False)); print()
+print(ny_fit["summ"].to_string())
+```
+
+```{python}
+#| echo: false
+sims, Fobs, p_perm = perm_F(ny[["Size", "Beds", "Baths"]], ny["Price"])
+print(f"observed F = {Fobs:.3f},  randomization p-value = {p_perm:.4f}")
+```
+
+**(a)** Significant at 5%: **Baths only** (p = 0.0015); Size (p = 0.969)
+and Beds (p = 0.229) are not. Most significant: **Baths** ($t = 3.54$).
+**(b)** **Beds ($-83.3$):** at fixed size and number of baths, each extra
+bedroom is associated with \$83,300 *lower* predicted price — this does
+not make much practical sense and is not significant, likely because beds
+and size overlap heavily (and several NY listings are small apartments).
+**Baths (+266.5):** each extra bathroom adds \$266,500 to predicted price
+at fixed size and beds — positive as expected, though the magnitude is
+inflated by the small sample.
+**(c)** For a 1500 sq ft home with 3 bedrooms and 2 baths:
+
+```{python}
+#| echo: false
+b = ny_fit["beta"]
+print(f"predicted price = {b[0] + b[1]*1500 + b[2]*3 + b[3]*2:.1f} "
+      "thousand dollars")
+```
+
+**Predicted price $\approx$ \$293.7 thousand (about \$294,000).**
+
+## Exercise 10.55
+
+*(Predicting Body Mass Gain in Mice)* Using **LightatNight4Weeks** ($n =
+27$ mice) to predict BMGain from Corticosterone, DayPct, Consumption and
+Activity:
+
+```{python}
+ln = pd.read_csv("data/ch10/LightatNight4Weeks.csv")
+ln_cols = ["BMGain", "Corticosterone", "DayPct", "Consumption", "Activity"]
+ln_fit = multi_reg(ln[ln_cols[1:]], ln["BMGain"], ln_cols[1:])
+print(ln_fit["coef"].to_string(index=False)); print()
+print(ln_fit["summ"].to_string())
+```
+
+```{python}
+#| echo: false
+sims, Fobs, p_perm = perm_F(ln[ln_cols[1:]], ln["BMGain"])
+print(f"observed F = {Fobs:.3f},  randomization p-value = {p_perm:.4f}")
+```
+
+**(a)** **DayPct (0.116):** each additional percent of calories eaten
+during the daytime (rather than at night, the mice's natural active period)
+is associated with **0.12 g more body mass gain** over the four weeks,
+holding the other variables constant.
+**(b)** **Consumption (0.904):** each additional gram of daily food
+consumption is associated with **0.90 g more body mass gain**, holding the
+other variables constant (p = 0.128, not significant).
+**(c)** Most significant: **DayPct** ($t = 4.66$, p = 0.0001).
+**(d)** Least significant: **Corticosterone** (p = 0.918).
+**(e)** ANOVA **F = 8.06** with df $(4, 22)$, **p = 0.0004** — reject
+$H_0$: the model **is effective** at predicting body mass gain (randomization
+p $\approx$ 0.0002 agrees).
+**(f)** **$R^2 = 59.4\%$**: the four predictors together explain 59.4% of
+the variation in mouse body mass gain (adjusted $R^2 = 52.1\%$).
+
+## Exercise 10.56
+
+*(NBA Winning Percentage)* Using **NBAStandings2019** ($n = 30$ teams):
+
+```{python}
+nba = pd.read_csv("data/ch09/NBAStandings2019.csv")
+nba_fit = multi_reg(nba[["PtsFor", "PtsAgainst"]], nba["WinPct"],
+                    ["PtsFor", "PtsAgainst"])
+print(nba_fit["coef"].to_string(index=False)); print()
+print(nba_fit["summ"].to_string())
+```
+
+```{python}
+#| echo: false
+b = nba_fit["beta"]
+pred = b[0] + b[1]*114.4 + b[2]*108.4
+print(f"Raptors: predicted {pred:.4f}, residual {0.707 - pred:+.4f}")
+sims, Fobs, p_perm = perm_F(nba[["PtsFor", "PtsAgainst"]], nba["WinPct"])
+print(f"observed F = {Fobs:.3f},  randomization p-value = {p_perm:.4f}")
+```
+
+**(a)** Fitted equation: **WinPct $= 0.303 + 0.0302\,$PtsFor $- 0.0285\,$PtsAgainst**.
+**(b)** Raptors (114.4 for, 108.4 against): **predicted WinPct = 0.677**;
+residual $= 0.707 - 0.677 =$ **+0.030** (they slightly outperformed the
+model).
+**(c)** **Both predictors are highly effective**: PtsFor $t = 21.5$ and
+PtsAgainst $t = -19.1$ (both p < 0.001) — one more point scored per game
+adds about 0.030 to predicted winning percentage, one more point allowed
+subtracts about 0.029, holding the other constant.
+**(d)** **Yes, dramatically better**: $R^2 = 96.1\%$ and $s_\epsilon =
+0.030$ for the two-predictor model vs $R^2 = 43.7\%$, $s_\epsilon = 0.112$
+for PtsFor alone and $R^2 = 29.2\%$, $s_\epsilon = 0.126$ for PtsAgainst
+alone.
+
+## Exercise 10.57
+
+*(Prices of Mustang Cars)* Using **MustangPrice** ($n = 25$ cars):
+
+```{python}
+mu = pd.read_csv("data/ch10/MustangPrice.csv")
+mu_age = multi_reg(mu[["Age"]], mu["Price"], ["Age"])
+mu_both = multi_reg(mu[["Age", "Miles"]], mu["Price"], ["Age", "Miles"])
+print("Price ~ Age:"); print(mu_age["coef"].to_string(index=False))
+print(mu_age["summ"].to_string(), "\n")
+print("Price ~ Age + Miles:")
+print(mu_both["coef"].to_string(index=False))
+print(mu_both["summ"].to_string())
+print(f"\ncorrelation(Age, Miles) = "
+      f"{np.corrcoef(mu['Age'], mu['Miles'])[0, 1]:.3f}")
+```
+
+```{python}
+#| echo: false
+sims, Fobs, p_perm = perm_F(mu[["Age", "Miles"]], mu["Price"])
+print(f"two-predictor model: observed F = {Fobs:.3f}, "
+      f"randomization p-value = {p_perm:.4f}")
+```
+
+**(a)** Price $= 30.26 - 1.72\,$Age: Age **is** an effective predictor alone
+($t = -4.71$, p = 0.0001, $R^2 = 49.1\%$) — older Mustangs sell for about
+\$1,700 less per year.
+**(b)** With Miles added: **Age is no longer effective** (coefficient
+$-0.16$, $t = -0.30$, p = 0.769), while Miles is ($-0.21$ per 1000 miles,
+$t = -3.63$, p = 0.0015); $R^2$ rises to 68.1%.
+**(c)** **Age and miles are strongly correlated ($r = 0.82$)**: older cars
+have been driven farther. In the simple model Age was acting as a proxy for
+mileage; once Miles is in the model, Age contributes essentially nothing
+unique — mileage, not age per se, is what lowers price.
+
+## Exercise 10.58
+
+*(Comparing Models for NBA Winning Percentage)*
+
+**(a)** Comparing the $R^2$s from the three fits above: **PtsFor alone
+43.7%, PtsAgainst alone 29.2%, both together 96.1%** — the multiple
+regression explains far more than either single predictor.
+
+**(b)** New predictor Diff $=$ PtsFor $-$ PtsAgainst:
+
+```{python}
+nba["Diff"] = nba["PtsFor"] - nba["PtsAgainst"]
+nba_diff = multi_reg(nba[["Diff"]], nba["WinPct"], ["Diff"])
+print(nba_diff["coef"].to_string(index=False)); print()
+print(nba_diff["summ"].to_string())
+```
+
+```{python}
+sims, Fobs, p_perm = perm_F(nba[["Diff"]], nba["WinPct"])
+print(f"observed F = {Fobs:.3f},  randomization p-value = {p_perm:.4f}")
+b = nba_diff["beta"]
+fig, ax = plt.subplots(figsize=(5.5, 3.4))
+ax.scatter(nba["Diff"], nba["WinPct"], color="#4c72b0", alpha=0.75)
+xs = np.linspace(nba["Diff"].min(), nba["Diff"].max(), 50)
+ax.plot(xs, b[0] + b[1]*xs, color="#c44e52", lw=2)
+ax.set_xlabel("Diff = PtsFor − PtsAgainst (points per game)")
+ax.set_ylabel("WinPct")
+plt.tight_layout(); plt.show()
+```
+
+The single-predictor model **WinPct $= 0.500 + 0.0294\,$Diff** explains
+**$R^2 = 96.0\%$** with $s_\epsilon = 0.030$ — essentially the same as the
+two-predictor model (96.1%, $s_\epsilon = 0.030$). The point differential
+captures virtually all the information in the two separate scoring rates;
+the relationship is very linear with Toronto (Diff $= 6.0$) and the other
+playoff teams at the upper right.
+
+## Exercise 10.59
+
+*(Randomization Test for a Multiple Regression Model)* For the
+**InkjetPrinters** model ($n = 20$ printers) predicting Price from
+PhotoTime and CostColor, the live fit gives $F = 6.30$ (matching Example
+10.7) with df $(2, 17)$:
+
+```{python}
+ip = pd.read_csv("data/ch09/InkjetPrinters.csv")
+ip_fit = multi_reg(ip[["PhotoTime", "CostColor"]], ip["Price"],
+                   ["PhotoTime", "CostColor"])
+print(ip_fit["coef"].to_string(index=False)); print()
+print(ip_fit["summ"].to_string())
+```
+
+Randomizing the 20 prices over the PhotoTime/CostColor combinations
+(10000 shuffles, seed 2026):
+
+```{python}
+sims, Fobs, p_perm = perm_F(ip[["PhotoTime", "CostColor"]], ip["Price"])
+p_F = stats.f.sf(Fobs, 2, 17)
+print(f"observed F = {Fobs:.3f}")
+print(f"F-distribution p-value (df = 2, 17): {p_F:.4f}")
+print(f"randomization p-value: {p_perm:.4f}")
+sim_hist(sims, Fobs)
+```
+
+The observed $F = 6.30$ sits firmly in the upper tail of the randomization
+distribution: the **randomization p-value $\approx$ 0.009** agrees closely
+with the **$F_{2,17}$ p-value $\approx$ 0.009**. The F-distribution
+approximates the randomization distribution very well here, and both
+indicate the printer model is effective (p < 0.05).
+
+:::

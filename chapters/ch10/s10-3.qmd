@@ -1,0 +1,727 @@
+---
+execute-dir: project
+title: "Chapter 10 · Section 10.3"
+subtitle: "Using Multiple Regression — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 10.3 is about **using** multiple regression: deciding which variables
+to keep or eliminate, interpreting each coefficient *conditional on the other
+predictors in the model*, and comparing candidate models. A coefficient on a
+**dummy variable** (0/1 indicator) is an **adjusted mean difference**: the
+average change in the response between the two groups when all other
+predictors are held fixed. Adding a confounder to the model can make a
+predictor's coefficient shrink, flip sign, or lose significance — that is the
+whole point of "accounting for" a third variable. When comparing models we
+look at **R²** (always weakly larger for bigger models), the error standard
+deviation **$s_\epsilon$**, adjusted R², and the ANOVA F and p-value: removing
+a useless predictor should leave R² almost unchanged, shrink $s_\epsilon$,
+and **increase F**. Finally, **large coefficients do not mean important
+variables** — coefficients carry units, so importance is judged by
+t-statistics, p-values, and changes in R², never by raw size. As usual we
+verify the parametric answers with **randomization** (permuting the response,
+10000 shuffles, seed 2026). Exercises are from *Statistics: Unlocking the
+Power of Data* (Lock⁵, 3rd ed., pp. 689–694): Skill Builders 10.81–10.82
+practice model-revision reasoning from printed output; applied exercises
+10.83–10.90 build and compare models for movie income, lake mercury, blood
+beta-carotene, baseball game times, prenatal fluoride and IQ, and country
+life expectancy; 10.91–10.94 revisit the carbon-vs-steel bike commute with
+dummy variables; 10.95–10.96 close with multicollinearity and the
+big-coefficient trap.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+from scipy import stats
+sns.set_theme(style="whitegrid")
+
+def multi_reg(X, y, names):
+    """OLS multiple regression via lstsq on a design matrix (with intercept).
+
+    X: (n, k) predictor block; returns (coefficient table, summary Series).
+    """
+    X = np.asarray(X, float); y = np.asarray(y, float)
+    n, k = X.shape
+    Xd = np.column_stack([np.ones(n), X])
+    df_e = n - k - 1
+    coef, *_ = np.linalg.lstsq(Xd, y, rcond=None)
+    fit = Xd @ coef
+    sse = ((y - fit) ** 2).sum()
+    sst = ((y - y.mean()) ** 2).sum()
+    ssm = sst - sse
+    sig2 = sse / df_e                       # sigma-hat^2 = SSE/(n-k-1)
+    se = np.sqrt(sig2 * np.diag(np.linalg.inv(Xd.T @ Xd)))
+    t = coef / se
+    p = 2 * stats.t.sf(np.abs(t), df_e)
+    F = (ssm / k) / sig2
+    tab = pd.DataFrame({"Coef": coef, "SE": se, "t": t, "p": p},
+                       index=["Intercept"] + list(names))
+    summ = pd.Series({"n": n, "R2": ssm / sst,
+                      "adjR2": 1 - (sse / df_e) / (sst / (n - 1)),
+                      "s_e": np.sqrt(sig2), "F": F,
+                      "F_p": stats.f.sf(F, k, df_e)})
+    return tab, summ
+
+def perm_F_multi(X, y, reps=10000, seed=2026):
+    """Randomization F-test: permute the response, refit, recompute F."""
+    X = np.asarray(X, float); y = np.asarray(y, float)
+    Fobs = multi_reg(X, y, [f"X{i}" for i in range(X.shape[1])])[1]["F"]
+    r = np.random.default_rng(seed)
+    n, k = X.shape
+    Xd = np.column_stack([np.ones(n), X])
+    pinv = np.linalg.pinv(Xd)
+    Fs = np.empty(reps)
+    for i in range(reps):
+        ys = r.permutation(y)
+        res = ys - Xd @ (pinv @ ys)
+        sse = (res ** 2).sum()
+        ssm = ((ys - ys.mean()) ** 2).sum() - sse
+        Fs[i] = (ssm / k) / (sse / (n - k - 1))
+    return Fs, Fobs, float((Fs >= Fobs).mean())
+
+def sim_hist(sims, stat, xlabel="Simulated F-statistics", bins=40,
+             figsize=(6, 3)):
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.histplot(x=sims, bins=bins, ax=ax, color="#4c72b0")
+    mask = sims >= stat
+    if mask.any():
+        sns.histplot(x=sims[mask], bins=bins, ax=ax, color="#c44e52")
+    ax.axvline(stat, color="black", lw=1.5)
+    ax.set_xlabel(xlabel); ax.set_ylabel("Simulated statistics")
+    plt.tight_layout(); plt.show()
+```
+
+::: {.panel-tabset}
+
+## Exercise 10.81
+
+*(Skill Builder 1)* Given output: $Y = 9.78 + 0.244\,X1 + 0.065\,X2 -
+0.219\,X3$, $n = 25$, individual p-values 0.184 (X1), **0.716 (X2)**, 0.214
+(X3); S = 4.94, R² = 15.0%, ANOVA F = 1.23, P = 0.322.
+
+**(a)** Try eliminating **X2** first — it has by far the **largest p-value
+(0.716)**, the least evidence of any real relationship with $Y$.
+
+**(b)** **R² = 15.0%**. Removing a predictor can never *increase* R², so we
+expect R² to **decrease slightly** (or stay about the same). A **small
+decrease** would indicate removing X2 was a good idea (we lost almost
+nothing); a **large decrease** would be a bad idea (X2 was actually carrying
+information).
+
+**(c)** **P = 0.322** for the ANOVA F-test. Because X2 is insignificant,
+dropping it should shrink the model without inflating SSE much, so the
+F-statistic should increase and the ANOVA p-value should most likely
+**decrease**. A decrease (toward significance) is a good idea; an increase
+is a bad idea.
+
+**(d)** **F = 1.23**. When we eliminate an insignificant variable the
+F-statistic most likely **increases** (the df cost outweighs the small loss
+in SSModel). We hope F **goes up** — ideally enough for the model to become
+significant.
+
+## Exercise 10.82
+
+*(Skill Builder 1)* Given output: $Y = 15.1 + 0.135\,X1 - 0.696\,X2 +
+0.025\,X3$, $n = 20$, individual p-values 0.573 (X1), 0.035 (X2), **0.897
+(X3)**; S = 4.92, R² = 41.7%, ANOVA F = 3.81, P = 0.031.
+
+**(a)** Try eliminating **X3** first — its p-value of **0.897** is the
+largest by far.
+
+**(b)** **R² = 41.7%**. As in 10.81, R² can only **decrease** (or stay the
+same) when a predictor is removed. A **small decrease** says removing X3 was
+a good idea; a **large decrease** says it was a bad idea.
+
+**(c)** **P = 0.031**. Removing the insignificant X3 will most likely make
+the F-statistic larger and the ANOVA p-value **smaller**. A decrease is good
+(the simplified model is even more clearly effective); an increase — say
+above 0.05 — would be bad.
+
+**(d)** **F = 3.81**. Hope the F-statistic **increases** when X3 is dropped;
+an increase indicates the simplification was a good idea (a decrease would
+indicate a bad idea).
+
+## Exercise 10.83
+
+Predicting Opening Weekend Income of Hollywood Movies (HollywoodMovies,
+n = 1295): response OpeningWeekend, five candidate predictors. Note
+**Budget is missing for 239 movies**, so every model that uses Budget fits
+on n = 1056.
+
+```{python}
+#| include: false
+hm = pd.read_csv("data/ch10/HollywoodMovies.csv")
+preds83 = ["RottenTomatoes", "AudienceScore", "TheatersOpenWeek", "Budget",
+           "Year"]
+d83 = hm[preds83 + ["OpeningWeekend"]].dropna()
+tab83, s83 = multi_reg(d83[preds83], d83.OpeningWeekend, preds83)
+fin83 = ["RottenTomatoes", "AudienceScore", "TheatersOpenWeek", "Budget"]
+d83f = hm[fin83 + ["OpeningWeekend"]].dropna()
+tab83f, s83f = multi_reg(d83f[fin83], d83f.OpeningWeekend, fin83)
+Fs83, Fobs83, p83 = perm_F_multi(d83f[fin83], d83f.OpeningWeekend)
+```
+
+Full five-predictor model (n = `{python} s83["n"]` — the movies with a
+recorded Budget):
+
+```{python}
+#| echo: false
+tab83.round(4).to_string()
+pd.Series({"R2": round(s83["R2"], 4), "s_e": round(s83["s_e"], 3),
+           "F": round(s83["F"], 1), "F p": float(f"{s83['F_p']:.3g}")}).to_string()
+```
+
+**Step 1 — drop Year** (p = 0.776, by far the largest p-value): R² barely
+moves (59.75% → **59.74%**), adjusted R² rises (59.55% → **59.60%**),
+$s_\epsilon$ falls (20.21 → **20.20**), and F jumps from 311.7 to **389.9**
+— a textbook good elimination.
+
+**Step 2 — all four remaining predictors are significant** (p < 0.0001:
+RottenTomatoes t = 4.24, AudienceScore t = 4.38, TheatersOpenWeek t = 13.7,
+Budget t = 18.5). Dropping RottenTomatoes would lower adjusted R² from
+59.6% to 58.9% and raise $s_\epsilon$ to 20.36, so we keep it.
+
+```{python}
+#| echo: false
+tab83f.round(4).to_string()
+pd.Series({"R2": round(s83f["R2"], 4), "s_e": round(s83f["s_e"], 3),
+           "F": round(s83f["F"], 1),
+           "randomization p": float(f"{p83:.3g}")}).to_string()
+```
+
+**Best model:** $\widehat{\text{OpeningWeekend}} = -32.75 +
+0.139\,\text{RottenTomatoes} + 0.217\,\text{AudienceScore} +
+0.0082\,\text{TheatersOpenWeek} + 0.262\,\text{Budget}$ — every predictor
+significant, **R² = 59.7%**, $s_\epsilon$ = 20.2 million, F = 389.9
+(p ≈ 0; randomization F-test on the same model agrees, p ≈
+`{python} f"{p83:.3f}"`). Each extra $1 million of budget adds about
+**$262,000** to the predicted opening weekend, holding the other variables
+constant.
+
+## Exercise 10.84
+
+Predicting Mercury Levels in Fish (FloridaLakes, n = 53): response
+AvgMercury, four candidate predictors Alkalinity, pH, Calcium, Chlorophyll.
+
+```{python}
+#| include: false
+fl = pd.read_csv("data/ch09/FloridaLakes.csv")
+preds84 = ["Alkalinity", "pH", "Calcium", "Chlorophyll"]
+tab84, s84 = multi_reg(fl[preds84], fl.AvgMercury, preds84)
+keep84 = ["Alkalinity", "Chlorophyll"]
+tab84f, s84f = multi_reg(fl[keep84], fl.AvgMercury, keep84)
+mid84 = ["Alkalinity", "Calcium", "Chlorophyll"]
+_, s84m = multi_reg(fl[mid84], fl.AvgMercury, mid84)
+Fs84, Fobs84, p84 = perm_F_multi(fl[keep84], fl.AvgMercury)
+```
+
+Full four-predictor model:
+
+```{python}
+#| echo: false
+tab84.round(4).to_string()
+pd.Series({"R2": round(s84["R2"], 4), "s_e": round(s84["s_e"], 4),
+           "F": round(s84["F"], 2)}).to_string()
+```
+
+**Step 1 — drop pH** (largest p = 0.308): $s_\epsilon$ is unchanged
+(0.2629 → 0.2630) and F rises. **Step 2 — drop Calcium** (p = 0.107 in the
+three-predictor model): $s_\epsilon$ 0.2630 → 0.2675 and adjusted R² drops
+only 40.5% → 38.5%, while every remaining predictor becomes significant.
+
+```{python}
+#| echo: false
+tab84f.round(4).to_string()
+pd.Series({"R2": round(s84f["R2"], 4), "s_e": round(s84f["s_e"], 4),
+           "F": round(s84f["F"], 2),
+           "randomization p": float(f"{p84:.3g}")}).to_string()
+```
+
+**Best model:** $\widehat{\text{AvgMercury}} = 0.752 -
+0.0042\,\text{Alkalinity} - 0.0030\,\text{Chlorophyll}$ — both predictors
+significantly negative (p = 0.0004 and 0.034), **R² = 40.9%**,
+F = 17.28 (p < 0.001; randomization agrees, p ≈ `{python} f"{p84:.3f}"`).
+More alkaline, greener lakes have **lower** fish mercury. The tiny loss in
+fit ($s_\epsilon$ 0.263 → 0.268) is worth a model with no dead weight.
+
+## Exercise 10.85
+
+Predicting Blood Levels of Beta-Carotene (NutritionStudy, n = 315): response
+BetaPlasma; candidate predictors Age, Fat, Fiber, Alcohol, BetaDiet.
+
+**(a)** Correlations with BetaPlasma:
+
+```{python}
+#| include: false
+ns = pd.read_csv("data/ch10/NutritionStudy.csv")
+preds85 = ["Age", "Fat", "Fiber", "Alcohol", "BetaDiet"]
+corr85 = ns[preds85 + ["BetaPlasma"]].corr()["BetaPlasma"].round(3)
+tab85, s85 = multi_reg(ns[preds85], ns.BetaPlasma, preds85)
+fin85 = ["Fat", "Fiber", "BetaDiet"]
+tab85f, s85f = multi_reg(ns[fin85], ns.BetaPlasma, fin85)
+Fs85, Fobs85, p85 = perm_F_multi(ns[fin85], ns.BetaPlasma)
+```
+
+```{python}
+#| echo: false
+corr85.to_string()
+```
+
+Only **Fiber (r = 0.236)** and **BetaDiet (r = 0.225)** look potentially
+useful; Age (0.101), Fat (−0.092) and Alcohol (−0.022) look negligible.
+
+**(b)** Full five-predictor model:
+
+```{python}
+#| echo: false
+tab85.round(4).to_string()
+pd.Series({"R2": round(s85["R2"], 4), "s_e": round(s85["s_e"], 2),
+           "F": round(s85["F"], 2)}).to_string()
+```
+
+The model is effective (F = 7.00, p < 0.001) — and notice **Fat is now
+significant (p = 0.006) despite its negligible correlation**, while Alcohol
+(p = 0.948) and Age (p = 0.330) contribute nothing. Eliminating them gives
+the best subset:
+
+```{python}
+#| echo: false
+tab85f.round(4).to_string()
+pd.Series({"R2": round(s85f["R2"], 4), "s_e": round(s85f["s_e"], 2),
+           "F": round(s85f["F"], 2),
+           "randomization p": float(f"{p85:.3g}")}).to_string()
+```
+
+**Final model:** $\widehat{\text{BetaPlasma}} = 128.2 -
+0.93\,\text{Fat} + 7.30\,\text{Fiber} + 0.018\,\text{BetaDiet}$ — all three
+predictors significant (p = 0.002, 0.001, 0.018), **R² = 9.9%**, F = 11.37
+(p < 0.001; randomization agrees, p ≈ `{python} f"{p85:.3f}"`), and the
+smallest $s_\epsilon$ (174.6) of any subset tried. Fiber and dietary
+beta-carotene raise blood beta-carotene; alcohol is useless here. The modest
+R² reminds us blood levels are hard to predict from diet alone.
+
+## Exercise 10.86
+
+Predicting Length of Games in Baseball (BaseballTimes, n = 30): response
+Time; candidate predictors Runs, Margin, Hits, Errors, Pitchers, Walks.
+
+**(a)** Correlations with Time:
+
+```{python}
+#| include: false
+bb = pd.read_csv("data/ch10/BaseballTimes.csv")
+preds86 = ["Runs", "Margin", "Hits", "Errors", "Pitchers", "Walks"]
+corr86 = bb[preds86 + ["Time"]].corr()["Time"].round(3)
+tab86, s86 = multi_reg(bb[preds86], bb.Time, preds86)
+fin86 = ["Pitchers", "Walks"]
+tab86f, s86f = multi_reg(bb[fin86], bb.Time, fin86)
+_, _, p86 = perm_F_multi(bb[fin86], bb.Time)
+```
+
+```{python}
+#| echo: false
+corr86.to_string()
+```
+
+**Pitchers (0.721), Walks (0.565), Runs (0.504) and Hits (0.349)** look
+potentially useful; Margin (−0.116) and Errors (−0.040) do not.
+
+**(b)** Full six-predictor model: **R² = 64.6%** but only Pitchers is
+significant (p = 0.001) — too many predictors for 30 games. Backward
+elimination (dropping the predictor with the largest p-value at each step)
+removes Margin (0.785), Errors (0.333), Hits (0.425) and Runs (0.331) in
+turn, landing on:
+
+```{python}
+#| echo: false
+tab86f.round(4).to_string()
+pd.Series({"R2": round(s86f["R2"], 4), "s_e": round(s86f["s_e"], 3),
+           "F": round(s86f["F"], 2),
+           "randomization p": float(f"{p86:.3g}")}).to_string()
+```
+
+**Final model:** $\widehat{\text{Time}} = 120.55 + 5.85\,\text{Pitchers} +
+2.36\,\text{Walks}$ — both predictors significant (p = 0.0001, 0.021),
+**R² = 60.7%**, $s_\epsilon$ = 13.35 minutes (down from 13.71 with all six
+predictors), F = 20.82 (p < 0.001; randomization agrees, p ≈
+`{python} f"{p86:.3f}"`). Each new pitcher adds about **5.9 minutes** and
+each walk about **2.4 minutes** to the game. (Adding Runs back gives
+essentially the same adjusted R², 57.7%, but with an insignificant Runs
+coefficient — not worth it.)
+
+## Exercise 10.87
+
+Prenatal Fluoride Exposure and IQ (conceptual — no data to fit).
+
+**(a)** The association was significant at the 5% level, so the p-value must
+be **less than 0.05**.
+
+**(b)** **No.** This was an observational study — mothers were not randomly
+assigned fluoride levels — so a significant association alone cannot
+establish that fluoride *causes* lower IQ.
+
+**(c)** They most likely **included lead, mercury, manganese and arsenic as
+additional explanatory variables in the multiple regression model** with
+fluoride, checking whether the fluoride coefficient changed much.
+
+**(d)** **No.** Multiple regression can adjust only for confounders that are
+*measured and included*; unmeasured confounders may remain, and no amount of
+adjustment in an observational study proves causation. Only a randomized
+experiment could do that.
+
+## Exercise 10.88
+
+Life Expectancy and Electricity Use (AllCountries).
+
+**(a)** Simple regression of LifeExpectancy on Electricity:
+
+```{python}
+#| include: false
+ac = pd.read_csv("data/ch09/AllCountries.csv")
+d88 = ac[["Electricity", "GDP", "LifeExpectancy"]].dropna()
+tab88a, _ = multi_reg(d88[["Electricity"]], d88.LifeExpectancy,
+                      ["Electricity"])
+tab88c, s88 = multi_reg(d88[["Electricity", "GDP"]], d88.LifeExpectancy,
+                        ["Electricity", "GDP"])
+r88 = d88[["Electricity", "GDP"]].corr().iloc[0, 1]
+```
+
+```{python}
+#| echo: false
+tab88a.round(4).to_string()
+```
+
+**Yes** — t = 6.59, **p < 0.001** (n = 133, R² = 24.0%): electricity use is
+a significant single predictor of life expectancy.
+
+**(b)** **GDP is a potential confounder**: wealthier countries both consume
+more electricity per capita *and* have longer life expectancies (better
+health care, sanitation, nutrition). Electricity and GDP are strongly
+associated (r = 0.70), so Electricity may simply be tagging wealth, not
+causing longevity.
+
+**(c)** Multiple regression with both predictors:
+
+```{python}
+#| echo: false
+tab88c.round(4).to_string()
+```
+
+**No** — after accounting for GDP, the t-statistic for Electricity collapses
+to **0.57, p = 0.572**, while GDP is highly significant (t = 6.84,
+p < 0.001). The electricity "effect" was confounding by wealth.
+
+## Exercise 10.89
+
+Life Expectancy and Cell Phones (AllCountries).
+
+**(a)** Simple regression of LifeExpectancy on Cell (mobile subscriptions
+per 100 people):
+
+```{python}
+#| include: false
+d89 = ac[["Cell", "GDP", "LifeExpectancy"]].dropna()
+tab89a, _ = multi_reg(d89[["Cell"]], d89.LifeExpectancy, ["Cell"])
+tab89c, s89 = multi_reg(d89[["Cell", "GDP"]], d89.LifeExpectancy,
+                        ["Cell", "GDP"])
+r89 = d89[["Cell", "GDP"]].corr().iloc[0, 1]
+```
+
+```{python}
+#| echo: false
+tab89a.round(4).to_string()
+```
+
+**Yes** — t = 9.12, **p < 0.001** (n = 178, R² = 30.4%).
+
+**(b)** **GDP is a potential confounder**: rich countries have both more
+cell subscriptions (r = 0.45 with GDP) and longer lives, so Cell may just be
+another wealth indicator.
+
+**(c)** Multiple regression with both:
+
+```{python}
+#| echo: false
+tab89c.round(4).to_string()
+```
+
+**Yes** — Cell **remains significant after accounting for GDP** (t = 5.95,
+**p < 0.001**), unlike Electricity in 10.88. Cell-phone infrastructure
+carries information about a country's development beyond what GDP measures.
+(Still an observational association — not evidence that phones cause
+longevity.)
+
+## Exercise 10.90
+
+Predicting Prices of Homes (HomesForSale, n = 120). Refitting the printed
+model from the data (Price in $1000s, Size1000 in 1000s of sq ft) reproduces
+the output exactly; refitting with raw Size shows what changes:
+
+```{python}
+#| include: false
+hs = pd.read_csv("data/ch10/HomesForSale.csv")
+hs["Size1000"] = hs["Size"] / 1000
+tab90, s90 = multi_reg(hs[["Size1000", "Beds", "Baths"]], hs.Price,
+                       ["Size1000", "Beds", "Baths"])
+tab90r, _ = multi_reg(hs[["Size", "Beds", "Baths"]], hs.Price,
+                      ["Size", "Beds", "Baths"])
+```
+
+```{python}
+#| echo: false
+tab90.round(4).to_string()
+pd.Series({"R2": round(s90["R2"], 4), "s_e": round(s90["s_e"], 1),
+           "F": round(s90["F"], 3)}).to_string()
+tab90r.round(4).to_string()
+```
+
+**(a)** Rescaling the predictor rescales its coefficient and standard error
+by the same factor and leaves the t-statistic (and p-value) untouched:
+Size coefficient **0.0820 → 81.99** (per 1000 sq ft instead of per sq ft),
+SE **0.0426 → 42.64**, but **t = 1.923 and p = 0.057 in both models**. The
+fits, predictions, R² (19.5%) and F (9.385) are identical — just the units
+of one coefficient changed.
+
+**(b)** Coefficient for Beds = **−25.81**: holding size and number of
+bathrooms fixed, each additional bedroom is associated with a price about
+**$25,810 lower**.
+
+**(c)** **Don't build houses with fewer bedrooms!** This is an
+observational dataset, and bedrooms are strongly tied to house size: among
+homes of the *same* size, more bedrooms means smaller, less desirable rooms,
+so the conditional association is negative. The coefficient does **not**
+say that removing a bedroom from a fixed house raises its price — association
+conditioned on the model's other variables is not causation, and the
+negative sign comes from how bedrooms co-vary with size.
+
+## Exercise 10.91
+
+ARE CARBON OR STEEL BIKES FASTER? Minutes vs Bike Type (BikeCommute, 56
+days; BikeSteel = 1 for the 29.75 lb steel bike, 0 for the 20.9 lb carbon
+bike). Refitting from the data reproduces the printed output:
+
+```{python}
+#| include: false
+bc = pd.read_csv("data/ch10/BikeCommute.csv",
+                 usecols=["Bike", "Distance", "Minutes", "AvgSpeed"]).dropna()
+dummies = pd.get_dummies(bc.Bike, drop_first=True)  # Steel = 1, Carbon = 0
+bc = pd.concat([bc, dummies], axis=1)
+tab91, s91 = multi_reg(bc[["Steel"]], bc.Minutes, ["BikeSteel"])
+Fs91, Fobs91, p91 = perm_F_multi(bc[["Steel"]], bc.Minutes)
+```
+
+```{python}
+#| echo: false
+tab91.round(4).to_string()
+pd.Series({"R2": round(s91["R2"], 4), "s_e": round(s91["s_e"], 3),
+           "randomization p": round(p91, 4)}).to_string()
+```
+
+**(a)** Steel bike: $108.342 + (-0.553) = \mathbf{107.79}$ minutes.
+
+**(b)** Carbon bike: **108.34 minutes** (the intercept is the carbon mean
+because BikeSteel = 0 there).
+
+**(c)** **No significant difference**: t = −0.37, **p = 0.711** — the 0.55
+minute (33 second) advantage for steel is well within chance variation. The
+randomization F-test agrees: **p ≈ `{python} f"{p91:.3f}"`**.
+
+```{python}
+#| echo: false
+sim_hist(Fs91, Fobs91)
+```
+
+## Exercise 10.92
+
+Distance vs Bike Type: regressing Distance on BikeSteel:
+
+```{python}
+#| include: false
+tab92, s92 = multi_reg(bc[["Steel"]], bc.Distance, ["BikeSteel"])
+```
+
+```{python}
+#| echo: false
+tab92.round(5).to_string()
+pd.Series({"R2": round(s92["R2"], 4), "s_e": round(s92["s_e"], 4)}).to_string()
+```
+
+The predicted distance is **higher for the carbon bike**: 27.374 miles vs
+$27.374 - 0.396 = \mathbf{26.978}$ miles for the steel bike — the steel-bike
+days averaged about **0.40 miles shorter** rides. This difference **is
+highly significant**: t = −6.96, **p ≈ 0.000000005** (R² = 47.3%). The
+routes were not randomly balanced by distance — the coin flips happened to
+send the steel bike on shorter rides.
+
+## Exercise 10.93
+
+Minutes vs Distance and Bike Type: regress Minutes on both BikeSteel and
+Distance:
+
+```{python}
+#| include: false
+tab93, s93 = multi_reg(bc[["Steel", "Distance"]], bc.Minutes,
+                       ["BikeSteel", "Distance"])
+Fs93, Fobs93, p93 = perm_F_multi(bc[["Steel", "Distance"]], bc.Minutes)
+r = np.random.default_rng(2026)
+Xd93 = np.column_stack([np.ones(len(bc)),
+                        bc[["Steel", "Distance"]].astype(float)])
+pinv93 = np.linalg.pinv(Xd93)
+tobs93 = tab93.loc["BikeSteel", "t"]
+ts93 = np.empty(10000)
+for i in range(10000):
+    ys = r.permutation(bc.Minutes.to_numpy())
+    b = pinv93 @ ys
+    res = ys - Xd93 @ b
+    se93 = np.sqrt((res ** 2).sum() / (len(bc) - 3) *
+                   np.diag(np.linalg.inv(Xd93.T @ Xd93)))
+    ts93[i] = b[1] / se93[1]
+p93t = float((np.abs(ts93) >= abs(tobs93)).mean())
+```
+
+```{python}
+#| echo: false
+tab93.round(4).to_string()
+pd.Series({"R2": round(s93["R2"], 4), "s_e": round(s93["s_e"], 3),
+           "F": round(s93["F"], 3),
+           "randomization F p": round(p93, 4),
+           "randomization t (BikeSteel) p": round(p93t, 4)}).to_string()
+```
+
+**(a)** Coefficient of BikeSteel = **+3.571**: for rides of the *same*
+distance, the steel bike takes about **3.6 minutes longer**, on average
+(p = 0.065 — not quite significant at 5%; the randomization test for this
+coefficient gives p ≈ `{python} f"{p93t:.3f}"`).
+
+**(b)** Coefficient of Distance = **+10.410**: each additional mile of
+commute adds about **10.4 minutes**, holding bike type constant.
+
+**(c)** At 27 miles: steel $= -176.620 + 3.571 + 10.410(27) =
+\mathbf{108.0}$ minutes; carbon $= -176.620 + 10.410(27) = \mathbf{104.4}$
+minutes. The whole randomization F-test for the two-predictor model is
+significant: F = 5.09, p = 0.0095 (permutation p ≈
+`{python} f"{p93:.3f}"`).
+
+```{python}
+#| echo: false
+sim_hist(Fs93, Fobs93)
+```
+
+## Exercise 10.94
+
+Predicting Average Bike Speed — reconciling the sign flip.
+
+**(a)** The two models answer different questions. The steel-bike days
+happened to be ridden over **shorter routes** (10.92: about 0.40 miles
+shorter, highly significant). In 10.91, Minutes on BikeSteel alone lumps
+that route disadvantage in with the bike effect: shorter rides pulled the
+steel bike's average time *down*, so the simple coefficient is negative.
+Once **Distance is held constant** in 10.93, we compare rides of equal
+length — and there the heavier steel bike is (weakly) *slower*, so the
+coefficient flips positive. This is a classic omitted-variable (confounding)
+effect: the coefficient of a predictor depends on **which other predictors
+are in the model**.
+
+**(b)** **Negative.** AvgSpeed = Distance/Minutes, and the steel bike's
+rides were on shorter routes, which lowers average speed regardless of the
+bike; so regressing AvgSpeed on BikeSteel should give a negative
+coefficient. The data confirm: coefficient = −0.152 (p = 0.437).
+
+```{python}
+#| include: false
+tab94, _ = multi_reg(bc[["Steel"]], bc.AvgSpeed, ["BikeSteel"])
+```
+
+```{python}
+#| echo: false
+tab94.round(4).to_string()
+```
+
+## Exercise 10.95
+
+Par and Distance as Predictors of Golf Scores (GolfRound, one round of 18
+holes): $\widehat{\text{Score}}$ from Par and Distance.
+
+```{python}
+#| include: false
+gr = pd.read_csv("data/ch09/GolfRound.csv")
+tab95, s95 = multi_reg(gr[["Par", "Distance"]], gr.Score,
+                       ["Par", "Distance"])
+Fs95, Fobs95, p95 = perm_F_multi(gr[["Par", "Distance"]], gr.Score)
+r95 = gr.Par.corr(gr.Distance)
+```
+
+```{python}
+#| echo: false
+tab95.round(4).to_string()
+pd.Series({"R2": round(s95["R2"], 4), "s_e": round(s95["s_e"], 4),
+           "F": round(s95["F"], 2),
+           "randomization p": round(p95, 4),
+           "corr(Par, Distance)": round(r95, 4)}).to_string()
+```
+
+**(a)** Individual t-tests: Par — t = **−0.52, p = 0.612**; Distance —
+t = **1.39, p = 0.185**. **Neither predictor is significant** at 5% in the
+multiple regression.
+
+**(b)** ANOVA F-test for the two-predictor model: **F = 4.35** (df 2 and
+15), **p = 0.032 < 0.05** (randomization F-test agrees: p ≈
+`{python} f"{p95:.3f}"`) — the model **is** effective overall.
+
+**(c)** The apparent inconsistency is **multicollinearity**: Par and
+Distance are almost perfectly correlated (**r = 0.951** — longer holes are
+par-5s, shorter ones par-3s). Because they carry nearly the same
+information, each coefficient's standard error is inflated, so neither
+t-test is significant even though *together* they explain a significant
+share of the variability in score (R² = 36.7%). The F-test asks "does the
+pair help?", which one redundant variable can answer yes to on its own.
+
+```{python}
+#| echo: false
+sim_hist(Fs95, Fobs95)
+```
+
+## Exercise 10.96
+
+Big Coefficients (Cars2020): city mpg predicted from Weight (lbs) and
+Seating (people) — two predictors measured in very different units.
+
+```{python}
+#| include: false
+cars = pd.read_csv("data/ch09/Cars2020.csv")
+tab96, s96 = multi_reg(cars[["Weight", "Seating"]], cars.CityMPG,
+                       ["Weight", "Seating"])
+_, s96w = multi_reg(cars[["Weight"]], cars.CityMPG, ["Weight"])
+_, s96s = multi_reg(cars[["Seating"]], cars.CityMPG, ["Seating"])
+```
+
+```{python}
+#| echo: false
+tab96.round(4).to_string()
+pd.Series({"R2 (both)": round(s96["R2"], 4),
+           "R2 (Weight only)": round(s96w["R2"], 4),
+           "R2 (Seating only)": round(s96s["R2"], 4)}).to_string()
+```
+
+Seating's coefficient (**0.253**) is about **60 times larger** in absolute
+value than Weight's (**−0.0041**) — yet Seating is **not significant**
+(t = 1.34, p = 0.184) while Weight is **highly significant**
+(t = −13.4, p < 0.001). Weight alone explains **74.8%** of the variability
+in city mpg; Seating alone explains only **33.3%**.
+
+The lesson for the classmate: **coefficients carry units** — this one is
+"mpg change per pound" and that one is "mpg change per seat" — so their raw
+sizes are not comparable. Importance is judged by the **t-statistics,
+p-values, and how much R² changes** when a variable is added or removed,
+never by the magnitude of the coefficient.
+
+:::

@@ -1,0 +1,714 @@
+---
+execute-dir: project
+title: "Chapter 10 · Section 10.2"
+subtitle: "Checking Conditions for a Regression Model — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Before a fitted regression model earns tests and intervals, its
+**conditions** must be checked: (1) **linearity** — the mean response
+follows a linear function of the predictor(s); (2) **constant
+variability** — the spread around the line is similar at every predictor
+value; (3) **normality of errors** — deviations around the line behave
+like a normal sample, with no extreme outliers; (4) **independence** of
+observations (a design matter). The diagnostic tool for (1)–(3) is the
+**residual** $e = y - \hat y$: the textbook's three relevant graphs are
+the scatterplot with the least squares line, a **histogram of the
+residuals**, and a **residual plot** (residuals vs fitted values —
+equivalent to residuals vs $x$ for a simple linear model). Curvature in
+the residual plot signals non-linearity; a funnel shape signals changing
+variability; skewness or extreme values in the histogram signal
+non-normal errors. Points with unusually large residuals are **outliers**;
+points far from the center of the predictor space have high **leverage**
+and may be **influential** — refitting without them shows how much the
+slope, p-value, and $R^2$ depend on them. Below, every model is fit from
+the raw data (scipy `linregress`, numpy least squares for multiple
+predictors), residuals are standardized as $e_i/(s_\epsilon\sqrt{1-h_{ii}})$
+with leverage $h_{ii}$ from the hat matrix, and — per this project's
+convention — the slope tests for Exercises 10.69–10.72 are re-verified
+with **permutation randomization** (10,000 shuffles, seed 2026).
+Exercises are from *Statistics: Unlocking the Power of Data* (Lock⁵, 3rd
+ed., pp. 676–679): Skill Builders 10.60–10.63 match residual plots to
+scatterplots, 10.64–10.65 read three-graph condition checks, and the
+applied exercises 10.66–10.80 cover student height/weight, exercise and
+pulse, nutrition, restaurant tips, Atlanta and St. Louis commutes, car
+mileage, Pennsylvania seniors, New York housing, light-at-night mice, NBA
+standings, and used Mustang prices.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+from scipy import stats
+sns.set_theme(style="whitegrid")
+
+def fit_line(x, y):
+    """Simple linear regression plus residual quantities."""
+    x = np.asarray(x, float); y = np.asarray(y, float)
+    r = stats.linregress(x, y)
+    yhat = r.intercept + r.slope * x
+    e = y - yhat
+    se = np.sqrt((e**2).sum() / (len(x) - 2))
+    return dict(x=x, y=y, yhat=yhat, e=e, se=se, n=len(x),
+                intercept=r.intercept, slope=r.slope, stderr=r.stderr,
+                r2=r.rvalue**2, t=r.slope / r.stderr,
+                p=2 * stats.t.sf(abs(r.slope / r.stderr), len(x) - 2),
+                skew=stats.skew(e))
+
+def three_graphs(f, xlabel, ylabel, star=None):
+    """Data+line, residual histogram, residuals vs fitted (with optional ★ point)."""
+    fig, ax = plt.subplots(1, 3, figsize=(12.5, 3.4))
+    ax[0].plot(f["x"], f["y"], "o", ms=4, color="#c44e52", alpha=.7)
+    xx = np.linspace(f["x"].min(), f["x"].max(), 10)
+    ax[0].plot(xx, f["intercept"] + f["slope"] * xx, color="#4c72b0", lw=2)
+    ax[0].set(xlabel=xlabel, ylabel=ylabel, title="Data with least squares line")
+    ax[1].hist(f["e"], bins=18, color="#8da0cb", edgecolor="white")
+    ax[1].set(xlabel="Residual", ylabel="Frequency", title="Histogram of residuals")
+    ax[2].plot(f["yhat"], f["e"], "o", ms=4, color="#c44e52", alpha=.7)
+    ax[2].axhline(0, color="gray", lw=1)
+    ax[2].set(xlabel="Fitted value", ylabel="Residual", title="Residuals vs fitted")
+    if star is not None:
+        for a, px, py in [(ax[0], f["x"][star], f["y"][star]),
+                          (ax[1], f["e"][star], 1),
+                          (ax[2], f["yhat"][star], f["e"][star])]:
+            a.plot(px, py, "*", ms=14, color="#2ca02c", zorder=5)
+    plt.tight_layout()
+
+def mult_model(df, preds, resp):
+    """Least squares multiple regression with leverage and standardized residuals."""
+    X = df[preds].to_numpy(float); Y = df[resp].to_numpy(float)
+    n = len(Y); k = X.shape[1]
+    X1 = np.column_stack([np.ones(n), X])
+    beta, *_ = np.linalg.lstsq(X1, Y, rcond=None)
+    yhat = X1 @ beta
+    e = Y - yhat
+    sse = float(e @ e); sst = float(((Y - Y.mean())**2).sum())
+    dfe = n - k - 1
+    se = np.sqrt(sse / dfe)
+    h = np.diag(X1 @ np.linalg.inv(X1.T @ X1) @ X1.T)
+    F = ((sst - sse) / k) / (sse / dfe)
+    return dict(n=n, k=k, dfe=dfe, e=e, yhat=yhat, h=h, se=se, sse=sse,
+                beta=pd.Series(beta, index=["Intercept"] + preds),
+                r2=1 - sse / sst, F=F, pF=stats.f.sf(F, k, dfe),
+                std=e / (se * np.sqrt(1 - h)), skew=stats.skew(e))
+
+def resid_plots(m, df=None, pred=None):
+    """Histogram of residuals + residuals vs fitted (+ residuals vs one predictor)."""
+    cols = 3 if pred is not None else 2
+    fig, ax = plt.subplots(1, cols, figsize=(4.2 * cols, 3.4))
+    ax[0].hist(m["e"], bins=15, color="#8da0cb", edgecolor="white")
+    ax[0].set(xlabel="Residual", ylabel="Frequency", title="Histogram of residuals")
+    ax[1].plot(m["yhat"], m["e"], "o", ms=4, color="#c44e52", alpha=.7)
+    ax[1].axhline(0, color="gray", lw=1)
+    ax[1].set(xlabel="Fitted value", ylabel="Residual", title="Residuals vs fitted")
+    if pred is not None:
+        ax[2].plot(df[pred], m["e"], "o", ms=4, color="#c44e52", alpha=.7)
+        ax[2].axhline(0, color="gray", lw=1)
+        ax[2].set(xlabel=pred, ylabel="Residual", title=f"Residuals vs {pred}")
+    plt.tight_layout()
+
+def perm_slope(x, y, reps=10000, seed=2026):
+    """Randomization test for the slope: shuffle y, recompute slope."""
+    x = np.asarray(x, float); y = np.asarray(y, float)
+    obs = stats.linregress(x, y).slope
+    sxx = ((x - x.mean())**2).sum()
+    rng = np.random.default_rng(seed)
+    Y = rng.permuted(np.tile(y, (reps, 1)), axis=1)
+    slopes = (x - x.mean()) @ (Y - Y.mean(axis=1, keepdims=True)).T / sxx
+    return obs, float((np.abs(slopes) >= abs(obs)).mean())
+```
+
+::: {.panel-tabset}
+
+## Exercise 10.60
+
+*(Skill Builder 1)* The residual plot shows a clear **U-shape**:
+residuals start positive ($\approx +15$ to $+20$) at small fitted values,
+dip to about $-20$ in the middle, and climb back to $+40$ or more at
+large fitted values. This positive–negative–positive signature is what a
+**convex (bending-upward) relationship** leaves behind after a line is
+fit, so the match is **scatterplot (c)** — the curved, exponential-type
+growth pattern (whose fitted values, like these, span roughly 0–120).
+
+## Exercise 10.61
+
+*(Skill Builder 1)* The residuals form a rough **horizontal band**
+between about $-6$ and $+7.5$ around zero with **no pronounced pattern**
+— the mild excess of positive residuals near the middle is minor. That
+is the signature of a linear trend with fairly constant variability, so
+the match is **scatterplot (b)**, the cleanest increasing panel (no
+outlier, no curvature).
+
+## Exercise 10.62
+
+*(Skill Builder 1)* One point is a dramatic **outlier**: at a fitted
+value near 30 its residual is about $+33$, far above the rest, which
+scatter randomly between roughly $-10$ and $+8$. Panel **(a)** is the
+increasing scatterplot with a **single point far above the line at low
+$X$** (near $(3, 60)$) — exactly the point this residual plot flags.
+
+## Exercise 10.63
+
+*(Skill Builder 1)* The mirror-image outlier: one point sits at fitted
+$\approx 55$ with residual $\approx -31$, far **below** the rest, which
+form a random band between about $-8$ and $+10$. Panel **(d)** — the
+decreasing scatterplot — contains a **low outlier far below the line**
+(near $(3, \approx 24)$), which produces this large negative residual at
+a high fitted value.
+
+## Exercise 10.64
+
+Reading the three graphs: the scatterplot of $Y2$ vs $X2$ shows a
+roughly **linear decreasing** trend with moderate scatter; the histogram
+of residuals is roughly symmetric around 0 with one mild right tail
+(residuals from $-10$ up to $+16$); and the residuals vs fitted values
+form a random horizontal band, with spread perhaps slightly wider at
+larger fitted values.
+
+**Conditions are reasonably met**: linearity ✓ (no curvature in the
+residual plot), constant variability mostly ✓ (only a hint of fan-out),
+normality roughly ✓ (a single large positive residual, about $+15$, in a
+small sample is the only wrinkle).
+
+## Exercise 10.65
+
+**Conditions are not all met.** The scatterplot of $Y4$ vs $X4$
+decreases but is clearly **curved** (steeper at first, flattening out),
+and the residual plot confirms it: residuals rise to about $+10$ at
+moderate fitted values, then fall to $-10$ to $-15$ at high fitted
+values — a classic **arch ($\cap$) pattern** signaling non-linearity.
+The residual histogram is roughly symmetric (normality OK-ish) and the
+spread is roughly constant (equal variability OK-ish), but the
+**linearity condition fails**, so a straight-line model is not
+appropriate for these data.
+
+## Exercise 10.66
+
+Height → Weight (StudentSurvey, $n = 352$): the fit reproduces the book's
+line, $\widehat{Weight} = -170.3 + 4.823\,Height$ ($s_\epsilon = 24.9$,
+$R^2 = 38.4\%$).
+
+```{python}
+#| include: false
+ss = pd.read_csv("data/ch09/StudentSurvey.csv")
+d66 = ss[["Height", "Weight"]].dropna()
+f66 = fit_line(d66.Height, d66.Weight)
+star66 = int(np.where((f66["x"] == 63) & (f66["y"] == 200))[0][0])
+```
+
+```{python}
+#| echo: false
+#| fig-cap: "Figure 10.8 recreated; the green ★ is the student from part (a)."
+three_graphs(f66, "Height (in)", "Weight (lb)", star=star66)
+```
+
+**(a)** The student (63 in, 200 lb) is the ★ at the **far left of the
+scatterplot, far above the line**.
+
+**(b)** Predicted: $\hat y = -170 + 4.82(63) = \mathbf{133.66}$ lb;
+residual $= 200 - 133.66 = \mathbf{+66.34}$ lb (standardized: $66.34/24.9 = 2.7$).
+
+**(c)** In the histogram this student is far out in the **right tail**;
+in the residuals-vs-fitted plot the ★ sits high above the band at fitted
+$\approx 134$.
+
+**(d)** Conditions: the scatterplot is roughly **linear** and the
+residual plot is a random band with no funnel, so **constant
+variability** is fine; the residual histogram is mound-shaped but
+somewhat **right-skewed with several large residuals** — 6 students have
+$|e/s_\epsilon| > 3$ (largest $+4.1$ for a 63 in, 235 lb student; $-4.0$
+for 83 in, 130 lb). Overall the conditions are **roughly met**, with
+normality the shakiest (a few big outliers, softened by $n = 352$).
+
+## Exercise 10.67
+
+Same model as 10.66 ($n = 352$, $\widehat{Weight} = -170 + 4.82\,Height$).
+
+```{python}
+#| include: false
+star67 = int(np.where((f66["x"] == 73) & (f66["y"] == 120))[0][0])
+keep67 = np.abs(f66["e"] / f66["se"]) <= 3
+r67 = stats.linregress(f66["x"][keep67], f66["y"][keep67])
+```
+
+```{python}
+#| echo: false
+#| fig-cap: "The green ★ is the student from part (a)."
+three_graphs(f66, "Height (in)", "Weight (lb)", star=star67)
+```
+
+**(a)** The student (73 in, 120 lb) is the ★ on the **right side of the
+scatterplot, far below the line**.
+
+**(b)** Predicted: $\hat y = -170 + 4.82(73) = \mathbf{181.86}$ lb;
+residual $= 120 - 181.86 = \mathbf{-61.86}$ lb.
+
+**(c)** In the histogram this student is far out in the **left tail**;
+in the residuals-vs-fitted plot the ★ sits below the band at fitted
+$\approx 182$.
+
+**(d)** As in 10.66: no curvature, no funnel — the conditions are
+roughly met, but with several large residuals in both tails (the same 6
+students with $|e/s_\epsilon| > 3$). Refitting without those 6 points
+moves the slope from **4.82 to 4.96** and $R^2$ from **38.4% to 44.7%**
+— a modest change, because the big residuals fall in both tails and
+partly cancel.
+
+## Exercise 10.68
+
+Pulse ← Exercise (StudentSurvey, $n = 361$).
+
+```{python}
+#| include: false
+d68 = ss[["Exercise", "Pulse"]].dropna()
+f68 = fit_line(d68.Exercise, d68.Pulse)
+```
+
+```{python}
+#| echo: false
+three_graphs(f68, "Exercise (hrs/week)", "Pulse (bpm)")
+```
+
+Fit: $\widehat{Pulse} = 72.9 - 0.367\,Exercise$ ($t = -3.32$,
+p = 0.001, but $R^2 = \mathbf{3\%}$).
+
+- **Scatterplot**: a weak decreasing cloud with enormous scatter —
+  knowing hours of exercise barely narrows down pulse; two extreme
+  students reported pulses of **130 bpm** (14 hrs/week, $e/s_\epsilon = +5.2$)
+  and **120 bpm** (3 hrs/week, $+4.0$).
+- **Histogram of residuals**: mound-shaped with a mild right tail
+  (skew 0.40) and those same two big positive outliers.
+- **Residuals vs fitted**: a random band (no curvature, no funnel) with
+  the two outliers above.
+
+**Conclusion**: linearity and constant variability are fine; **normality
+is borderline** because of a couple of unusually high pulse rates — with
+$n = 361$ the inference survives, but the two outliers deserve a look.
+
+## Exercise 10.69
+
+Calories ← Fat (NutritionStudy, $n = 315$).
+
+```{python}
+#| include: false
+ns = pd.read_csv("data/ch02/NutritionStudy.csv")
+d69 = ns[["Fat", "Calories"]].dropna()
+f69 = fit_line(d69.Fat, d69.Calories)
+o69, p69 = perm_slope(d69.Fat, d69.Calories)
+keep69 = np.abs(f69["e"] / f69["se"]) <= 2.5
+r69 = stats.linregress(f69["x"][keep69], f69["y"][keep69])
+```
+
+```{python}
+#| echo: false
+three_graphs(f69, "Fat (g/day)", "Calories (kcal/day)")
+```
+
+Fit: $\widehat{Calories} = 446 + 17.53\,Fat$ ($s_\epsilon = 334$,
+$R^2 = 76.0\%$, $t = 31.5$, p $< 10^{-4}$; randomization p $< 10^{-4}$
+too).
+
+- **Scatterplot**: a strong positive linear trend — with dramatic
+  positive outliers, led by a subject reporting 164 g of fat and **6662
+  calories** ($e/s_\epsilon = \mathbf{+10.0}$).
+- **Histogram**: strongly **right-skewed** (skew 3.6) — a handful of
+  very large "calorie reporters" stick far out.
+- **Residuals vs fitted**: random band with a mild funnel and the huge
+  positive outliers.
+
+**Conditions are not well met**: the outliers and skew violate
+normality, so symmetric intervals are untrustworthy. Sensitivity:
+dropping the 7 points with $|e/s_\epsilon| > 2.5$ moves the slope from
+**17.53 to 16.55** and $R^2$ from **76.0% to 84.3%** — the outliers are
+influential.
+
+## Exercise 10.70
+
+Cholesterol ← Fat (NutritionStudy, $n = 315$).
+
+```{python}
+#| include: false
+d70 = ns[["Fat", "Cholesterol"]].dropna()
+f70 = fit_line(d70.Fat, d70.Cholesterol)
+o70, p70 = perm_slope(d70.Fat, d70.Cholesterol)
+keep70 = np.abs(f70["e"] / f70["se"]) <= 2.5
+r70 = stats.linregress(f70["x"][keep70], f70["y"][keep70])
+```
+
+```{python}
+#| echo: false
+three_graphs(f70, "Fat (g/day)", "Cholesterol (mg/dL)")
+```
+
+Fit: $\widehat{Cholesterol} = 29.1 + 2.77\,Fat$ ($R^2 = 50.4\%$,
+$t = 17.8$, p $< 10^{-4}$; randomization p $< 10^{-4}$).
+
+- **Scatterplot**: a moderate positive linear trend with wide scatter
+  and several big outliers (e.g., 689 mg/dL at 52.8 g of fat,
+  $e/s_\epsilon = +5.5$; 747.5 at 76.5 g, $+5.4$).
+- **Histogram**: right-skewed (skew 1.7); 5 residuals exceed
+  $|e/s_\epsilon| = 3$.
+- **Residuals vs fitted**: roughly a random band with a mild fan
+  (corr$|e|$ vs $\hat y$ = 0.31).
+
+**Conclusion**: linearity is OK, but **constant variability is
+borderline and normality is questionable** (skew plus outliers).
+Sensitivity: dropping the 8 points with $|e/s_\epsilon| > 2.5$ moves the
+slope from **2.77 to 2.62** and $R^2$ from **50.4% to 59.4%**.
+
+## Exercise 10.71
+
+Tip ← Bill (RestaurantTips, $n = 157$).
+
+```{python}
+#| include: false
+tips = pd.read_csv("data/ch09/RestaurantTips.csv")
+d71 = tips[["Bill", "Tip"]].dropna()
+f71 = fit_line(d71.Bill, d71.Tip)
+o71, p71 = perm_slope(d71.Bill, d71.Tip)
+keep71 = np.abs(f71["e"] / f71["se"]) <= 2.5
+r71 = stats.linregress(f71["x"][keep71], f71["y"][keep71])
+```
+
+```{python}
+#| echo: false
+three_graphs(f71, "Bill ($)", "Tip ($)")
+```
+
+Fit: $\widehat{Tip} = -0.29 + 0.182\,Bill$ ($R^2 = 83.7\%$, $t = 28.2$,
+p $< 10^{-4}$; randomization p $< 10^{-4}$).
+
+- **Scatterplot**: a strong linear trend with a few generous tippers
+  above the line — most notably **$10 on a $23.70 bill (42.2%!**,
+  $e/s_\epsilon = +6.1$), then $8 on $19.53 ($+4.8$) and $15 on $60.72
+  ($+4.3$).
+- **Histogram**: **right-skewed** (skew 2.7) — the residuals are **not
+  normal**, driven by the big-hearted outliers.
+- **Residuals vs fitted**: random band with a mild funnel.
+
+**Conclusion**: linearity and constant variability are acceptable, but
+the **normality condition fails** (skewed residuals with outliers).
+Sensitivity: dropping the 4 points with $|e/s_\epsilon| > 2.5$ moves the
+slope from **0.182 to 0.174** and $R^2$ from **83.7% to 91.2%** — the
+outliers deflate the apparent fit.
+
+## Exercise 10.72
+
+Commute time ← distance (CommuteAtlanta, $n = 500$).
+
+```{python}
+#| include: false
+ca = pd.read_csv("data/ch03/CommuteAtlanta.csv")
+f72 = fit_line(ca.Distance, ca.Time)
+o72, p72 = perm_slope(ca.Distance, ca.Time)
+n_out72 = int((np.abs(f72["e"] / f72["se"]) > 3).sum())
+pred20 = f72["intercept"] + f72["slope"] * 20
+```
+
+```{python}
+#| echo: false
+three_graphs(f72, "Distance (miles)", "Time (minutes)")
+```
+
+**(a)** $\widehat{Time} = \mathbf{7.12 + 1.211\,Distance}$
+($s_\epsilon = 12.26$, $R^2 = 65.1\%$, p $< 10^{-4}$; randomization
+p $< 10^{-4}$).
+
+**(b)** $7.12 + 1.211(20) = \mathbf{31.34}$ minutes.
+
+**(c)** Scatterplot: a clear positive linear trend, but the spread
+**widens with distance** (longer trips can go very wrong); extreme
+outliers include a **5-mile commute taking 120 minutes**
+($e = 106.8$, $e/s_\epsilon = +8.7$) and a 30-mile, 120-minute commute.
+
+**(d)** Histogram of residuals: **strongly right-skewed** (skew 2.8)
+with 10 residuals beyond $\pm 3\,s_\epsilon$ — the **normality
+condition is questionable**.
+
+**(e)** Residuals vs fitted: no curvature, but a visible **fan**
+(corr($|e|, \hat y$) = 0.36) — **constant variability is questionable**
+too. Linearity is the best-met condition.
+
+## Exercise 10.73
+
+Same questions for St. Louis (CommuteStLouis, $n = 500$).
+
+```{python}
+#| include: false
+cl = pd.read_csv("data/ch03/CommuteStLouis.csv")
+f73 = fit_line(cl.Distance, cl.Time)
+cmp73 = pd.DataFrame({
+    "Atlanta": [f72["intercept"], f72["slope"], f72["se"], 100 * f72["r2"],
+                ca.Distance.mean(), ca.Time.mean(), f72["skew"]],
+    "St. Louis": [f73["intercept"], f73["slope"], f73["se"], 100 * f73["r2"],
+                  cl.Distance.mean(), cl.Time.mean(), f73["skew"]]},
+    index=["Intercept", "Slope (min/mile)", "s_e", "R2 %",
+           "Mean distance (mi)", "Mean time (min)", "Residual skew"]).round(2)
+```
+
+```{python}
+#| echo: false
+three_graphs(f73, "Distance (miles)", "Time (minutes)")
+```
+
+```{python}
+#| echo: false
+cmp73.to_string()
+```
+
+Fit: $\widehat{Time} = \mathbf{6.41 + 1.099\,Distance}$
+($s_\epsilon = 7.94$, $R^2 = 68.9\%$), predicting $6.41 + 1.099(20) =
+\mathbf{28.39}$ minutes for a 20-mile commute.
+
+- **Scatterplot**: the same positive linear trend with widening spread
+  and one spectacular outlier (a **30-mile commute of 130 minutes**,
+  $e/s_\epsilon = +11.4$).
+- **Histogram**: right-skewed (skew 4.1) with 7 residuals beyond
+  $\pm 3\,s_\epsilon$ — normality again questionable.
+- **Residuals vs fitted**: mild fan (0.20), no curvature.
+
+**Comparison**: the results are **not much different from Atlanta** —
+similar slopes (1.10 vs 1.21 min/mile) and $R^2$ (68.9% vs 65.1%), but
+St. Louis commuters travel **shorter distances** (mean 14.2 vs 18.2
+miles), spend **less time** (mean 22.0 vs 29.1 min), and their model is
+more precise ($s_\epsilon = 7.9$ vs 12.3 min). Both cities share the
+same flaws: right-skewed residuals and fan-shaped spread.
+
+## Exercise 10.74
+
+Using the printed output for a 20-mile Atlanta commute (Fit = 31.343,
+SE Fit = 0.553, 95% CI (30.257, 32.430), 95% PI (7.235, 55.452)).
+
+```{python}
+#| include: false
+x74 = f72["x"]; n74 = len(x74)
+yhat74 = f72["intercept"] + f72["slope"] * 20
+extra74 = (20 - x74.mean())**2 / ((n74 - 1) * x74.std(ddof=1)**2)
+t74 = stats.t.ppf(0.975, n74 - 2)
+se_fit74 = f72["se"] * np.sqrt(1 / n74 + extra74)
+ci74 = yhat74 + np.array([-1, 1]) * t74 * se_fit74
+pi74 = yhat74 + np.array([-1, 1]) * t74 * f72["se"] * np.sqrt(1 + 1 / n74 + extra74)
+tab74 = pd.Series({"Fit": round(yhat74, 3), "SE Fit": round(se_fit74, 3),
+                   "95% CI": f"({ci74[0]:.3f}, {ci74[1]:.3f})",
+                   "95% PI": f"({pi74[0]:.3f}, {pi74[1]:.3f})"},
+                  name="x* = 20 miles")
+```
+
+```{python}
+#| echo: false
+tab74.to_string()
+```
+
+Recomputing the intervals from the raw data reproduces the output
+**exactly**.
+
+**(a)** The 95% CI is for the **mean** commute time of *all* Atlanta
+commuters with a 20-mile commute: we are 95% sure that the **average
+time of all such commutes is between 30.26 and 32.43 minutes**.
+
+**(b)** The prediction interval tries to bracket one *individual*
+commute, but its **lower endpoint is physically impossible**: 20 miles
+in 7.235 minutes would average **165 mph**, while the 55-mph freeway
+limit means the trip needs at least $20/55 \times 60 = 21.8$ minutes.
+Because the residuals are **right-skewed with huge positive outliers**
+(10.72(d)), the symmetric interval $\hat y \pm t^* s_\epsilon
+\sqrt{1 + h^*}$ hands far too much room to the lower tail: real
+uncertainty is asymmetric, bounded below by driving physics and
+stretched above by traffic jams.
+
+## Exercise 10.75
+
+HwyMPG ← CityMPG + Weight (Cars2020, $n = 110$): the model from
+Exercise 10.52 gives $\widehat{HwyMPG} = 20.57 + 1.298\,CityMPG -
+0.00200\,Weight$ ($s_\epsilon = 3.38$, $R^2 = 78.3\%$).
+
+```{python}
+#| include: false
+cars = pd.read_csv("data/ch09/Cars2020.csv")
+d75 = cars[["CityMPG", "Weight", "HwyMPG"]].dropna()
+m75 = mult_model(d75, ["CityMPG", "Weight"], "HwyMPG")
+```
+
+```{python}
+#| echo: false
+#| fig-cap: "Residual checks for the two-predictor model."
+resid_plots(m75, df=d75, pred="Weight")
+```
+
+- **Linearity**: the residuals vs fitted (and vs Weight) show **no
+  curved pattern** — the best-behaved condition.
+- **Normality**: the residual histogram is fairly symmetric with only
+  mild right skew (skew 0.39); the biggest standardized residual is
+  $+3.6$ (a VW Jetta rated 54 mpg highway, about 12 mpg above
+  predicted).
+- **Equal variability**: the residuals vs fitted **fan out** at larger
+  fitted values (corr($|e|, \hat y$) = 0.39) — the most troublesome
+  condition. One heavy car (the 4810-lb Audi A8, leverage 0.16 vs mean
+  0.027) sits far out in predictor space.
+
+**Ranking (least → most problematic): linearity, then normality, then
+equal variability.**
+
+## Exercise 10.76
+
+Armspan ← Height + Foot (PASeniors, $n = 401$): the model from
+Exercise 10.53 gives $\widehat{Armspan} = 8.52 + 0.736\,Height +
+1.448\,Foot$ ($s_\epsilon = 8.39$, $R^2 = 61.8\%$).
+
+```{python}
+#| include: false
+pa = pd.read_csv("data/ch09/PASeniors.csv")
+d76 = pa[["Height", "Foot", "Armspan"]].dropna()
+m76 = mult_model(d76, ["Height", "Foot"], "Armspan")
+```
+
+```{python}
+#| echo: false
+resid_plots(m76)
+```
+
+**(a) Linearity**: the residuals vs fitted plot shows no curved
+pattern — no concern.
+
+**(b) Equal variance**: the spread around zero is roughly constant
+across fitted values (corr($|e|, \hat y$) $\approx 0$) — no concern.
+
+**(c) Normality**: the residuals are **left-skewed** (skew $-1.5$):
+several students report armspans far below predicted (e.g., a student
+180.3 cm tall with a 132 cm armspan, $e = -45.3$, $e/s_\epsilon
+\sqrt{1-h} = -5.4$; two entries list just 119 cm). **Normality is the
+one condition with a real concern**, likely reflecting a few unusual
+measurements at the low end.
+
+## Exercise 10.77
+
+Price ← Size + Beds + Baths (HomesForSaleNY, $n = 30$): the model from
+Exercise 10.54 gives $\widehat{Price} = 15.7 - 0.0035\,Size - 83.3\,Beds
++ 266.5\,Baths$ ($s_\epsilon = 261$, $R^2 = 39.4\%$).
+
+```{python}
+#| include: false
+ny = pd.read_csv("data/ch10/HomesForSaleNY.csv")
+d77 = ny[["Size", "Beds", "Baths", "Price"]].dropna()
+m77 = mult_model(d77, ["Size", "Beds", "Baths"], "Price")
+```
+
+```{python}
+#| echo: false
+resid_plots(m77)
+```
+
+The residual plots raise **all three distributional concerns**:
+
+- **Skewness**: home prices are strongly right-skewed (median \$257k,
+  max \$1250k) and so are the residuals (skew 0.58).
+- **Equal variability**: the residuals vs fitted **fan out** sharply
+  (corr($|e|, \hat y$) = 0.48).
+- **Linearity**: with the fan and curvature visible at high fitted
+  values, the linear surface misfits the expensive end; the biggest
+  residuals are the costly homes (\$875k: $+581$, \$1.25M: $+508$) and
+  one bargain (\$85k: $-474$).
+
+A symptom in the fit itself: the Size coefficient is essentially zero
+($-0.0035$) and Beds comes out negative — with $n = 30$ and a skewed,
+fan-shaped response the model is unstable. **Conditions are not well
+met.**
+
+## Exercise 10.78
+
+BMGain ← Corticosterone + DayPct + Consumption + Activity
+(LightatNight4Weeks, $n = 27$): the model from Exercise 10.55 gives
+$\widehat{BMGain} = -1.95 + 0.001\,Corticosterone + 0.116\,DayPct +
+0.904\,Consumption - 0.0001\,Activity$ ($s_\epsilon = 2.25$, $R^2 =
+59.4\%$, F = 8.06, p = 0.0004).
+
+```{python}
+#| include: false
+lan = pd.read_csv("data/ch10/LightatNight4Weeks.csv")
+d78 = lan[["Corticosterone", "DayPct", "Consumption", "Activity",
+           "BMGain"]].dropna()
+m78 = mult_model(d78, ["Corticosterone", "DayPct", "Consumption",
+                       "Activity"], "BMGain")
+```
+
+```{python}
+#| echo: false
+resid_plots(m78, df=d78, pred="Consumption")
+```
+
+- **Histogram of residuals**: roughly symmetric (skew $-0.11$) —
+  normality looks fine.
+- **Residuals vs fitted**: no curvature and near-constant spread —
+  linearity and equal variability look fine.
+- **The catch is leverage**: one mouse ate **7.18 g/day** (next highest
+  5.94), putting it far out in predictor space with **leverage 0.58 vs
+  a mean of 0.19**. Its standardized residual is $+2.75$, and dropping
+  it would noticeably move the coefficients — in a sample of 27, any
+  single point can be influential.
+
+**Conclusion**: the three conditions are roughly met on the plots, but
+the **high-leverage mouse** makes the fitted coefficients fragile.
+
+## Exercise 10.79
+
+WinPct ← PtsFor + PtsAgainst (NBAStandings2019, $n = 30$): the model
+from Exercise 10.56 gives $\widehat{WinPct} = 0.303 + 0.0302\,PtsFor -
+0.0285\,PtsAgainst$ ($s_\epsilon = 0.030$, $R^2 = 96.1\%$).
+
+```{python}
+#| include: false
+nba = pd.read_csv("data/ch09/NBAStandings2019.csv")
+d79 = nba[["PtsFor", "PtsAgainst", "WinPct"]].dropna()
+m79 = mult_model(d79, ["PtsFor", "PtsAgainst"], "WinPct")
+```
+
+```{python}
+#| echo: false
+resid_plots(m79)
+```
+
+The residual histogram is roughly symmetric (skew $-0.35$), the
+residuals vs fitted form a clean random band with no curvature and no
+fan, and no standardized residual exceeds 2.4 in absolute value (the
+biggest, $-2.3$, is the New Orleans Pelicans, who won only 40.2% of
+their games while scoring 115.4 points per game and allowing 116.8).
+**Conditions are reasonably met** — no serious concerns for inference.
+
+## Exercise 10.80
+
+Price ← Age + Miles (MustangPrice, $n = 25$): the model from Exercise
+10.57 gives $\widehat{Price} = 30.87 - 0.155\,Age - 0.205\,Miles$
+($s_\epsilon = 6.55$, $R^2 = 68.1\%$; Price in \$1000s, Miles in 1000s).
+
+```{python}
+#| include: false
+mu = pd.read_csv("data/ch03/MustangPrice.csv")
+d80 = mu[["Age", "Miles", "Price"]].dropna()
+m80 = mult_model(d80, ["Age", "Miles"], "Price")
+```
+
+```{python}
+#| echo: false
+resid_plots(m80)
+```
+
+- **Histogram**: **right-skewed** (skew 1.62).
+- **Residuals vs fitted**: a mild fan (corr($|e|, \hat y$) = 0.37).
+- **Outlier**: one **7-year-old Mustang with 33k miles priced at
+  \$45k** sits far above the plane ($e = +22.0$, standardized $+3.5$) —
+  a specialty model the linear surface can't explain; at the other end,
+  a 9-year-old with 61.9k miles at \$7k is a bargain outlier.
+
+**Conclusion**: linearity is acceptable, but with $n = 25$ the
+**constant-variability and normality conditions are shaky** (skew plus
+the \$45k outlier) — any interval from this model inherits that doubt.
+
+:::
