@@ -1,0 +1,853 @@
+---
+execute-dir: project
+title: "Chapter 5 · Section 5.1"
+subtitle: "Hypothesis Tests Using Normal Distributions — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 5.1 of Lock⁵ trades the dotplot for a curve: when a randomization
+(or bootstrap) distribution is reasonably bell-shaped — which it usually is
+for large samples — we stop simulating and approximate it with a **normal
+distribution**. For a hypothesis test the approximating curve is
+**$N(\text{null value},\ SE)$**: it is centered at the null value of the
+parameter (the "if $H_0$ is true" world) and its spread is the standard
+error taken from the randomization distribution. Rather than work with a
+different curve for every problem, we standardize once and for all: the
+**standardized test statistic**
+$$z=\frac{\text{Sample Statistic}-\text{Null Parameter}}{SE}$$
+measures how many standard errors the observed statistic sits from the null
+value, and the **p-value is the tail area of the standard normal distribution
+beyond $z$** — one tail for a one-sided alternative ($H_a\colon \mu > \mu_0$
+or $\mu < \mu_0$), both tails for $H_a\colon \mu \ne \mu_0$. Below we compute
+every area and p-value with the normal CDF (`scipy.stats.norm`), and, where
+the exercise gives real data or exact counts, we verify the normal answer
+against a randomization simulation (10000 simulated samples, seed 2026).
+The exercises are from *Statistics: Unlocking the Power of Data* (Lock⁵,
+3rd ed., pp. 413–417): Skill Builders 5.1–5.6 find standard normal tail
+areas; 5.7–5.12 compute $z$-statistics; 5.13–5.14 convert $z$ to p-values;
+5.15–5.17 find areas in general $N(\mu,\sigma)$ curves; and the applied
+exercises 5.18–5.33 carry out full tests, ending with Exercise 5.33 — a
+cautionary tale about using the normal curve when the large-sample
+conditions fail.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+from scipy import stats
+sns.set_theme(style="whitegrid")
+
+def zstat(stat, null, se):
+    """Standardized test statistic z = (statistic - null parameter) / SE."""
+    return (stat - null) / se
+
+def norm_p(z, tail):
+    """p-value for a z-statistic read off a standard normal curve."""
+    if tail == "right":
+        return float(stats.norm.sf(z))
+    if tail == "left":
+        return float(stats.norm.cdf(z))
+    return float(2 * stats.norm.sf(abs(z)))
+
+def ztest_row(stat, null, se, tail, digits=4):
+    """One-row summary: statistic, z-statistic, and normal-curve p-value."""
+    z = zstat(stat, null, se)
+    return pd.Series({"Statistic": round(float(stat), 4),
+                      "Null value": round(float(null), 4),
+                      "SE": se,
+                      "z-statistic": round(float(z), 3),
+                      "p-value (normal)": round(norm_p(z, tail), digits)})
+
+def zcurve(z, tail, figsize=(6, 2.6)):
+    """Standard normal curve with the p-value tail beyond z shaded."""
+    x = np.linspace(-4.5, 4.5, 500)
+    y = stats.norm.pdf(x)
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.plot(x, y, color="#4c72b0", lw=2)
+    if tail == "right":
+        mask = x >= z
+    elif tail == "left":
+        mask = x <= z
+    else:
+        mask = (x >= abs(z)) | (x <= -abs(z))
+    if mask.any():
+        ax.fill_between(x[mask], y[mask], color="#c44e52", alpha=0.65)
+    ax.axvline(np.clip(z, -4.5, 4.5), color="black", lw=1)
+    ax.set_xlabel("z")
+    ax.set_ylabel("Density")
+    plt.tight_layout()
+    plt.show()
+
+def rand_prop(n, p0, x, tail, reps=10000, seed=2026):
+    """Randomization distribution for a single proportion: simulate `reps`
+    samples of size n with success probability p0 (the null value) and record
+    the sample proportion in each. Returns (proportions, p-value)."""
+    r = np.random.default_rng(seed)
+    counts = r.binomial(n, p0, reps)
+    props = counts / n
+    if tail == "right":
+        p = (counts >= x).mean()
+    elif tail == "left":
+        p = (counts <= x).mean()
+    else:  # two-tailed: double the tail on the side of the observed statistic
+        p = 2 * ((counts >= x).mean() if x / n >= p0 else (counts <= x).mean())
+    return props, p
+
+def shuffle_stats(pooled, n1, stat_fn, reps=10000, seed=2026):
+    """Randomization distribution by shuffling group labels: permute `pooled`,
+    give the first n1 values to group 1, and apply stat_fn(group1, group2)."""
+    r = np.random.default_rng(seed)
+    pooled = np.asarray(pooled, float)
+    out = np.empty(reps)
+    for i in range(reps):
+        perm = r.permutation(pooled)
+        out[i] = stat_fn(perm[:n1], perm[n1:])
+    return out
+
+def tail_plot(boots, observed, tail, xlabel, null=0.0, bins=40, figsize=(6, 3)):
+    """Histogram of a randomization distribution with the p-value tail shaded."""
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.histplot(x=boots, bins=bins, ax=ax, color="#4c72b0")
+    if tail == "right":
+        mask = boots >= observed
+    elif tail == "left":
+        mask = boots <= observed
+    else:
+        mask = np.abs(boots - null) >= abs(observed - null)
+    if mask.any():
+        sns.histplot(x=boots[mask], bins=bins, ax=ax, color="#c44e52")
+    ax.axvline(observed, color="black", lw=1.5)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Simulated statistics")
+    plt.tight_layout()
+    plt.show()
+
+def p_row(label, stat, boots, tail, null=0.0, digits=4):
+    """One-row summary: statistic and randomization p-value."""
+    if tail == "right":
+        p = (boots >= stat).mean()
+    elif tail == "left":
+        p = (boots <= stat).mean()
+    else:
+        p = (np.abs(boots - null) >= abs(stat - null)).mean()
+    return pd.Series({label: round(float(stat), 4),
+                      "Randomization p-value": round(float(p), digits),
+                      "Simulated samples": len(boots)})
+```
+
+::: {.panel-tabset}
+
+## Exercise 5.1
+
+*(Skill Builder 1)* Area in the right tail more extreme than $z = 2.20$.
+
+```{python}
+#| echo: false
+round(float(stats.norm.sf(2.20)), 4)
+```
+
+**Area ≈ 0.0139** — about 1.4% of a standard normal distribution lies above
+$z = 2.20$.
+
+## Exercise 5.2
+
+*(Skill Builder 1)* Area in the right tail more extreme than $z = 0.80$.
+
+```{python}
+#| echo: false
+round(float(stats.norm.sf(0.80)), 4)
+```
+
+**Area ≈ 0.2119** — roughly 21% of the distribution, since $z = 0.80$ is
+still less than one standard deviation above the mean.
+
+## Exercise 5.3
+
+*(Skill Builder 1)* Area in the right tail more extreme than $z = -1.25$.
+
+```{python}
+#| echo: false
+round(float(stats.norm.sf(-1.25)), 4)
+```
+
+**Area ≈ 0.8944.** The "right tail more extreme than" a *negative* $z$ is
+the large area to the **right** of $-1.25$ — everything above it, including
+the whole right half of the curve.
+
+## Exercise 5.4
+
+*(Skill Builder 1)* Area in the right tail more extreme than $z = 3.0$.
+
+```{python}
+#| echo: false
+round(float(stats.norm.sf(3.0)), 5)
+```
+
+**Area ≈ 0.00135** — about 1 in 750. Values beyond 3 standard deviations
+are rare, which is why a $z$-statistic past 3 already signals a small
+p-value.
+
+## Exercise 5.5
+
+*(Skill Builder 1)* Area in the left tail more extreme than $z = -1.75$.
+
+```{python}
+#| echo: false
+round(float(stats.norm.cdf(-1.75)), 4)
+```
+
+**Area ≈ 0.0401** — just under 5%.
+
+## Exercise 5.6
+
+*(Skill Builder 1)* Area in the left tail more extreme than $z = -2.60$.
+
+```{python}
+#| echo: false
+round(float(stats.norm.cdf(-2.60)), 4)
+```
+
+**Area ≈ 0.0047** — under half a percent.
+
+## Exercise 5.7
+
+*(Skill Builder 2)* Test $H_0\colon \mu = 80$ vs $H_a\colon \mu > 80$;
+sample $n = 20$, $\bar x = 82.4$, $s = 3.5$, with $SE = 0.8$.
+
+```{python}
+#| echo: false
+round(float(zstat(82.4, 80, 0.8)), 2)
+```
+
+$$z=\frac{82.4-80}{0.8}=3.00$$ The sample mean sits 3 standard errors above
+the null mean.
+
+## Exercise 5.8
+
+*(Skill Builder 2)* Test $H_0\colon p = 0.25$ vs $H_a\colon p < 0.25$;
+sample $n = 800$, $\hat p = 0.235$, with $SE = 0.018$.
+
+```{python}
+#| echo: false
+round(float(zstat(0.235, 0.25, 0.018)), 2)
+```
+
+$$z=\frac{0.235-0.25}{0.018}=-0.83$$ — less than one standard error below
+the null value.
+
+## Exercise 5.9
+
+*(Skill Builder 2)* Test $H_0\colon p = 0.5$ vs $H_a\colon p \ne 0.5$;
+sample $n = 50$, $\hat p = 0.41$, with $SE = 0.07$.
+
+```{python}
+#| echo: false
+round(float(zstat(0.41, 0.5, 0.07)), 2)
+```
+
+$$z=\frac{0.41-0.5}{0.07}=-1.29$$
+
+## Exercise 5.10
+
+*(Skill Builder 2)* Test $H_0\colon \mu = 10$ vs $H_a\colon \mu \ne 10$;
+sample $n = 75$, $\bar x = 11.3$, $s = 0.85$, with $SE = 0.10$.
+
+```{python}
+#| echo: false
+round(float(zstat(11.3, 10, 0.10)), 1)
+```
+
+$$z=\frac{11.3-10}{0.10}=13.0$$ — thirteen standard errors above the null!
+The p-value is essentially 0 (about $10^{-39}$); such a $z$ means the data
+are wildly inconsistent with $H_0$.
+
+## Exercise 5.11
+
+*(Skill Builder 2)* Test $H_0\colon p_1 = p_2$ vs $H_a\colon p_1 < p_2$;
+samples $n_1 = 150$ with $\hat p_1 = 0.18$ and $n_2 = 100$ with
+$\hat p_2 = 0.23$; $SE = 0.05$ for $\hat p_1 - \hat p_2$.
+
+```{python}
+#| echo: false
+round(float(zstat(0.18 - 0.23, 0, 0.05)), 2)
+```
+
+$$z=\frac{0.18-0.23}{0.05}=-1.00$$ — the null value for a difference is 0.
+
+## Exercise 5.12
+
+*(Skill Builder 2)* Test $H_0\colon \mu_1 = \mu_2$ vs $H_a\colon \mu_1 >
+\mu_2$; samples $n_1 = n_2 = 50$, $\bar x_1 = 35.4$, $\bar x_2 = 33.1$,
+$s_1 = 1.28$, $s_2 = 1.17$; $SE = 0.25$ for $\bar x_1 - \bar x_2$.
+
+```{python}
+#| echo: false
+round(float(zstat(35.4 - 33.1, 0, 0.25)), 1)
+```
+
+$$z=\frac{35.4-33.1}{0.25}=9.2$$ — far beyond the usual ±3 benchmark; the
+p-value is essentially 0.
+
+## Exercise 5.13
+
+*(Skill Builder 3)* Find the p-value on a standard normal curve for each
+standardized test statistic.
+
+```{python}
+#| echo: false
+pd.Series({"(a) z = 0.84, right-tail": round(float(stats.norm.sf(0.84)), 4),
+           "(b) z = -2.38, left-tail": round(float(stats.norm.cdf(-2.38)), 4),
+           "(c) z = 2.25, two-tailed": round(float(2 * stats.norm.sf(2.25)), 4)}).to_string()
+```
+
+- **(a) p-value ≈ 0.2005** — the area to the right of 0.84.
+- **(b) p-value ≈ 0.0087** — the area to the left of −2.38.
+- **(c) p-value ≈ 0.0244** — *both* tails beyond ±2.25, i.e. twice the
+  one-tailed area.
+
+## Exercise 5.14
+
+*(Skill Builder 3)* Same task, new statistics.
+
+```{python}
+#| echo: false
+pd.Series({"(a) z = -1.08, left-tail": round(float(stats.norm.cdf(-1.08)), 4),
+           "(b) z = 4.12, right-tail": float(f"{stats.norm.sf(4.12):.2e}"),
+           "(c) z = -1.58, two-tailed": round(float(2 * stats.norm.cdf(-1.58)), 4)}).to_string()
+```
+
+- **(a) p-value ≈ 0.1401.**
+- **(b) p-value ≈ 0.0000** (about $1.9\times10^{-5}$, or 2 in 100000) — a
+  $z$ beyond 4 is essentially off the curve.
+- **(c) p-value ≈ 0.1141** — both tails beyond ±1.58.
+
+## Exercise 5.15
+
+*(Skill Builder 4)* For a $N(60, 10)$ distribution find (a) the area to the
+right of 65 and (b) the area to the left of 48.
+
+```{python}
+#| echo: false
+#| fig-cap: A N(60, 10) distribution with the area to the right of 65 and the area to the left of 48 shaded
+x = np.linspace(22, 98, 600)
+y = stats.norm.pdf(x, 60, 10)
+fig, ax = plt.subplots(figsize=(6, 2.8))
+ax.plot(x, y, color="#4c72b0", lw=2)
+ax.fill_between(x[x >= 65], y[x >= 65], color="#c44e52", alpha=0.65)
+ax.fill_between(x[x <= 48], y[x <= 48], color="#dd8452", alpha=0.65)
+for v in (48, 65):
+    ax.axvline(v, color="black", lw=1)
+ax.set_xlabel("Value")
+ax.set_ylabel("Density")
+plt.tight_layout()
+plt.show()
+pd.Series({"(a) Area right of 65": round(float(stats.norm.sf(65, 60, 10)), 4),
+           "(b) Area left of 48": round(float(stats.norm.cdf(48, 60, 10)), 4)}).to_string()
+```
+
+- **(a) ≈ 0.3085** — 65 is only half a standard deviation above the mean.
+- **(b) ≈ 0.1151** — 48 is 1.2 standard deviations below the mean.
+
+## Exercise 5.16
+
+*(Skill Builder 4)* For a $N(15, 5)$ distribution find (a) the area to the
+right of 28 and (b) the area to the left of 12.
+
+```{python}
+#| echo: false
+pd.Series({"(a) Area right of 28": round(float(stats.norm.sf(28, 15, 5)), 4),
+           "(b) Area left of 12": round(float(stats.norm.cdf(12, 15, 5)), 4)}).to_string()
+```
+
+- **(a) ≈ 0.0047** — 28 is $13/5 = 2.6$ standard deviations above the mean.
+- **(b) ≈ 0.2743** — 12 is only $3/5 = 0.6$ standard deviations below.
+
+## Exercise 5.17
+
+*(Skill Builder 4)* For a $N(160, 25)$ distribution find (a) the area to
+the right of 140 and (b) the area to the left of 200.
+
+```{python}
+#| echo: false
+pd.Series({"(a) Area right of 140": round(float(stats.norm.sf(140, 160, 25)), 4),
+           "(b) Area left of 200": round(float(stats.norm.cdf(200, 160, 25)), 4)}).to_string()
+```
+
+- **(a) ≈ 0.7881** — 140 lies *below* the mean, so most of the curve is
+  above it.
+- **(b) ≈ 0.9452** — 200 is $40/25 = 1.6$ standard deviations above the
+  mean.
+
+## Exercise 5.18
+
+**Effect of Organic Soybeans after 5 Days.** Testing
+$H_0\colon p_o = p_c$ vs $H_a\colon p_o > p_c$ (proportions of fruit flies
+alive after 5 days eating organic vs conventional soybeans);
+$\hat p_o - \hat p_c = 0.90 - 0.84 = 0.06$, $SE = 0.021$, 5% level.
+
+```{python}
+#| echo: false
+#| fig-cap: Standard normal curve with the right tail beyond z = 2.86 shaded
+z = zstat(0.06, 0, 0.021)
+zcurve(z, "right")
+ztest_row(0.06, 0, 0.021, "right").to_string()
+```
+
+$z = 0.06/0.021 = 2.86$ and **p-value ≈ 0.0021**. Since $0.0021 < 0.05$ we
+reject $H_0$: the difference in survival proportions is too large to
+attribute to random chance, so the data provide convincing evidence that
+fruit flies eating organic soybeans have a *higher* 5-day survival rate than
+those eating conventional soybeans.
+
+## Exercise 5.19
+
+**Effect of Organic Bananas after 25 Days.** Same hypotheses;
+$\hat p_o - \hat p_c = 0.42 - 0.40 = 0.02$, $SE = 0.031$, 5% level.
+
+```{python}
+#| echo: false
+ztest_row(0.02, 0, 0.031, "right").to_string()
+```
+
+$z = 0.02/0.031 = 0.65$ and **p-value ≈ 0.259**. The p-value is much larger
+than 0.05, so we do not reject $H_0$ — a 2-percentage-point advantage for
+organic bananas is entirely plausible by random chance, and the data provide
+no evidence that organic bananas improve 25-day survival.
+
+## Exercise 5.20
+
+**Effect of Organic Potatoes after 11 Days.** Same hypotheses;
+$\hat p_o - \hat p_c = 0.68 - 0.66 = 0.02$, $SE = 0.030$, 5% level.
+
+```{python}
+#| echo: false
+ztest_row(0.02, 0, 0.030, "right").to_string()
+```
+
+$z = 0.02/0.030 = 0.67$ and **p-value ≈ 0.253**. Again the p-value far
+exceeds 0.05: we fail to reject $H_0$ and conclude the data provide no
+evidence that organic potatoes raise the 11-day survival proportion.
+
+## Exercise 5.21
+
+**Effect of Organic Soybeans after 8 Days.** Same hypotheses;
+$\hat p_o - \hat p_c = 0.79 - 0.32 = 0.47$, $SE = 0.031$, 5% level.
+
+```{python}
+#| echo: false
+p = norm_p(zstat(0.47, 0, 0.031), "right")
+pd.Series({"z-statistic": round(float(zstat(0.47, 0, 0.031)), 2),
+           "p-value (normal)": float(f"{p:.2e}"),
+           "Significant at 5%?": "Yes" if p < 0.05 else "No"}).to_string()
+```
+
+$z = 0.47/0.031 = 15.16$ and **p-value ≈ $10^{-52}$ — effectively zero**. We
+reject $H_0$ overwhelmingly: a 47-percentage-point survival advantage some
+16 standard errors from the null is impossible to explain by chance, giving
+very strong evidence that organic soybeans dramatically improve 8-day
+survival.
+
+## Exercise 5.22
+
+**How Do You Get Your News?** In a 2010 random sample of $n = 1500$ US
+adults, 66% said television was one of their main news sources. Test
+whether more than 65% of all US adults used television as a main news
+source: $H_0\colon p = 0.65$ vs $H_a\colon p > 0.65$, with randomization
+$SE = 0.013$.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of sample proportions when p = 0.65, observed 0.66 shaded in the right tail
+r = np.random.default_rng(2026)
+boots = r.binomial(1500, 0.65, 10000) / 1500
+tail_plot(boots, 0.66, "right", "Randomization sample proportions", bins=24)
+pd.Series({"SE simulated": round(float(boots.std(ddof=1)), 4),
+           "SE from book": 0.013}).to_string()
+```
+
+```{python}
+#| echo: false
+ztest_row(0.66, 0.65, 0.013, "right").to_string()
+```
+
+$z = (0.66 - 0.65)/0.013 = 0.77$ and **p-value ≈ 0.221** — the simulation
+above (randomizing 1500 coin flips with $p = 0.65$, giving
+$SE \approx 0.012$) agrees: about 21% of randomization samples reach 0.66
+or higher. Since $0.221 > 0.05$ we fail to reject $H_0$: a sample result of
+66% is quite plausible when the true proportion is 65%, so the data provide
+**no evidence** that more than 65% of all US adults used television as a
+main news source.
+
+## Exercise 5.23
+
+**To Study Effectively, Test Yourself!** 118 students randomly split
+between re-reading Swahili–English word pairs and self-quizzing; on the
+final test a week later the recall proportions were 0.15 (reading) and 0.42
+(self-quiz). Test $H_0\colon p_q = p_r$ vs $H_a\colon p_q > p_r$ with
+$SE = 0.07$ for the difference in proportions.
+
+```{python}
+#| echo: false
+#| fig-cap: Standard normal curve with the right tail beyond z = 3.86 shaded
+z = zstat(0.42 - 0.15, 0, 0.07)
+zcurve(z, "right")
+ztest_row(0.42 - 0.15, 0, 0.07, "right").to_string()
+```
+
+$z = 0.27/0.07 = 3.86$ and **p-value ≈ 0.0001**. Since $0.0001 < 0.05$ we
+reject $H_0$: if self-quizzing and re-reading were equally effective, a
+sample advantage of 27 percentage points or more for the quizzers would
+occur only about 1 time in 10000. The data provide strong evidence that
+self-testing is the more effective study method.
+
+## Exercise 5.24
+
+**Penalty Shots in World Cup Soccer.** In 138 World Cup Finals penalty
+shots (1982–1994), goalkeepers guessed the kick direction correctly only
+41% of the time. Test $H_0\colon p = 0.5$ vs $H_a\colon p < 0.5$ (5%
+level), with randomization $SE = 0.043$.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of sample proportions when p = 0.5 for 138 penalty shots, observed 0.41 shaded in the left tail
+r = np.random.default_rng(2026)
+boots = r.binomial(138, 0.5, 10000) / 138
+tail_plot(boots, 0.41, "left", "Randomization sample proportions", bins=22)
+pd.Series({"SE simulated": round(float(boots.std(ddof=1)), 4),
+           "SE from book": 0.043}).to_string()
+```
+
+```{python}
+#| echo: false
+ztest_row(0.41, 0.5, 0.043, "left").to_string()
+```
+
+$z = (0.41 - 0.5)/0.043 = -2.09$ and **p-value ≈ 0.018**; simulating 138
+fair coin flips gives $SE \approx 0.042$ and about 1.6% of samples at or
+below 0.41 — consistent. Since $0.018 < 0.05$ we reject $H_0$: goalkeepers
+guess the correct direction significantly *less* than the 50% expected by
+random chance — consistent with kickers placing shots where keepers are
+not.
+
+## Exercise 5.25
+
+**Dogs Ignore an Unreliable Person.** Each of 26 dogs saw a reliable
+experimenter and (on another trial) an unreliable one: 16 of 26 followed
+the cue after reliable behavior, but only 7 of 26 after being misled. Test
+$H_0\colon p_R = p_U$ vs $H_a\colon p_R \ne p_U$ with $SE = 0.138$ (5%
+level).
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in proportions following the cue, reliable minus unreliable
+follow = np.repeat([1.0, 0.0], [16 + 7, 52 - 23])
+boots = shuffle_stats(follow, 26, lambda a, b: a.mean() - b.mean())
+tail_plot(boots, 16 / 26 - 7 / 26, "two",
+          "Difference in proportions following the cue (reliable - unreliable)")
+p_row("Difference (reliable - unreliable)", 16 / 26 - 7 / 26, boots, "two").to_string()
+```
+
+```{python}
+#| echo: false
+ztest_row(16 / 26 - 7 / 26, 0, 0.138, "two").to_string()
+```
+
+Sample statistic: $\hat p_R - \hat p_U = 16/26 - 7/26 = 9/26 \approx 0.346$.
+$z = 0.346/0.138 = 2.51$ and **p-value ≈ 0.012** (two-tailed); shuffling the
+52 dogs into two groups of 26 above gives about the same p-value. Since
+$0.012 < 0.05$ we reject $H_0$: dogs are significantly more likely to
+follow a cue from a person who has just behaved reliably than from one who
+just misled them.
+
+## Exercise 5.26
+
+**Exercise and Sex.** The `ExerciseHours` data give mean weekly exercise of
+9.4 hours for 30 female and 12.4 hours for 20 male statistics students;
+randomization of these data under $H_0\colon \mu_F = \mu_M$ gives
+$SE = 2.38$. Test $H_a\colon \mu_F < \mu_M$ at the 5% level.
+
+*Data:* `data/ch04/ExerciseHours.csv`, from
+<https://www.lock5stat.com/datasets3e/ExerciseHours.csv>:
+
+```{python}
+#| echo: false
+eh = pd.read_csv("data/ch04/ExerciseHours.csv")
+fem = eh.loc[eh.Sex == "F", "Exercise"].dropna().to_numpy(float)
+mal = eh.loc[eh.Sex == "M", "Exercise"].dropna().to_numpy(float)
+pd.Series({"Mean hours, female": round(fem.mean(), 1),
+           "Mean hours, male": round(mal.mean(), 1),
+           "n female / male": f"{len(fem)} / {len(mal)}"}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in mean exercise hours, female minus male, from shuffling the ExerciseHours data
+boots = shuffle_stats(np.concatenate([fem, mal]), len(fem),
+                      lambda a, b: a.mean() - b.mean())
+tail_plot(boots, fem.mean() - mal.mean(), "left",
+          "Difference in mean exercise hours (female - male)")
+p_row("Difference (female - male)", fem.mean() - mal.mean(), boots, "left").to_string()
+```
+
+```{python}
+#| echo: false
+ztest_row(fem.mean() - mal.mean(), 0, 2.38, "left").to_string()
+```
+
+$z = (9.4 - 12.4)/2.38 = -1.26$ and **p-value ≈ 0.104**. The shuffles of
+the real data above reproduce the book's $SE \approx 2.4$ and give a
+matching p-value. Since $0.104 > 0.05$ we fail to reject $H_0$: a mean
+difference of 3 hours is not unusual when labels are assigned at random,
+so the data do **not** show that female statistics students exercise less,
+on average, than male statistics students.
+
+## Exercise 5.27
+
+**Smile Leniency.** In the Smiles experiment (Data 4.5), smiling subjects
+were judged more leniently: $\bar x_s - \bar x_n = 4.91 - 4.12 = 0.79$, and
+the randomization distribution of differences in means (Figure 5.12) is
+bell-shaped with $SE \approx 0.393$. Test $H_0\colon \mu_s = \mu_n$ vs
+$H_a\colon \mu_s > \mu_n$ using a normal distribution.
+
+*Data:* `data/ch04/Smiles.csv`, from
+<https://www.lock5stat.com/datasets3e/Smiles.csv>:
+
+```{python}
+#| echo: false
+sm = pd.read_csv("data/ch04/Smiles.csv")
+s = sm.loc[sm.Group == "smile", "Leniency"].dropna().to_numpy(float)
+n = sm.loc[sm.Group == "neutral", "Leniency"].dropna().to_numpy(float)
+pd.Series({"Mean leniency, smile": round(s.mean(), 2),
+           "Mean leniency, neutral": round(n.mean(), 2),
+           "Observed difference": round(s.mean() - n.mean(), 2)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in mean leniency scores from shuffling the Smiles data, observed difference 0.79 marked
+boots = shuffle_stats(np.concatenate([s, n]), len(s),
+                      lambda a, b: a.mean() - b.mean())
+tail_plot(boots, s.mean() - n.mean(), "right",
+          "Difference in mean leniency (smile - neutral)")
+p_row("Difference (smile - neutral)", s.mean() - n.mean(), boots, "right").to_string()
+```
+
+```{python}
+#| echo: false
+ztest_row(s.mean() - n.mean(), 0, 0.393, "right").to_string()
+```
+
+$z = 0.79/0.393 = 2.01$ and **p-value ≈ 0.022** — the area to the right of
+$z = 2.01$ on a standard normal curve. Shuffling the real Smiles data above
+reproduces Figure 5.12 ($SE \approx 0.39$, red dots beyond 0.79) and gives
+the same p-value. **Interpretation:** if smiling had no effect on leniency,
+a difference in sample means of 0.79 or more would occur in only about 2%
+of random assignments — evidence at the 5% level that smiling increases the
+leniency shown to students accused of cheating.
+
+## Exercise 5.28
+
+**How Often Do You Use Cash?** In an April 2012 survey of 1000 American
+adults, 43% reported going an entire week without paying anything in cash.
+Test $H_0\colon p = 0.40$ vs $H_a\colon p > 0.40$ (5% level), with
+randomization $SE = 0.016$.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of sample proportions when p = 0.40, observed 0.43 shaded in the right tail
+r = np.random.default_rng(2026)
+boots = r.binomial(1000, 0.40, 10000) / 1000
+tail_plot(boots, 0.43, "right", "Randomization sample proportions", bins=22)
+pd.Series({"SE simulated": round(float(boots.std(ddof=1)), 4),
+           "SE from book": 0.016}).to_string()
+```
+
+```{python}
+#| echo: false
+ztest_row(0.43, 0.40, 0.016, "right").to_string()
+```
+
+$z = (0.43 - 0.40)/0.016 = 1.88$ and **p-value ≈ 0.030**; the simulation of
+1000 coin flips with $p = 0.40$ gives $SE \approx 0.016$ and about 2.8% of
+samples at 0.43 or above — consistent. Since $0.030 < 0.05$ we reject
+$H_0$: the data provide evidence that more than 40% of all American adults
+go a full week without paying cash.
+
+## Exercise 5.29
+
+**Incentives to Exercise: How Well Do They Work?** For 281 participants
+assigned to walk 7000 steps a day over 100 days, the mean number of days
+meeting the goal was 36.5 with $SE = 1.80$. Test $H_0\colon \mu = 35$ vs
+$H_a\colon \mu > 35$.
+
+```{python}
+#| echo: false
+#| fig-cap: Standard normal curve with the right tail beyond z = 0.83 shaded
+z = zstat(36.5, 35, 1.80)
+zcurve(z, "right")
+ztest_row(36.5, 35, 1.80, "right").to_string()
+```
+
+$z = (36.5 - 35)/1.80 = 0.83$ and **p-value ≈ 0.202**. Since $0.202 > 0.05$
+we fail to reject $H_0$: a sample mean 1.5 days above 35 is well within
+random-chance range, so the data provide no evidence that the mean number
+of days meeting the goal exceeds 35.
+
+## Exercise 5.30
+
+**Incentives to Exercise: What Works Best?** In the same study, the three
+non-loss incentive groups averaged 33.7 days meeting the goal, while the
+group that *lost* money for missed days averaged 45.0 days. Test
+$H_0\colon \mu_L = \mu_O$ vs $H_a\colon \mu_L \ne \mu_O$ with $SE = 4.14$
+for the difference in means.
+
+```{python}
+#| echo: false
+#| fig-cap: Standard normal curve with both tails beyond z = 2.73 shaded
+z = zstat(45.0 - 33.7, 0, 4.14)
+zcurve(z, "two")
+ztest_row(45.0 - 33.7, 0, 4.14, "two").to_string()
+```
+
+$z = (45.0 - 33.7)/4.14 = 2.73$ and **p-value ≈ 0.006** (two-tailed). Since
+$0.006 < 0.05$ we reject $H_0$: the difference of 11.3 days is too large to
+attribute to random assignment chance, providing evidence that the
+incentive structure matters — and specifically that people who stand to
+*lose* money meet the step goal on many more days than those with other
+incentives.
+
+## Exercise 5.31
+
+**Incentives for Quitting Smoking: Group or Individual?** Over 2000 smokers
+trying to quit were randomly assigned to a group program (148 of 1080 still
+abstaining at six months) or an individual program (120 of 990 successful).
+
+- **(a)** $H_0\colon p_G = p_I$ vs $H_a\colon p_G \ne p_I$, where $p_G$ and
+  $p_I$ are the proportions of all such smokers who would successfully quit
+  with a group vs an individual program. Statistic:
+  $\hat p_G - \hat p_I = 148/1080 - 120/990 \approx 0.137 - 0.121 = 0.016$.
+- **(b) Randomization p-value:** shuffle the 2070 participants (268
+  successes) into groups of 1080 and 990 (done below via the equivalent
+  hypergeometric draw); two-tailed **p-value ≈ 0.29**.
+- **(c)** The matching normal curve is $N(0,\ SE)$ with **mean 0** and
+  **SE ≈ 0.0147** (the SD of the randomization differences): the normal
+  p-value is about **0.28**.
+- **(d)** Using the randomization SE, $z = 0.0158/0.0147 = 1.07$, giving
+  **p-value ≈ 0.28** on the standard normal curve.
+- **(e)** All three p-values (0.29, 0.28, 0.28) agree: a difference of
+  0.016 is entirely typical of random assignment noise, so we fail to
+  reject $H_0$ — the data provide **no evidence of a difference** in
+  quitting success between group and individual programs.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in quitting proportions, group minus individual, with both tails shaded
+r = np.random.default_rng(2026)
+g1 = r.hypergeometric(268, 2070 - 268, 1080, 10000)  # successes in the group arm after shuffling
+boots = g1 / 1080 - (268 - g1) / 990
+se = boots.std(ddof=1)
+tail_plot(boots, 148 / 1080 - 120 / 990, "two",
+          "Difference in quitting proportions (group - individual)")
+pd.Series({"Statistic (pG - pI)": round(148 / 1080 - 120 / 990, 4),
+           "(b) Randomization p-value": round(float((np.abs(boots) >= abs(148 / 1080 - 120 / 990)).mean()), 4),
+           "(c) Randomization SE": round(float(se), 4),
+           "(c) Normal p-value, N(0, SE)": round(float(2 * stats.norm.sf(abs((148 / 1080 - 120 / 990) / se))), 4),
+           "(d) z-statistic": round(float((148 / 1080 - 120 / 990) / se), 3),
+           "(d) Standard-normal p-value": round(float(2 * stats.norm.sf(abs((148 / 1080 - 120 / 990) / se))), 4)}).to_string()
+```
+
+## Exercise 5.32
+
+**Incentives for Quitting Smoking: Do They Work?** With no incentive about
+0.06 of quitters are still abstaining six months later. In the least
+successful incentive group, 47 of 498 participants were abstaining.
+
+- **(a)** $H_0\colon p = 0.06$ vs $H_a\colon p > 0.06$, where $p$ is the
+  proportion who would successfully quit with even the smallest incentive.
+  Statistic: $\hat p = 47/498 \approx 0.094$.
+- **(b) Randomization p-value:** simulate 10000 samples of 498 people
+  quitting with $p = 0.06$; **p-value ≈ 0.002**.
+- **(c)** The matching normal curve is $N(0.06, SE)$ with **mean 0.06** and
+  **SE ≈ 0.0106** (the SD of the simulated proportions,
+  $\sqrt{0.06 \cdot 0.94/498}$): the p-value is
+  $1 - \Phi((0.0944 - 0.06)/0.0106) \approx$ **0.0006**.
+- **(d)** Using the randomization SE, $z = 0.0344/0.0106 = 3.23$, giving
+  **p-value ≈ 0.0006** on the standard normal curve.
+- **(e)** The p-values agree up to Monte Carlo wobble (the simulation
+  counts discrete successes): all are far below 0.05, so we reject $H_0$ —
+  strong evidence that even the smallest incentive raises six-month
+  abstinence above the 0.06 obtained with no incentive at all.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the abstinence proportion when p = 0.06 for 498 smokers, observed 0.094 shaded in the right tail
+r = np.random.default_rng(2026)
+boots = r.binomial(498, 0.06, 10000) / 498
+se = boots.std(ddof=1)
+tail_plot(boots, 47 / 498, "right", "Randomization sample proportions", bins=24)
+pd.Series({"Statistic": round(47 / 498, 4),
+           "(b) Randomization p-value": round(float((boots >= 47 / 498).mean()), 4),
+           "(c) Randomization SE": round(float(se), 4),
+           "(c) Normal p-value, N(0.06, SE)": round(float(stats.norm.sf((47 / 498 - 0.06) / se)), 5),
+           "(d) z-statistic": round(float((47 / 498 - 0.06) / se), 3),
+           "(d) Standard-normal p-value": round(float(stats.norm.sf((47 / 498 - 0.06) / se)), 5)}).to_string()
+```
+
+## Exercise 5.33
+
+**Lucky Numbers.** If lottery digits are chosen at random the last digit is
+7 with probability $p = 0.10$; among $n = 20$ people asked for a three-digit
+number, four ended in 7, so $\hat p = 0.20$. Figure 5.13 shows the
+randomization distribution of proportions for 5000 simulated samples under
+$H_0\colon p = 0.10$: mean 0.101, SD 0.067, right-tail area (beyond 0.200)
+equal to 0.137.
+
+```{python}
+#| echo: false
+#| fig-cap: Our randomization distribution for Exercise 5.33 with the N(0.101, 0.067) normal approximation overlaid, observed 0.20 marked
+sims = np.random.default_rng(2026).binomial(20, 0.10, 10000) / 20
+fig, ax = plt.subplots(figsize=(6, 3))
+sns.histplot(x=sims, bins=np.arange(-0.025, 0.475, 0.05), ax=ax,
+             color="#4c72b0", stat="density")
+xg = np.linspace(-0.05, 0.45, 400)
+ax.plot(xg, stats.norm.pdf(xg, 0.101, 0.067), color="black", lw=2)
+ax.axvline(0.20, color="#c44e52", lw=1.5)
+ax.set_xlabel("Randomization sample proportions")
+ax.set_ylabel("Density")
+plt.tight_layout()
+plt.show()
+pd.Series({"Simulated mean": round(float(sims.mean()), 3),
+           "Simulated SD": round(float(sims.std(ddof=1)), 3),
+           "Right-tail p, simulation": round(float((sims >= 0.20).mean()), 3),
+           "(a) z-statistic": round(float(zstat(0.20, 0.101, 0.067)), 2),
+           "(b) p-value, normal": round(float(stats.norm.sf(zstat(0.20, 0.101, 0.067))), 4)}).to_string()
+```
+
+- **(a)** Using the sample proportion $\hat p = 0.20$ and the standard
+  error from the randomization distribution:
+  $$z=\frac{0.20-0.101}{0.067}\approx 1.48$$
+- **(b)** The upper-tail area beyond $z = 1.48$ on a standard normal curve
+  is **p-value ≈ 0.070**.
+- **(c)** The randomization distribution gives a right-tail p-value of
+  **0.137** — roughly double the normal answer (our own 10000-sample
+  simulation above reproduces the figure: mean 0.100, SD 0.068, right tail
+  0.135). The discrepancy arises because the large-sample conditions fail
+  badly here: with $n = 20$ and $p_0 = 0.10$, a sample averages only
+  $np_0 = 2$ successes, so the randomization distribution takes just the
+  few values $0, 0.05, \ldots, 0.45$ — highly discrete and visibly
+  right-skewed (see the tall spikes and the poor normal fit above). A bell
+  curve is simply not a good model for this distribution, and the normal
+  p-value understates how often $\hat p \ge 0.20$ occurs by chance. This is
+  the section's built-in warning: use the normal approximation only when
+  the sample is large enough for the randomization distribution to be
+  reasonably normal.
+
+:::

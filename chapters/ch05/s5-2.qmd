@@ -1,0 +1,705 @@
+---
+execute-dir: project
+title: "Chapter 5 · Section 5.2"
+subtitle: "Confidence Intervals Using Normal Distributions — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 5.2 of Lock⁵ turns a bootstrap distribution into a one-line formula.
+Whenever a bootstrap (or randomization) distribution for a statistic is
+approximately **normal**, a confidence interval needs no percentiles at all:
+
+$$\text{Sample statistic} \pm z^* \cdot SE$$
+
+where $SE$ is the standard error of the statistic (read off the bootstrap
+distribution, or given), and **$z^*$ is the endpoint of a standard normal
+distribution** that leaves the confidence level $C$ between $-z^*$ and
+$+z^*$ — **$z^* = 1.96$ for 95% confidence**, 1.645 for 90%, 2.326 for 98%,
+2.576 for 99%; any other level comes from `norm.ppf(1 - (1 - C)/2)`. For a
+single proportion the large-sample standard error is
+$\sqrt{\hat p(1-\hat p)/n}$ and for a single mean it is $s/\sqrt n$ (Chapter 6
+develops these shortcut formulas in earnest); in this section the SE is simply
+provided or estimated by bootstrapping. The normal-based interval and the
+bootstrap **percentile interval** answer the same question two ways: they
+agree closely when the bootstrap distribution is roughly symmetric and
+normal-shaped, and drift apart when it is skewed — the percentile interval
+follows the skew while the normal-based interval is always symmetric about the
+statistic. The normal approximation is justified by **large samples**: for
+proportions, counts of successes and failures comfortably above 10 and $n$
+large; for means, $n \ge 30$ or data that are not strongly skewed.
+The exercises below are from *Statistics: Unlocking the Power of Data*
+(Lock⁵, 3rd ed., pp. 426–429). Skill Builders 5.34–5.35 find $z^*$ endpoints
+for unusual confidence levels; 5.36–5.41 build
+$\text{statistic} \pm z^* \cdot SE$ intervals from supplied standard errors;
+the applied exercises 5.42–5.48 compute and interpret intervals for real
+studies; 5.49–5.52 work the Online Dating Survey (Data 5.2); and the
+technology exercises 5.53–5.57 compare percentile and normal-based intervals
+on real Lock⁵ datasets. Every bootstrap below uses 10000 resamples (5000
+where the book specifies) with seed 2026, so all intervals are reproducible.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+from scipy import stats
+sns.set_theme(style="whitegrid")
+
+def zstar(conf):
+    """Standard normal endpoint z* for a confidence level (0.95 -> 1.96)."""
+    return float(stats.norm.ppf(1 - (1 - conf) / 2))
+
+def ci_row(label, stat, se, conf, digits=3):
+    """One-row summary of a normal-based interval: statistic ± z*·SE."""
+    z = zstar(conf)
+    m = z * se
+    return pd.Series({label: round(float(stat), digits),
+                      "Confidence level": f"{conf:.0%}",
+                      "z*": round(z, 3),
+                      "SE": se,
+                      "Margin of error": round(m, digits),
+                      "Interval": f"({stat - m:.{digits}f}, {stat + m:.{digits}f})"})
+```
+
+::: {.panel-tabset}
+
+## Exercise 5.34
+
+*(Skill Builder 1)* Find $z^*$ for (a) an 80% interval for a proportion,
+(b) an 84% interval for a slope, (c) a 92% interval for a standard deviation.
+$z^*$ depends only on the confidence level, not on the parameter: it is the
+value with area $C$ between $-z^*$ and $z^*$ on a standard normal curve, i.e.
+area $(1+C)/2$ to the left of $z^*$.
+
+```{python}
+#| echo: false
+pd.DataFrame({"Confidence level": ["80%", "84%", "92%"],
+              "z* = norm.ppf(1 - (1 - C)/2)":
+              [round(zstar(c / 100), 3) for c in (80, 84, 92)]}).to_string(index=False)
+```
+
+- **(a) $z^* = 1.28$** (80%: 0.90 to the left).
+- **(b) $z^* = 1.41$** (84%: 0.92 to the left).
+- **(c) $z^* = 1.75$** (92%: 0.96 to the left).
+
+## Exercise 5.35
+
+*(Skill Builder 1)* (a) 86% interval for a correlation, (b) 94% interval for
+a difference in proportions, (c) 96% interval for a proportion.
+
+```{python}
+#| echo: false
+pd.DataFrame({"Confidence level": ["86%", "94%", "96%"],
+              "z* = norm.ppf(1 - (1 - C)/2)":
+              [round(zstar(c / 100), 3) for c in (86, 94, 96)]}).to_string(index=False)
+```
+
+- **(a) $z^* = 1.48$.**
+- **(b) $z^* = 1.88$.**
+- **(c) $z^* = 2.05$.**
+
+## Exercise 5.36
+
+*(Skill Builder 2)* 95% interval for a proportion: $n = 100$,
+$\hat p = 0.43$, $SE = 0.05$.
+
+```{python}
+#| echo: false
+ci_row("Sample proportion", 0.43, 0.05, 0.95).to_string()
+```
+
+$\hat p \pm 1.96(0.05) = 0.43 \pm 0.098$. **We are 95% confident that the
+population proportion $p$ is between 0.332 and 0.528.**
+
+## Exercise 5.37
+
+*(Skill Builder 2)* 95% interval for a mean: $n = 50$, $\bar x = 72$,
+$s = 12$, $SE = 1.70$.
+
+```{python}
+#| echo: false
+ci_row("Sample mean", 72, 1.70, 0.95).to_string()
+```
+
+$\bar x \pm 1.96(1.70) = 72 \pm 3.33$. **We are 95% confident that the
+population mean $\mu$ is between 68.67 and 75.33.**
+
+## Exercise 5.38
+
+*(Skill Builder 2)* 90% interval for a mean: $n = 30$, $\bar x = 23.1$,
+$s = 5.7$, $SE = 1.04$.
+
+```{python}
+#| echo: false
+ci_row("Sample mean", 23.1, 1.04, 0.90).to_string()
+```
+
+$\bar x \pm 1.645(1.04) = 23.1 \pm 1.71$. **We are 90% confident that $\mu$ is
+between 21.39 and 24.81.**
+
+## Exercise 5.39
+
+*(Skill Builder 2)* 99% interval for a proportion: $n = 200$,
+$\hat p = 0.78$, $SE = 0.03$.
+
+```{python}
+#| echo: false
+ci_row("Sample proportion", 0.78, 0.03, 0.99).to_string()
+```
+
+$\hat p \pm 2.576(0.03) = 0.78 \pm 0.077$. **We are 99% confident that $p$ is
+between 0.703 and 0.857.**
+
+## Exercise 5.40
+
+*(Skill Builder 2)* 95% interval for a difference in proportions
+$p_1 - p_2$: $n_1 = 50$ with $\hat p_1 = 0.68$ and $n_2 = 80$ with
+$\hat p_2 = 0.61$; $SE = 0.085$.
+
+```{python}
+#| echo: false
+ci_row("Difference in proportions", 0.68 - 0.61, 0.085, 0.95).to_string()
+```
+
+$(\hat p_1 - \hat p_2) \pm 1.96(0.085) = 0.07 \pm 0.167$. **We are 95%
+confident that $p_1 - p_2$ is between −0.097 and 0.237.** The interval
+contains 0, so $p_1$ could equal $p_2$ (or even be smaller).
+
+## Exercise 5.41
+
+*(Skill Builder 2)* 95% interval for a difference in means
+$\mu_1 - \mu_2$: $n_1 = 100$ with $\bar x_1 = 256$, $s_1 = 51$ and
+$n_2 = 120$ with $\bar x_2 = 242$, $s_2 = 47$; $SE = 6.70$.
+
+```{python}
+#| echo: false
+ci_row("Difference in means", 256 - 242, 6.70, 0.95).to_string()
+```
+
+$(\bar x_1 - \bar x_2) \pm 1.96(6.70) = 14 \pm 13.1$. **We are 95% confident
+that $\mu_1 - \mu_2$ is between 0.87 and 27.13.** The interval lies entirely
+above 0, so group 1 plausibly has the larger mean.
+
+## Exercise 5.42
+
+**What Is Your Sleep Position?** Of 1000 UK adults asked their starting sleep
+position, 41% said the fetal position; the standard error of the estimate is
+$SE = 0.016$. Find and interpret a 95% interval for the proportion of all UK
+adults who start sleep in this position.
+
+```{python}
+#| echo: false
+ci_row("Proportion, fetal position", 0.41, 0.016, 0.95).to_string()
+```
+
+$0.41 \pm 1.96(0.016) = 0.41 \pm 0.031$. **We are 95% confident that between
+0.379 and 0.441 — about 38% to 44% — of all UK adults fall asleep starting in
+the fetal position.** With $n = 1000$ and roughly 410 successes, the
+large-sample conditions for using the normal distribution are comfortably met.
+
+## Exercise 5.43
+
+**Hearing Loss in Teenagers.** In NHANES, 19.5% of 1771 participants aged 12
+to 19 had some hearing loss; the bootstrap standard error for the proportion
+is $SE = 0.009$. Find and interpret a 90% interval for the proportion of all
+teenagers with some hearing loss.
+
+```{python}
+#| echo: false
+ci_row("Proportion with hearing loss", 0.195, 0.009, 0.90).to_string()
+```
+
+$0.195 \pm 1.645(0.009) = 0.195 \pm 0.0148$. **We are 90% confident that
+between 0.180 and 0.210 — 18.0% to 21.0% — of all teenagers have some hearing
+loss.**
+
+## Exercise 5.44
+
+**Where Is the Best Seat on the Plane?** A survey of 1000 air travelers found
+60% prefer a window seat, with $SE = 0.015$. Find and interpret a 99%
+interval for the proportion of all air travelers who prefer a window seat.
+
+```{python}
+#| echo: false
+ci_row("Proportion preferring window", 0.60, 0.015, 0.99).to_string()
+```
+
+$0.60 \pm 2.576(0.015) = 0.60 \pm 0.039$. **We are 99% confident that between
+0.561 and 0.639 — about 56% to 64% — of all air travelers prefer a window
+seat.**
+
+## Exercise 5.45
+
+**Average Age for ICU Patients.** The `ICUAdmissions` dataset ($n = 200$) has
+mean age 57.55 years with $SE = 1.42$. Find and interpret a 95% interval for
+the mean age of all ICU patients.
+
+```{python}
+#| echo: false
+ci_row("Mean age", 57.55, 1.42, 0.95).to_string()
+```
+
+*Data:* `data/ch03/ICUAdmissions.csv`, from
+<https://www.lock5stat.com/datasets3e/ICUAdmissions.csv> — the data confirm
+the book's summary statistics:
+
+```{python}
+#| echo: false
+icu = pd.read_csv("data/ch03/ICUAdmissions.csv")
+age = icu.Age.to_numpy(float)
+pd.Series({"n": len(age),
+           "Sample mean age": round(age.mean(), 2),
+           "SE = s / sqrt(n)": round(age.std(ddof=1) / np.sqrt(len(age)), 2)}).to_string()
+```
+
+$57.55 \pm 1.96(1.42) = 57.55 \pm 2.78$. **We are 95% confident that the mean
+age of all ICU patients is between 54.77 and 60.33 years** (about 55 to 60).
+The sample mean 57.55 (our data give 57.54) lies at the center, as it should.
+
+## Exercise 5.46
+
+**Smoke-Free Legislation and Asthma.** Monthly records of the annualized
+percent change in childhood asthma admissions in Scotland, before and after
+the March 2006 smoke-free legislation: before, admissions were increasing at
+a mean rate of 5.2% per year ($SE = 0.7$); after, decreasing at 18.2% per
+year ($SE = 1.79$).
+
+```{python}
+#| echo: false
+z95 = zstar(0.95)
+pairs = [("Before legislation", 5.2, 0.7), ("After legislation", -18.2, 1.79)]
+pd.DataFrame({"Period": [p[0] for p in pairs],
+              "Statistic (% per year)": [p[1] for p in pairs],
+              "SE": [p[2] for p in pairs],
+              "Margin of error": [round(z95 * p[2], 3) for p in pairs],
+              "95% CI": [f"({p[1] - z95 * p[2]:.2f}, {p[1] + z95 * p[2]:.2f})"
+                         for p in pairs]}).to_string(index=False)
+```
+
+- **(a)** Before: $5.2 \pm 1.96(0.7) = 5.2 \pm 1.37$. **We are 95% confident
+  that, before the legislation, childhood asthma admissions were increasing
+  at a mean rate between 3.83 and 6.57 percent per year.**
+- **(b)** After: $-18.2 \pm 1.96(1.79) = -18.2 \pm 3.51$. **We are 95%
+  confident that, after the legislation, admissions were decreasing at a mean
+  rate between 14.69 and 21.71 percent per year** (interval from −21.71 to
+  −14.69).
+- **(c) An observational study.** No random assignment — Scotland simply
+  passed the legislation and admissions were recorded before and after.
+- **(d) No.** Because the study is observational, confounding variables
+  (other policy changes, weather, medical practice, secular trends) could
+  contribute to the dramatic change; the evidence is compelling but cause and
+  effect cannot be concluded from this design alone.
+
+## Exercise 5.47
+
+**How Much More Effective Is It to Test Yourself in Studying?** Students who
+self-quiz recall a greater proportion of words than students who only read:
+$\hat p_Q = 0.42$ vs $\hat p_R = 0.15$, with $SE \approx 0.07$ for the
+difference. Find and interpret a 99% interval for $p_Q - p_R$.
+
+```{python}
+#| echo: false
+ci_row("Difference in proportions", 0.42 - 0.15, 0.07, 0.99).to_string()
+```
+
+$(\hat p_Q - \hat p_R) \pm 2.576(0.07) = 0.27 \pm 0.18$. **We are 99%
+confident that the proportion of correctly recalled words is between 0.090
+and 0.450 higher for self-quiz students than for reading-only students** —
+the self-testing advantage could be anywhere from about 9 to 45 percentage
+points.
+
+## Exercise 5.48
+
+**Incentives to Exercise: How Much More Effective Is It to Lose Money?**
+Overweight participants who *lost* money for missing an exercise goal met the
+goal an average of 45.0 days (of 100) vs 33.7 days for those who *won* money
+or received other incentives; the bootstrap SE for the difference in means is
+4.14. Find and interpret a 95% interval for the difference in mean days.
+
+```{python}
+#| echo: false
+ci_row("Difference in means (days)", 45.0 - 33.7, 4.14, 0.95).to_string()
+```
+
+$(45.0 - 33.7) \pm 1.96(4.14) = 11.3 \pm 8.1$. **We are 95% confident that
+people facing a financial loss meet their exercise goal, on average, between
+3.19 and 19.41 more days out of 100 than people facing an equivalent
+financial gain.**
+
+## Exercise 5.49
+
+**18- to 24-year-olds.** *(More on the Online Dating Survey, Data 5.2: a July
+2015 random sample of US adults on whether they had ever used online
+dating.)* Of 194 young adults aged 18 to 24, 53 had used online dating;
+$SE = 0.032$. Find a 95% interval for the proportion of all US adults ages
+18–24 who have used online dating.
+
+```{python}
+#| echo: false
+n, succ = 194, 53
+phat = succ / n
+r = np.random.default_rng(2026)
+simse = (r.binomial(n, phat, 5000) / n).std()
+ci_row("Proportion, ages 18-24", phat, 0.032, 0.95).to_string()
+```
+
+```{python}
+#| echo: false
+pd.Series({"phat = 53/194": round(phat, 4),
+           "Formula SE sqrt(p(1-p)/n)": round(np.sqrt(phat * (1 - phat) / n), 4),
+           "Simulated SE (5000 samples)": round(simse, 4),
+           "SE given in the exercise": 0.032}).to_string()
+```
+
+$0.273 \pm 1.96(0.032) = 0.273 \pm 0.063$. **We are 95% confident that
+between 0.210 and 0.336 — about 21% to 34% — of all US adults ages 18 to 24
+have used online dating.** The three SE checks agree (0.032 each way), and
+with roughly 53 successes and 141 failures the normal approximation is fine.
+
+## Exercise 5.50
+
+**55- to 64-year-olds.** Same survey: of 411 adults aged 55 to 64, 50 had
+used online dating; $SE = 0.016$. Find a 95% interval for the proportion of
+all US adults ages 55–64 who have used online dating.
+
+```{python}
+#| echo: false
+n2, succ2 = 411, 50
+phat2 = succ2 / n2
+r = np.random.default_rng(2026)
+simse2 = (r.binomial(n2, phat2, 5000) / n2).std()
+ci_row("Proportion, ages 55-64", phat2, 0.016, 0.95).to_string()
+```
+
+```{python}
+#| echo: false
+pd.Series({"phat = 50/411": round(phat2, 4),
+           "Formula SE sqrt(p(1-p)/n)": round(np.sqrt(phat2 * (1 - phat2) / n2), 4),
+           "Simulated SE (5000 samples)": round(simse2, 4),
+           "SE given in the exercise": 0.016}).to_string()
+```
+
+$0.122 \pm 1.96(0.016) = 0.122 \pm 0.031$. **We are 95% confident that
+between 0.090 and 0.153 — about 9% to 15% — of all US adults ages 55 to 64
+have used online dating.** The two intervals (this and Exercise 5.49) do not
+overlap: online dating is far more common among the young.
+
+## Exercise 5.51
+
+**College-Educated or Not?** Same survey: online-dating use by education
+level (Table 5.2, entered directly).
+
+```{python}
+#| echo: false
+pd.DataFrame({"": ["Yes", "No", "Total"],
+              "College": [157, 666, 823],
+              "High school": [70, 565, 635],
+              "Total": [227, 1231, 1458]}).to_string(index=False)
+```
+
+```{python}
+#| echo: false
+pc, phs = 157 / 823, 70 / 635
+ci_row("College - high school or less", pc - phs, 0.019, 0.99).to_string()
+```
+
+```{python}
+#| echo: false
+pd.Series({"College graduates": round(pc, 4),
+           "High school or less": round(phs, 4),
+           "Sample difference": round(pc - phs, 4),
+           "Formula SE (for comparison)": round(
+               np.sqrt(pc * (1 - pc) / 823 + phs * (1 - phs) / 635), 4)}).to_string()
+```
+
+- **(a)** College graduates: $157/823 = 0.191$. High school or less:
+  $70/635 = 0.110$. Sample difference:
+  $\hat p_C - \hat p_H = 0.081$.
+- **(b)** $0.081 \pm 2.576(0.019) = 0.081 \pm 0.049$. **We are 99% confident
+  that the difference in the proportions using online dating,
+  $p_C - p_H$, is between 0.032 and 0.129.** (The formula SE,
+  $\sqrt{\hat p_C(1-\hat p_C)/823 + \hat p_H(1-\hat p_H)/635} = 0.019$,
+  matches the given SE.)
+- **(c) No.** The 99% interval lies entirely above 0, so a difference of 0 is
+  not in the range of plausible values: college graduates are more likely to
+  have used online dating than those with a high school degree or less.
+
+## Exercise 5.52
+
+**Comparing Males to Females.** Same survey: 17% of the men and 14% of the
+women said they had used online dating.
+
+```{python}
+#| echo: false
+ci_row("Men - women", 0.17 - 0.14, 0.016, 0.99).to_string()
+```
+
+- **(a)** $(0.17 - 0.14) \pm 2.576(0.016) = 0.03 \pm 0.041$. **We are 99%
+  confident that the difference in the proportions using online dating,
+  men minus women, is between −0.011 and 0.071.**
+- **(b) Yes, it is plausible that there is no difference.** The interval
+  contains 0, so "men and women are equally likely to use online dating" is
+  among the plausible values — the observed 3-point gap is well within
+  random-sampling noise at this sample size.
+
+## Exercise 5.53
+
+**Prices of Used Mustangs.** Data 3.4: $n = 25$ Mustangs offered for sale on
+the Internet (`MustangPrice`, `Price` in $1000s). Construct a 95% interval
+for the mean price two ways — (a) percentiles of a bootstrap distribution and
+(b) a normal-based interval with the bootstrap SE — and compare.
+
+*Data:* `data/ch03/MustangPrice.csv`, from
+<https://www.lock5stat.com/datasets3e/MustangPrice.csv>:
+
+```{python}
+#| echo: false
+mp = pd.read_csv("data/ch03/MustangPrice.csv")
+price = mp.Price.to_numpy(float)
+r = np.random.default_rng(2026)
+bmean = np.array([r.choice(price, len(price), replace=True).mean()
+                  for _ in range(10000)])
+se = bmean.std()
+lo_p, hi_p = np.percentile(bmean, [2.5, 97.5])
+lo_n, hi_n = price.mean() - 1.96 * se, price.mean() + 1.96 * se
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the mean Mustang price with the percentile and normal-based 95 percent intervals marked
+fig, ax = plt.subplots(figsize=(7, 3.2))
+sns.histplot(x=bmean, bins=40, ax=ax, color="#4c72b0")
+ax.axvline(price.mean(), color="black", lw=1.5)
+for v in (lo_p, hi_p):
+    ax.axvline(v, color="#c44e52", ls="--", lw=1.2)
+for v in (lo_n, hi_n):
+    ax.axvline(v, color="#55a868", ls=":", lw=1.5)
+ax.set_xlabel("Bootstrap sample means ($1000s)")
+plt.tight_layout()
+plt.show()
+pd.Series({"Observed mean": round(price.mean(), 3),
+           "Bootstrap SE (10000 samples)": round(se, 3),
+           "(a) 95% percentile interval": f"({lo_p:.2f}, {hi_p:.2f})",
+           "(b) 95% normal interval": f"({lo_n:.2f}, {hi_n:.2f})"}).to_string()
+```
+
+- **(a)** The 2.5th and 97.5th percentiles of the 10000 bootstrap means give
+  **(11.93, 20.52)** — roughly \$11,900 to \$20,500.
+- **(b)** $15.98 \pm 1.96(2.20)$ gives **(11.67, 20.29)** — roughly \$11,700
+  to \$20,300.
+- **Comparison:** the two intervals agree closely (the normal one is shifted
+  slightly left, because the bootstrap distribution is mildly left-skewed),
+  so the normal approximation works well here: both say the mean price of all
+  such Internet Mustangs is plausibly anywhere from about \$11,700 to
+  \$20,500.
+
+## Exercise 5.54
+
+**Predicting Price of Used Mustangs from Miles Driven.** Same 25 Mustangs:
+predict `Price` (in $1000s) from `Miles` (in 1000s). (a) Find the regression
+slope. (b) Bootstrap the slope and use the normal distribution to find a 98%
+interval for the population slope.
+
+```{python}
+#| echo: false
+xm, ym = mp.Miles.to_numpy(float), mp.Price.to_numpy(float)
+dm = np.column_stack([xm, ym])
+r = np.random.default_rng(2026)
+bslope = np.empty(10000)
+for i in range(10000):
+    s = dm[r.choice(len(dm), len(dm), replace=True)]
+    bslope[i] = np.polyfit(s[:, 0], s[:, 1], 1)[0]
+slope = np.polyfit(xm, ym, 1)[0]
+se_s = bslope.std()
+lo_p98, hi_p98 = np.percentile(bslope, [1, 99])
+z98 = zstar(0.98)
+lo_n98, hi_n98 = slope - z98 * se_s, slope + z98 * se_s
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the regression slope for Price on Miles with the percentile and normal-based 98 percent intervals marked
+fig, ax = plt.subplots(figsize=(7, 3.2))
+sns.histplot(x=bslope, bins=40, ax=ax, color="#4c72b0")
+ax.axvline(slope, color="black", lw=1.5)
+for v in (lo_p98, hi_p98):
+    ax.axvline(v, color="#c44e52", ls="--", lw=1.2)
+for v in (lo_n98, hi_n98):
+    ax.axvline(v, color="#55a868", ls=":", lw=1.5)
+ax.set_xlabel("Bootstrap sample slopes ($1000s per 1000 miles)")
+plt.tight_layout()
+plt.show()
+pd.Series({"(a) Slope": round(slope, 4),
+           "Bootstrap SE (10000 samples)": round(se_s, 4),
+           "(b) 98% normal interval": f"({lo_n98:.3f}, {hi_n98:.3f})",
+           "98% percentile interval (comparison)": f"({lo_p98:.3f}, {hi_p98:.3f})"}).to_string()
+```
+
+- **(a) Slope = −0.219**: each additional 1000 miles on the odometer is
+  associated with a predicted price about \$219 lower.
+- **(b)** With the bootstrap SE ≈ 0.030 and $z^* = 2.33$ for 98% confidence:
+  $-0.219 \pm 2.326(0.030)$ gives **(−0.289, −0.148)** — we are 98% confident
+  that each extra 1000 miles lowers the mean price of all such Mustangs by
+  between about \$148 and \$289. The percentile interval (−0.297, −0.150)
+  agrees well, since the bootstrap slope distribution is nearly symmetric.
+
+## Exercise 5.55
+
+**Correlation between Time and Distance in Commuting.** For the $n = 500$
+Atlanta commutes in `CommuteAtlanta`, the correlation between `Distance`
+(miles) and `Time` (minutes) is $r = 0.807$. (a) Bootstrap to estimate the SE
+of sample correlations. (b) Assuming the bootstrap correlations are normal,
+find and interpret a 90% interval for the population correlation.
+
+*Data:* `data/ch03/CommuteAtlanta.csv`, from
+<https://www.lock5stat.com/datasets3e/CommuteAtlanta.csv>:
+
+```{python}
+#| echo: false
+ca = pd.read_csv("data/ch03/CommuteAtlanta.csv")
+dc = ca[["Distance", "Time"]].to_numpy(float)
+r = np.random.default_rng(2026)
+bcorr = np.array([np.corrcoef(dc[r.choice(len(dc), len(dc), replace=True)].T)[0, 1]
+                  for _ in range(10000)])
+rhat = ca.Distance.corr(ca.Time)
+se_c = bcorr.std()
+lo_p90, hi_p90 = np.percentile(bcorr, [5, 95])
+z90 = zstar(0.90)
+lo_n90, hi_n90 = rhat - z90 * se_c, rhat + z90 * se_c
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the correlation between Distance and Time with the percentile and normal-based 90 percent intervals marked
+fig, ax = plt.subplots(figsize=(7, 3.2))
+sns.histplot(x=bcorr, bins=40, ax=ax, color="#4c72b0")
+ax.axvline(rhat, color="black", lw=1.5)
+for v in (lo_p90, hi_p90):
+    ax.axvline(v, color="#c44e52", ls="--", lw=1.2)
+for v in (lo_n90, hi_n90):
+    ax.axvline(v, color="#55a868", ls=":", lw=1.5)
+ax.set_xlabel("Bootstrap sample correlations")
+plt.tight_layout()
+plt.show()
+pd.Series({"(a) Bootstrap SE (10000 samples)": round(se_c, 4),
+           "(b) 90% normal interval": f"({lo_n90:.3f}, {hi_n90:.3f})",
+           "90% percentile interval (comparison)": f"({lo_p90:.3f}, {hi_p90:.3f})"}).to_string()
+```
+
+- **(a)** Resampling the 500 (Distance, Time) pairs with replacement 10000
+  times and recording each correlation gives **SE ≈ 0.036**.
+- **(b)** $0.807 \pm 1.645(0.036) = 0.807 \pm 0.059$ gives **(0.747, 0.866)**.
+  **We are 90% confident that the correlation between distance and time of
+  Atlanta commutes is between 0.75 and 0.87** — a strong positive association:
+  longer commutes take longer, though much of the scatter (traffic, route,
+  mode) keeps it well below 1. The percentile interval (0.741, 0.860) is
+  very close.
+
+## Exercise 5.56
+
+**Facebook.** A 2019 Pew random sample of US adults: the sample proportion
+using Facebook was $\hat p = 0.69$ based on 1502 respondents.
+
+- **(a)** Describe how to construct a bootstrap distribution to estimate the
+  SE of the proportion: write each of the 1502 sample responses (about 69%
+  "yes, use Facebook", 31% "no") on a slip, **draw 1502 slips with
+  replacement** to form one bootstrap sample, record the proportion of yes
+  answers, and repeat many times (say 5000); the standard deviation of those
+  5000 bootstrap proportions estimates the SE. (This is equivalent to
+  simulating 5000 samples of 1502 coin flips with success probability 0.69,
+  whose SD matches $\sqrt{0.69(0.31)/1502}$.)
+- **(b)** One such distribution (5000 samples) is normal with SE = 0.012.
+  Find a 99% interval for the proportion of all US adults (in 2019) who use
+  Facebook.
+
+```{python}
+#| echo: false
+r = np.random.default_rng(2026)
+simsfb = r.binomial(1502, 0.69, 5000) / 1502
+ci_row("Proportion using Facebook", 0.69, 0.012, 0.99).to_string()
+```
+
+```{python}
+#| echo: false
+pd.Series({"Formula SE sqrt(0.69 * 0.31 / 1502)":
+           round(np.sqrt(0.69 * 0.31 / 1502), 4),
+           "Simulated SE (5000 samples)": round(simsfb.std(), 4),
+           "SE used in part (b)": 0.012}).to_string()
+```
+
+- **(b)** $0.69 \pm 2.576(0.012) = 0.69 \pm 0.031$ gives **(0.659, 0.721)**.
+  **We are 99% confident that between 65.9% and 72.1% of US adults used
+  Facebook in 2019.** (Our 5000-sample simulation gives SE = 0.012, matching
+  the book's distribution; the formula SE is 0.0119.)
+
+## Exercise 5.57
+
+**Malevolent Uniforms in Football.** Figure 5.23 (reproduced below from our
+own bootstrap) shows a bootstrap distribution of correlations between penalty
+yards and uniform malevolence for the 28 NFL teams in `MalevolentUniformsNFL`:
+mean 0.397, SE 0.205, 99% percentile interval −0.224 to 0.788. The original
+sample correlation is $r = 0.43$.
+
+*Data:* `data/ch05/MalevolentUniformsNFL.csv`, from
+<https://www.lock5stat.com/datasets3e/MalevolentUniformsNFL.csv>:
+
+```{python}
+#| echo: false
+mu = pd.read_csv("data/ch05/MalevolentUniformsNFL.csv")
+du = mu[["NFL_Malevolence", "ZPenYds"]].to_numpy(float)
+r = np.random.default_rng(2026)
+bmu = np.empty(5000)
+for i in range(5000):
+    s = du[r.choice(28, 28, replace=True)]
+    bmu[i] = np.corrcoef(s.T)[0, 1]
+rhat_u = np.corrcoef(du.T)[0, 1]
+se_u = bmu.std()
+lo_p99, hi_p99 = np.percentile(bmu, [0.5, 99.5])
+z99 = zstar(0.99)
+lo_n99, hi_n99 = rhat_u - z99 * 0.205, rhat_u + z99 * 0.205
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the correlation between uniform malevolence and penalty yards for 28 NFL teams with the percentile and normal-based 99 percent intervals marked
+fig, ax = plt.subplots(figsize=(7, 3.2))
+sns.histplot(x=bmu, bins=45, ax=ax, color="#4c72b0")
+ax.axvline(rhat_u, color="black", lw=1.5)
+for v in (lo_p99, hi_p99):
+    ax.axvline(v, color="#c44e52", ls="--", lw=1.2)
+for v in (lo_n99, hi_n99):
+    ax.axvline(v, color="#55a868", ls=":", lw=1.5)
+ax.set_xlabel("Bootstrap sample correlations")
+plt.tight_layout()
+plt.show()
+pd.Series({"Observed r": round(rhat_u, 3),
+           "Bootstrap mean / median": f"({bmu.mean():.3f}, {np.median(bmu):.3f})",
+           "Bootstrap SE (5000 samples)": round(se_u, 3),
+           "SE shown in Figure 5.23": 0.205,
+           "(a) 99% normal interval": f"({lo_n99:.3f}, {hi_n99:.3f})",
+           "99% percentile interval (comparison)": f"({lo_p99:.3f}, {hi_p99:.3f})"}).to_string()
+```
+
+- **(a)** Using the original $r = 0.43$ and the SE = 0.205 from Figure 5.23
+  with $z^* = 2.576$ for 99% confidence:
+  $0.43 \pm 2.576(0.205) = 0.43 \pm 0.528$ gives **(−0.098, 0.958)**. (Our
+  own 5000-sample bootstrap reproduces the figure: mean 0.397, SE ≈ 0.207,
+  percentile interval (−0.221, 0.792) vs the book's (−0.224, 0.788).)
+- **(b)** The normal-based interval (−0.098, 0.958) is symmetric about
+  $r = 0.43$, while the percentile interval (−0.224, 0.788) is not — it is
+  shifted noticeably left. **The reason is skew: the bootstrap distribution
+  has a long left tail** (its mean, 0.397, sits below the median ≈ 0.42, and
+  the dots trail down past −0.4). A normal model, which is symmetric,
+  cannot capture that left tail, so the symmetric $z^*$ interval misses it:
+  it cuts off the low end too early and stretches the high end too far. When
+  the bootstrap distribution is skewed, the percentile interval is the more
+  trustworthy of the two.
+
+:::

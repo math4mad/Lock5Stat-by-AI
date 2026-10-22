@@ -97,6 +97,10 @@ website:
             text: "Unit B · Synthesis (B.1–B.44)"
           - href: chapters/synthesis/unit-b-2.qmd
             text: "Unit B · Synthesis (B.45–B.82)"
+          - href: chapters/ch05/s5-1.qmd
+            text: "Ch. 5 · Section 5.1"
+          - href: chapters/ch05/s5-2.qmd
+            text: "Ch. 5 · Section 5.2"
 
 format:
   html:
