@@ -1,0 +1,848 @@
+---
+execute-dir: project
+title: "Chapter 9 · Section 9.1"
+subtitle: "Inference for Slope and Correlation — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 9.1 brings inference to **two quantitative variables**. A simple
+linear model writes the response as $Y=\beta_0+\beta_1X+\epsilon$, where the
+errors $\epsilon$ are independent $N(0,\sigma_\epsilon)$ values. The sample
+slope $b_1$ (with standard error SE from regression output) and the sample
+correlation $r$ both get **t-distributions with $n-2$ degrees of freedom**:
+
+$$\text{slope CI: } b_1\pm t^*\cdot SE,\qquad
+\text{slope test: } t=b_1/SE,\qquad
+\text{correlation test: } t=\frac{r\sqrt{n-2}}{\sqrt{1-r^2}}.$$
+
+The t-statistic for the slope is **always identical** to the t-statistic for
+the correlation, so the two tests are interchangeable, and
+$R^2=r^2$ is the proportion of variability in $Y$ explained by $X$. We also
+check conditions (linearity, consistent error variability, no big outliers)
+on scatterplots. Below we compute every interval, statistic and p-value with
+`scipy.stats`, and — per this project's convention — verify each applied
+test with a **randomization test** (10000 shuffles of the response, seed
+2026) and each confidence interval where feasible with a bootstrap.
+Exercises are from *Statistics: Unlocking the Power of Data* (Lock⁵, 3rd ed.,
+pp. 626–632): Skill Builders 9.1–9.14 read computer output, form slope
+confidence intervals and test correlations; the applied exercises 9.15–9.33
+use correlation matrices, depression scores, Verbal SAT and GPA, mice weight
+gain, Facebook friends and brain density, Florida lake mercury, NFL
+pre-season wins, honeybee colonies, California homes, country life
+expectancy, golf rounds, NBA standings, and world birth rates.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+from scipy import stats
+sns.set_theme(style="whitegrid")
+
+def corr_test(r, n, alt="two-sided"):
+    """t-test for correlation: returns (t, df, p-value)."""
+    t = r * np.sqrt(n - 2) / np.sqrt(1 - r ** 2)
+    df = n - 2
+    if alt == "two-sided":
+        p = 2 * stats.t.sf(abs(t), df)
+    elif alt == "greater":
+        p = stats.t.sf(t, df)
+    else:
+        p = stats.t.cdf(t, df)
+    return round(float(t), 3), df, float(f"{p:.3g}")
+
+def slope_ci(b1, se, n, conf=0.95):
+    """Confidence interval for a slope with n-2 df."""
+    df = n - 2
+    tstar = stats.t.ppf((1 + conf) / 2, df)
+    lo, hi = b1 - tstar * se, b1 + tstar * se
+    return round(float(lo), 4), round(float(hi), 4), round(float(tstar), 3)
+
+def reg_fit(x, y):
+    """Fit least squares: returns Series with slope, SE, t, p, r, R2, s_e."""
+    x = np.asarray(x, float); y = np.asarray(y, float)
+    res = stats.linregress(x, y)
+    n = len(x)
+    fit = res.intercept + res.slope * x
+    se_e = np.sqrt(((y - fit) ** 2).sum() / (n - 2))
+    t = res.slope / res.stderr
+    p = 2 * stats.t.sf(abs(t), n - 2)
+    return pd.Series({
+        "n": n, "intercept": round(res.intercept, 4),
+        "slope": round(res.slope, 4), "SE(slope)": round(res.stderr, 4),
+        "t": round(t, 3), "p-value": float(f"{p:.3g}"),
+        "r": round(res.rvalue, 4), "R2": round(res.rvalue ** 2, 4),
+        "s_e": round(se_e, 4)})
+
+def perm_slope(x, y, alt="two-sided", reps=10000, seed=2026):
+    """Randomization test for the slope: shuffle the response."""
+    x = np.asarray(x, float); y = np.asarray(y, float)
+    obs = stats.linregress(x, y).slope
+    r = np.random.default_rng(seed)
+    sims = np.empty(reps)
+    for i in range(reps):
+        sims[i] = stats.linregress(x, r.permutation(y)).slope
+    if alt == "greater":
+        p = (sims >= obs).mean()
+    elif alt == "less":
+        p = (sims <= obs).mean()
+    else:
+        p = (np.abs(sims) >= abs(obs)).mean()
+    return sims, obs, float(p)
+
+def scatter_line(x, y, xlabel, ylabel, figsize=(5.5, 3.4)):
+    """Scatterplot with the least squares line."""
+    x = np.asarray(x, float); y = np.asarray(y, float)
+    res = stats.linregress(x, y)
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.scatter(x, y, color="#4c72b0", alpha=0.75)
+    xs = np.linspace(x.min(), x.max(), 50)
+    ax.plot(xs, res.intercept + res.slope * xs, color="#c44e52", lw=2)
+    ax.set_xlabel(xlabel); ax.set_ylabel(ylabel)
+    plt.tight_layout(); plt.show()
+
+def sim_hist(sims, obs, xlabel="Simulated slopes", bins=40, figsize=(6, 3)):
+    """Histogram of simulated statistics with the observed one marked."""
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.histplot(x=sims, bins=bins, ax=ax, color="#4c72b0")
+    mask = np.abs(sims) >= abs(obs)
+    if mask.any():
+        sns.histplot(x=sims[mask], bins=bins, ax=ax, color="#c44e52")
+    ax.axvline(obs, color="black", lw=1.5)
+    ax.set_xlabel(xlabel); ax.set_ylabel("Simulated statistics")
+    plt.tight_layout(); plt.show()
+```
+
+::: {.panel-tabset}
+
+## Exercise 9.1
+
+*(Skill Builder 1)* Estimate $\beta_0$ and $\beta_1$ and give the least
+squares line from the Minitab-style output.
+
+**Answer:** $b_0 = 29.266 \approx 29.3$ and $b_1 = 4.2969 \approx 4.30$, so
+$$\widehat{Y} = 29.3 + 4.30\,X.$$
+
+## Exercise 9.2
+
+*(Skill Builder 1)* Same task for the output "The regression equation is
+$Y = 808 - 3.66\,A$".
+
+**Answer:** $b_0 = 807.79 \approx 808$ and $b_1 = -3.659 \approx -3.66$, so
+$$\widehat{Y} = 808 - 3.66\,A.$$
+
+## Exercise 9.3
+
+*(Skill Builder 1)* Same task for the R-style output (predictor: Score).
+
+**Answer:** $b_0 = 77.44$ and $b_1 = -15.904 \approx -15.9$, so
+$$\widehat{Y} = 77.44 - 15.9 \cdot \text{Score}.$$
+
+## Exercise 9.4
+
+*(Skill Builder 1)* Same task for the output with predictor Dose.
+
+**Answer:** $b_0 = 7.277$ and $b_1 = -0.3560$, so
+$$\widehat{Y} = 7.277 - 0.356 \cdot \text{Dose}.$$
+
+## Exercise 9.5
+
+*(Skill Builder 2)* Identify the sample slope, hypotheses, p-value, and
+conclusion (5% level) for the model $\widehat{Y} = 89.4 - 8.20X$
+(SE of slope = 0.9563).
+
+```{python}
+#| echo: false
+pd.Series({"Sample slope": -8.1952, "SE": 0.9563,
+           "H0": "beta_1 = 0", "Ha": "beta_1 != 0",
+           "p-value": 0.000}).to_string()
+```
+
+The slope is $b_1 = -8.1952 \approx -8.20$, with $H_0\colon\beta_1 = 0$ vs
+$H_a\colon\beta_1 \neq 0$. The output shows **p-value = 0.000 < 0.05**, so we
+reject $H_0$: the model is effective (X is an effective predictor of Y).
+
+## Exercise 9.6
+
+*(Skill Builder 2)* Same task for the model with slope $-0.02413$
+(SE = 0.02018, P = 0.245).
+
+**Answer:** $b_1 = -0.02413 \approx -0.0241$; $H_0\colon\beta_1=0$ vs
+$H_a\colon\beta_1\neq 0$; **p-value = 0.245 > 0.05**, so we do not reject
+$H_0$ — the model is not shown to be effective.
+
+## Exercise 9.7
+
+*(Skill Builder 2)* Same task for the Dose model (slope $-0.3560$,
+SE = 0.2007, p = 0.087).
+
+**Answer:** $b_1 = -0.3560$; $H_0\colon\beta_1=0$ vs $H_a\colon\beta_1\neq0$;
+**p-value = 0.087 > 0.05**, so we do not reject $H_0$ at the 5% level — no
+convincing evidence that Dose is an effective predictor.
+
+## Exercise 9.8
+
+*(Skill Builder 2)* Same task for the model with slope $-3.659$
+(SE = 1.199, p = 0.006).
+
+**Answer:** $b_1 = -3.659$; $H_0\colon\beta_1=0$ vs $H_a\colon\beta_1\neq0$;
+**p-value = 0.006 < 0.05**, so we reject $H_0$ — A is an effective predictor
+of Y.
+
+## Exercise 9.9
+
+*(Skill Builder 3)* 95% CI for the slope of the model in Exercise 9.5
+($b_1=-8.1952$, SE $=0.9563$), $n=24$.
+
+```{python}
+#| echo: false
+lo, hi, ts = slope_ci(-8.1952, 0.9563, 24)
+pd.Series({"df": 22, "t*": ts, "CI low": lo, "CI high": hi}).to_string()
+```
+
+With $df = 24-2 = 22$ and $t^* = 2.074$: $-8.1952 \pm 2.074(0.9563)
+= -8.20 \pm 1.98 = $ **(−10.18, −6.21)**. We are 95% sure the population
+slope is between −10.18 and −6.21.
+
+## Exercise 9.10
+
+*(Skill Builder 3)* 95% CI for the slope of the Dose model in Exercise 9.7
+($b_1=-0.3560$, SE $=0.2007$), $n=30$.
+
+```{python}
+#| echo: false
+lo, hi, ts = slope_ci(-0.3560, 0.2007, 30)
+pd.Series({"df": 28, "t*": ts, "CI low": lo, "CI high": hi}).to_string()
+```
+
+With $df = 28$, $t^*=2.048$: $-0.3560 \pm 2.048(0.2007) = $ **(−0.767,
+0.055)**. The interval **includes 0**, consistent with the non-significant
+p-value (0.087) in Exercise 9.7.
+
+## Exercise 9.11
+
+*(Skill Builder 4)* Test for a positive correlation: $r = 0.35$, $n = 30$.
+
+```{python}
+#| echo: false
+t, df, p = corr_test(0.35, 30, "greater")
+pd.Series({"t": t, "df": df, "p-value (one-tail)": p}).to_string()
+```
+
+$H_0\colon\rho=0$ vs $H_a\colon\rho>0$. $t = 0.35\sqrt{28}/\sqrt{1-0.35^2}
+= 1.98$ with $df=28$, **p-value = 0.029 < 0.05**: significant evidence of a
+positive correlation.
+
+## Exercise 9.12
+
+*(Skill Builder 4)* Test for a linear association: $r = 0.28$, $n = 10$.
+
+```{python}
+#| echo: false
+t, df, p = corr_test(0.28, 10, "two-sided")
+pd.Series({"t": t, "df": df, "p-value (two-tail)": p}).to_string()
+```
+
+$t = 0.28\sqrt{8}/\sqrt{1-0.28^2} = 0.83$ with $df=8$, **p-value = 0.433**:
+no evidence of a linear association — with only 10 points even $r=0.28$ is
+easily explained by chance.
+
+## Exercise 9.13
+
+*(Skill Builder 4)* Test for a linear association: $r = 0.28$, $n = 100$.
+
+```{python}
+#| echo: false
+t, df, p = corr_test(0.28, 100, "two-sided")
+pd.Series({"t": t, "df": df, "p-value (two-tail)": p}).to_string()
+```
+
+$t = 0.28\sqrt{98}/\sqrt{1-0.28^2} = 2.89$ with $df=98$, **p-value = 0.005**:
+the *same* correlation is highly significant with a larger sample —
+strength of evidence depends on $n$ as well as $r$.
+
+## Exercise 9.14
+
+*(Skill Builder 4)* Test for a negative correlation: $r = -0.41$, $n = 18$.
+
+```{python}
+#| echo: false
+t, df, p = corr_test(-0.41, 18, "less")
+pd.Series({"t": t, "df": df, "p-value (one-tail)": p}).to_string()
+```
+
+$H_a\colon\rho<0$. $t = -0.41\sqrt{16}/\sqrt{1-0.41^2} = -1.80$ with
+$df=16$, **p-value = 0.046 < 0.05**: significant evidence of a negative
+correlation.
+
+## Exercise 9.15
+
+Student Survey: Correlation Matrix — Exercise, TV, Height, Weight, GPA
+(top number = $r$, bottom = two-tail p-value).
+
+```{python}
+#| echo: false
+pairs = {("Exercise","TV"):(0.010,0.852), ("Exercise","Height"):(0.118,0.026),
+         ("Exercise","Weight"):(0.118,0.026), ("Exercise","GPA"):(-0.159,0.003),
+         ("TV","Height"):(-0.129,0.181), ("TV","Weight"):(-0.165,0.002),
+         ("TV","GPA"):(-0.129,0.017), ("Height","Weight"):(0.619,0.000),
+         ("Height","GPA"):(-0.116,0.033), ("Weight","GPA"):(-0.217,0.000)}
+pd.DataFrame([(a,b,r,p) for (a,b),(r,p) in pairs.items()],
+             columns=["Var 1","Var 2","r","p-value"]).to_string(index=False)
+```
+
+**(a)** Most strongly positive: **Height & Weight, $r = 0.619$,
+p-value $\approx 0.000$**. Taller students tend to weigh more.
+
+**(b)** Most strongly negative: **Weight & GPA, $r = -0.217$,
+p-value $= 0.000$**. Heavier students tend to have slightly lower GPAs.
+
+**(c)** Pairs **not** convincing at 5% (p-value > 0.05): **Exercise & TV
+(p = 0.852), TV & Height (p = 0.181), TV & Weight (p = 0.165)** — all three
+involve TV.
+
+## Exercise 9.16
+
+NBA Players: Correlation Matrix — Age, Points, FTPct, Rebounds, Steals
+($n=193$).
+
+```{python}
+#| echo: false
+pairs = {("Age","Points"):(-0.072,0.319), ("Age","FTPct"):(0.165,0.022),
+         ("Age","Rebounds"):(-0.102,0.157), ("Age","Steals"):(0.008,0.912),
+         ("Points","FTPct"):(0.310,0.000), ("Points","Rebounds"):(0.533,0.000),
+         ("Points","Steals"):(0.527,0.000), ("FTPct","Rebounds"):(-0.136,0.060),
+         ("FTPct","Steals"):(0.042,0.564), ("Rebounds","Steals"):(0.371,0.000)}
+pd.DataFrame([(a,b,r,p) for (a,b),(r,p) in pairs.items()],
+             columns=["Var 1","Var 2","r","p-value"]).to_string(index=False)
+```
+
+**(a)** Most strongly positive: **Points & Rebounds, $r = 0.533$,
+p-value $= 0.000$** — players who score more tend to grab more rebounds.
+
+**(b)** Most strongly negative: **FTPct & Rebounds, $r = -0.136$,
+p-value $= 0.060$** — better free-throw shooters tend to get slightly fewer
+rebounds.
+
+**(c)** Pairs **not** convincing at 5% (p > 0.05): **Age & Points (0.319),
+Age & Rebounds (0.157), Age & Steals (0.912), FTPct & Rebounds (0.060),
+FTPct & Steals (0.564)**.
+
+## Exercise 9.17
+
+Healthy Lifestyle Helps Healthy Aging: a 1-point improvement in lifestyle
+score (0–8) is associated with 0.93 more disease-free years.
+
+**(a)** Explanatory $X$ = healthy lifestyle score; response $Y$ = number of
+disease-free life-years.
+
+**(b)** The quoted phrase refers to **(iv) the slope of the regression
+line** ($b_1 = 0.93$).
+
+**(c)** **No.** This is an observational study; association does not imply
+causation (confounding variables such as income or healthcare access could
+drive both).
+
+**(d)** The slope predicts $8 \times 0.93 = $ **7.44 more disease-free
+years** for a score of 8 versus 0.
+
+## Exercise 9.18
+
+Predicting One Depression Score from Another: $\widehat{CESD} =
+4.97 + 0.7923\,\text{DASS}$ (SE of slope = 0.0951, $n=75$).
+
+**(a)** For DASS = 20:
+
+```{python}
+#| echo: false
+fit = 4.97 + 0.7923 * 20
+pd.Series({"Predicted CESD": round(fit, 3),
+           "Residual (27 - fit)": round(27 - fit, 3)}).to_string()
+```
+
+Predicted CESD $= 4.97 + 0.7923(20) = 20.82$; residual $= 27 - 20.82 =
+\mathbf{6.18}$ (the person's actual score is 6.18 above the line).
+
+**(b)** Slope $b_1 = 0.7923$: each additional DASS point is associated with
+about **0.79 more points on the CESD scale**, on average.
+
+**(c)** $t = 0.7923/0.0951 = \mathbf{8.33}$, **p-value = 0.000 < 0.05**:
+very strong evidence that DASS is an effective predictor of CESD.
+
+**(d)** **R² = 48.75%**: about 48.75% of the variability in CESD scores is
+explained by variability in DASS scores.
+
+## Exercise 9.19
+
+Verbal SAT as a Predictor of GPA: $\widehat{GPA} = 2.03 +
+0.00189\,\text{VerbalSAT}$ (SE = 0.0002709, S = 0.373).
+
+**(a)** The scatterplot shows a linear, roughly symmetric band with no big
+outliers or curvature — no serious concerns about conditions.
+
+**(b)** For VerbalSAT = 650:
+
+```{python}
+#| echo: false
+pd.Series({"Predicted GPA": round(2.0336 + 0.0018929 * 650, 3)}).to_string()
+```
+
+$\widehat{GPA} = 2.03 + 0.00189(650) = \mathbf{3.26}$.
+
+**(c)** Slope = 0.00189: each additional Verbal SAT point is associated with
+about **0.0019 more GPA points** (≈ 0.19 GPA points per 100 SAT points).
+
+**(d)** $t = 6.99$, **p-value $\approx 0.000$**: strong evidence that
+VerbalSAT is an effective predictor of college GPA.
+
+**(e)** **R² = 12.5%** — only about 12.5% of GPA variability is explained by
+Verbal SAT; useful but far from the whole story.
+
+## Exercise 9.20
+
+Does When Food Is Eaten Affect Weight Gain? $r = 0.740$ (p = 0.000),
+$\widehat{BMGain} = 1.11 + 0.127\,\text{DayPct}$ (SE = 0.02315, n = 27).
+
+**(a)** The scatterplot (Figure 9.8) is roughly linear with fairly
+consistent scatter and no big outliers — no strong concerns.
+
+**(b)** $r = \mathbf{0.740}$, **p-value = 0.000**: strong evidence of a
+positive linear association between percent of calories eaten during the day
+and body mass gain.
+
+**(c)** Line: $\widehat{BMGain} = 1.11 + 0.127\,\text{DayPct}$; for
+DayPct = 50:
+
+```{python}
+#| echo: false
+pd.Series({"Predicted BMGain": round(1.113 + 0.12727 * 50, 3)}).to_string()
+```
+
+Predicted gain $= 1.113 + 0.12727(50) = \mathbf{7.48}$ grams.
+
+**(d)** Slope = 0.127: each extra 1% of calories eaten during the day is
+associated with about **0.13 g more weight gain**, on average.
+
+**(e)** Slope p-value = **0.000**: strong evidence that DayPct is an
+effective predictor of BMGain.
+
+**(f)** The two p-values are **the same (both 0.000)** — the slope and
+correlation tests are always equivalent.
+
+**(g)** **R² = 54.7%**: about 54.7% of the variability in body mass gain is
+explained by the percent of calories eaten during the day.
+
+**(h)** $r^2 = 0.740^2 = 0.5476 \approx \mathbf{54.8\%}$ — matches R² = 54.7%
+(up to round-off).
+
+## Exercise 9.21
+
+Social Networks and Brain Structure ($n = 40$): $r = 0.436$ (p = 0.005),
+$\widehat{FBfriends} = 366.64 + 82.45\,\text{GMdensity}$.
+
+**(a)** The GMdensity values are z-scores, so we look for |z| > 2:
+
+```{python}
+#| echo: false
+fb = pd.read_csv("data/ch09/FacebookFriends.csv")
+out = fb[fb.GMdensity.abs() > 2]
+out.to_string(index=False)
+```
+
+**One** participant has a grey-matter density z-score beyond 2: it is
+**below** the mean ($z = -2.1$) with about **140** Facebook friends.
+
+**(b)** The scatterplot shows a positive but very scattered linear pattern
+with no obvious curvature — conditions are reasonably met.
+
+**(c)** $r = \mathbf{0.436}$, **p-value = 0.005 < 0.05**: significant
+evidence of a positive linear association between grey matter density and
+number of Facebook friends.
+
+**(d)** Line: $\widehat{FBfriends} = 366.64 + 82.45\,\text{GMdensity}$:
+
+```{python}
+#| echo: false
+pd.Series({f"z = {z}": round(366.64 + 82.45 * z, 1)
+           for z in [0, 1, -1]}).to_string()
+```
+
+At z = 0: **367** friends; z = +1: **449**; z = −1: **284**.
+
+**(e)** Slope p-value = **0.005** — identical to the correlation test
+p-value, as always.
+
+**(f)** **R² = 19.0%**: grey matter density explains about 19% of the
+variability in Facebook friends.
+
+## Exercise 9.22
+
+Inference on the Slope of Facebook Friends and the Brain ($n = 40$).
+
+**(a)** Slope $b_1 = \mathbf{82.45}$, SE $= \mathbf{27.58}$.
+
+**(b)** Test and 95% CI, verified against the data with a randomization
+test:
+
+```{python}
+#| echo: false
+fit = reg_fit(fb.GMdensity, fb.FBfriends)
+lo, hi, ts = slope_ci(82.45, 27.58, 40)
+pd.Series({"t": 82.45 / 27.58, "df": 38,
+           "p-value": 2 * stats.t.sf(82.45 / 27.58, 38),
+           "t* (95%, df=38)": ts, "CI low": lo, "CI high": hi}).to_string()
+```
+
+```{python}
+#| include: false
+sims, obs, p_perm = perm_slope(fb.GMdensity, fb.FBfriends, "two-sided")
+```
+
+$H_0\colon\beta_1 = 0$ vs $H_a\colon\beta_1 \neq 0$:
+$t = 82.45/27.58 = \mathbf{2.99}$, $df = 38$, **p-value = 0.005 < 0.05** —
+reject $H_0$; GMdensity is an effective predictor of FBfriends. The
+randomization test on the raw data agrees (p $\approx$ `{python} f"{p_perm:.3f}"`).
+
+```{python}
+#| echo: false
+sim_hist(sims, obs)
+```
+
+**(c)** 95% CI: $82.45 \pm 2.025(27.58) = $ **(26.6, 138.3)**. We are 95%
+sure the population slope is between about 27 and 138 extra Facebook
+friends per unit of GMdensity z-score.
+
+## Exercise 9.23
+
+Using pH in Lakes as a Predictor of Mercury in Fish ($n = 53$):
+$\widehat{AvgMercury} = 1.5309 - 0.1523\,\text{pH}$ (SE = 0.03031).
+
+**(a)** For pH = 6.0:
+
+```{python}
+#| echo: false
+pd.Series({"Predicted AvgMercury": round(1.5309 - 0.1523 * 6, 3)}).to_string()
+```
+
+$\widehat{AvgMercury} = 1.5309 - 0.1523(6) = \mathbf{0.617}$.
+
+**(b)** Slope = −0.152: each 1-unit increase in pH is associated with about
+**0.15 less average mercury** in fish, on average.
+
+**(c)** $t = -5.02$, **p-value $\approx 0.000$**: strong evidence that pH is
+an effective (negative) predictor of mercury.
+
+**(d)** 95% CI, verified with a randomization test:
+
+```{python}
+#| echo: false
+lo, hi, ts = slope_ci(-0.1523, 0.03031, 53)
+pd.Series({"df": 51, "t*": ts, "CI low": lo, "CI high": hi}).to_string()
+```
+
+$-0.1523 \pm 2.008(0.03031) = $ **(−0.213, −0.091)**: we are 95% sure each
+extra pH unit lowers average mercury by between 0.09 and 0.21.
+
+```{python}
+#| include: false
+lakes = pd.read_csv("data/ch09/FloridaLakes.csv")
+sims, obs, p_perm = perm_slope(lakes.pH, lakes.AvgMercury, "two-sided")
+```
+
+The randomization test on the raw FloridaLakes data gives
+p $\approx$ `{python} f"{p_perm:.4f}"`, matching the t-test.
+
+**(e)** **R² = 33.1%**: pH explains about a third of the variability in
+average mercury levels.
+
+## Exercise 9.24
+
+Alkalinity in Lakes as a Predictor of Mercury in Fish (Figure 9.10).
+
+**Answer:** The scatterplot is clearly **curved** (a descending, concave
+pattern, steep at low alkalinity and flattening at high alkalinity) — a
+departure from the linearity condition. The variability also appears
+smaller at higher alkalinity. A linear model would be a poor fit; a
+transformation or nonlinear model would be preferable, so we hesitate to
+fit a simple linear model.
+
+## Exercise 9.25
+
+Rain and Hantavirus in Mice: "Precipitation accounted for 79% of the
+variation in prevalence."
+
+**(a)** 79% is **R²**, the coefficient of determination — the proportion of
+variability in hantavirus prevalence explained by precipitation.
+
+**(b)** Response $Y$ = hantavirus prevalence; explanatory $X$ =
+precipitation.
+
+**(c)** $r = \sqrt{0.79} = \mathbf{0.889}$ (positive, since the association
+is described as increasing).
+
+## Exercise 9.26
+
+NFL Pre-Season vs Regular Season Wins: $r = 0.118$ over 15 years
+($n = 480$ team-seasons).
+
+**(a)** $H_0\colon\rho = 0$ vs $H_a\colon\rho > 0$ (positive association).
+
+**(b)–(c)** Test and a randomization check:
+
+```{python}
+#| echo: false
+t, df, p = corr_test(0.118, 480, "greater")
+pd.Series({"t": t, "df": df, "p-value (one-tail)": p}).to_string()
+```
+
+$t = 0.118\sqrt{478}/\sqrt{1-0.118^2} = \mathbf{2.60}$, $df = 478$,
+**p-value = 0.005 < 0.05**. Reject $H_0$: there is statistically significant
+evidence of a positive association between pre-season and regular-season
+wins — though with $r = 0.118$ the association is very weak in practical
+terms (R² ≈ 1.4%), so pre-season success is a poor forecast of regular-
+season success.
+
+## Exercise 9.27
+
+Is the Honeybee Population Shrinking? $r = -0.41$ for colonies vs year
+($n = 18$ years).
+
+**(a)** Test and randomization-style t:
+
+```{python}
+#| echo: false
+t, df, p = corr_test(-0.41, 18, "two-sided")
+pd.Series({"t": t, "df": df, "p-value (two-tail)": p}).to_string()
+```
+
+$t = -0.41\sqrt{16}/\sqrt{1-0.41^2} = \mathbf{-1.80}$, $df = 16$,
+**p-value = 0.091 > 0.05**: not significant evidence that the number of
+honeybee colonies is linearly related to year (treated as a sample of
+years).
+
+**(b)** $R^2 = (-0.41)^2 = \mathbf{16.8\%}$ of the variability in colony
+counts is explained by year.
+
+## Exercise 9.28
+
+Homes for Sale: association between number of bathrooms and bedrooms
+(HomesForSaleCA, $n = 30$).
+
+**(a)** $H_0\colon\rho = 0$ vs $H_a\colon\rho > 0$ (positive association).
+
+**(b)–(d)** From the data, with a randomization check:
+
+```{python}
+#| include: false
+homes = pd.read_csv("data/ch09/HomesForSaleCA.csv")
+r_bb = homes.Beds.corr(homes.Baths)
+sims, obs, p_perm = perm_slope(homes.Baths, homes.Beds, "greater")
+```
+
+```{python}
+#| echo: false
+pd.Series({"r (Beds vs Baths)": round(r_bb, 3),
+           "t": corr_test(r_bb, 30, "greater")[0],
+           "df": 28,
+           "p-value (one-tail)": corr_test(r_bb, 30, "greater")[2],
+           "randomization p-value": round(p_perm, 4)}).to_string()
+```
+
+The sample correlation is $r = \mathbf{0.35}$; $t = 1.98$, $df = 28$,
+**p-value = 0.029** (randomization agrees, p ≈ `{python} f"{p_perm:.3f}"`).
+Reject
+$H_0$: significant evidence that houses with more bedrooms tend to have
+more bathrooms in this California sample.
+
+## Exercise 9.29
+
+Life Expectancy vs % of expenditure on health care (SampCountries, $n=50$).
+
+**(a)** Cases: the **50 countries** in the sample.
+
+**(b)** Scatterplot with regression line:
+
+```{python}
+#| include: false
+samp = pd.read_csv("data/ch09/SampCountries.csv")
+d = samp[["Health", "LifeExpectancy"]].dropna()
+```
+
+```{python}
+#| echo: false
+scatter_line(d.Health, d.LifeExpectancy, "% expenditure on health care",
+             "Life expectancy")
+```
+
+The trend is roughly linear with fairly even scatter — no serious concerns
+about the conditions.
+
+**(c)–(g)** Full regression output from the data:
+
+```{python}
+#| echo: false
+fit929 = reg_fit(d.Health, d.LifeExpectancy)
+fit929.to_string()
+```
+
+```{python}
+#| include: false
+sims, obs, p_perm = perm_slope(d.Health, d.LifeExpectancy, "greater")
+lo, hi, ts = slope_ci(fit929["slope"], fit929["SE(slope)"], int(fit929["n"]))
+```
+
+**(c)** Slope = **0.81**: each extra 1% spent on health care is associated
+with about **0.81 more years** of life expectancy, on average.
+
+**(d)** 95% CI: $0.81 \pm 2.010(0.192) = $ **(0.43, 1.20)** — we are 95%
+sure the population slope is between 0.43 and 1.20 years per 1%.
+
+**(e)** $t = 4.23$, **p-value $\approx 0.0001$** (randomization agrees, p ≈ `{python} f"{p_perm:.3f}"`): Health **is** a significant predictor of life
+expectancy.
+
+**(f)** The stated population slope 0.760 **is** inside the 95% CI
+(0.43, 1.20) — yes, captured.
+
+**(g)** **R² = 27.2%**: health expenditure explains about 27% of the
+variability in life expectancy among these countries.
+
+## Exercise 9.30
+
+Fluoride and IQ: match the p-values (0.33 and 0.02) to the CIs.
+
+**(a)** Boys: CI $-8.38$ to $-0.60$ **excludes 0** → this goes with
+**p-value = 0.02** (significant).
+
+**(b)** Girls: CI $-2.51$ to $7.36$ **includes 0** → this goes with
+**p-value = 0.33** (not significant).
+
+## Exercise 9.31
+
+Golf Scores (GolfRound, $n = 18$ holes): predict Score from Par and from
+Distance.
+
+```{python}
+#| include: false
+golf = pd.read_csv("data/ch09/GolfRound.csv")
+fit_par = reg_fit(golf.Par, golf.Score)
+fit_dist = reg_fit(golf.Distance, golf.Score)
+```
+
+```{python}
+#| echo: false
+pd.DataFrame({"Score ~ Par": fit_par, "Score ~ Distance": fit_dist}).to_string()
+```
+
+**(a)** $\widehat{Score} = 1.00 + 1.00\,\text{Par}$; slope = 1.00,
+$t = 2.53$, **p-value = 0.022 < 0.05**: Par **is** an effective predictor of
+Score (each extra par stroke adds about 1 stroke to the predicted score).
+
+**(b)** $\widehat{Score} = 2.56 + 0.0071\,\text{Distance}$; slope = 0.0071
+(about 0.7 strokes per 100 yards), $t = 2.97$, **p-value = 0.009**: Distance
+is also an effective predictor.
+
+**(c)** **Par** has the larger slope in its own units (1.00 vs 0.0071) —
+but slopes are not comparable across different units of X.
+
+**(d)** **Distance** explains more variability: $R^2 = 35.6\%$ vs $28.6\%$
+for Par.
+
+## Exercise 9.32
+
+NBA: Offense or Defense? (NBAStandings2019, $n = 30$ teams.)
+
+**(a)** Scatterplots (not shown here) are roughly linear for both predictors
+with consistent variability — conditions appear met for both models.
+
+**(b)–(f)** Fit both models:
+
+```{python}
+#| include: false
+nba = pd.read_csv("data/ch09/NBAStandings2019.csv")
+fitF = reg_fit(nba.PtsFor, nba.WinPct)
+fitA = reg_fit(nba.PtsAgainst, nba.WinPct)
+```
+
+```{python}
+#| echo: false
+pd.DataFrame({"WinPct ~ PtsFor": fitF,
+              "WinPct ~ PtsAgainst": fitA}).to_string()
+```
+
+**(b)** $\widehat{WinPct} = -2.13 + 0.0237\,\text{PtsFor}$; $t = 4.66$,
+p < 0.001 — PtsFor is an effective predictor.
+
+**(c)** $\widehat{WinPct} = 2.79 - 0.0206\,\text{PtsAgainst}$; $t = -3.40$,
+p = 0.002 — PtsAgainst is also an effective (negative) predictor.
+
+**(d)** **PtsFor explains 43.7%** of WinPct variability vs **29.2%** for
+PtsAgainst.
+
+**(e)** Raptors (PtsFor = 114.4, PtsAgainst = 108.4):
+
+```{python}
+#| echo: false
+pred_F = fitF["intercept"] + fitF["slope"] * 114.4
+pred_A = fitA["intercept"] + fitA["slope"] * 108.4
+pd.Series({"Predicted by PtsFor model": round(pred_F, 3),
+           "Predicted by PtsAgainst model": round(pred_A, 3),
+           "Actual WinPct": 0.707}).to_string()
+```
+
+The offense model predicts **0.576**, the defense model **0.558** — both
+well below the actual 0.707.
+
+**(f)** **PtsFor (offense)** appears more effective here: larger $|t|$,
+smaller p-value, and higher R². "Defense wins championships" is not
+supported by this single-season regression — though a simple linear model
+cannot settle the debate.
+
+## Exercise 9.33
+
+Birth Rate and Life Expectancy (AllCountries, $n = 199$ countries with both
+values).
+
+**(a)** Scatterplot:
+
+```{python}
+#| include: false
+allc = pd.read_csv("data/ch09/AllCountries.csv")
+d = allc[["BirthRate", "LifeExpectancy"]].dropna()
+fit933 = reg_fit(d.BirthRate, d.LifeExpectancy)
+```
+
+```{python}
+#| echo: false
+scatter_line(d.BirthRate, d.LifeExpectancy, "Birth rate", "Life expectancy")
+```
+
+A clear, roughly linear **negative** association.
+
+**(b)–(c)**
+
+```{python}
+#| echo: false
+fit933[["n", "r", "R2", "slope", "SE(slope)", "t", "p-value"]].to_string()
+```
+
+Yes, $r = -0.879$ with a tiny p-value — but **inference is not necessary**:
+the dataset includes essentially **all countries in the world** (a census of
+countries, not a random sample), so there is no sampling variability to
+account for; the sample correlation *is* the population correlation of
+interest.
+
+**(d)** Slope = **−0.68**: each 1-point (1%) increase in birth rate is
+associated with about **0.68 fewer years** of predicted life expectancy.
+
+**(e)** **No.** This is observational data on whole countries — lower birth
+rates do not *cause* longer life; both are driven by broader economic
+development (confounding), and no randomization or manipulation occurred.
+
+:::

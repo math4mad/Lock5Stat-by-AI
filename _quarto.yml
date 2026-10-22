@@ -119,6 +119,12 @@ website:
             text: "Ch. 8 · Section 8.1"
           - href: chapters/ch08/s8-2.qmd
             text: "Ch. 8 · Section 8.2"
+          - href: chapters/ch09/s9-1.qmd
+            text: "Ch. 9 · Section 9.1"
+          - href: chapters/ch09/s9-2.qmd
+            text: "Ch. 9 · Section 9.2"
+          - href: chapters/ch09/s9-3.qmd
+            text: "Ch. 9 · Section 9.3"
 
 format:
   html:

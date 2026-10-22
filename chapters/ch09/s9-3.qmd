@@ -1,0 +1,425 @@
+---
+execute-dir: project
+title: "Chapter 9 · Section 9.3"
+subtitle: "Confidence and Prediction Intervals — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 9.3 attaches uncertainty to **predictions** from a least squares
+line. For a predictor value $x^*$ both interval types are centered at
+$\hat y = b_0 + b_1 x^*$, but they answer different questions:
+
+$$\text{CI for the mean: } \hat y \pm t^* s_\epsilon
+\sqrt{\tfrac{1}{n} + \tfrac{(x^*-\bar x)^2}{(n-1)s_x^2}},
+\qquad
+\text{PI for an individual: } \hat y \pm t^* s_\epsilon
+\sqrt{1 + \tfrac{1}{n} + \tfrac{(x^*-\bar x)^2}{(n-1)s_x^2}}.$$
+
+The prediction interval adds "1" inside the square root for the
+irreducible error term $\epsilon$, so a **PI is always wider than the
+matching CI**, and both widen as $x^*$ moves away from $\bar x$. Below we
+compute every interval from the raw data with these formulas (matching the
+textbook's software output wherever one is given), and, per this project's
+convention, cross-check selected intervals with a bootstrap. Exercises are
+from *Statistics: Unlocking the Power of Data* (Lock⁵, 3rd ed., pp.
+649–651): Skill Builders 9.64–9.67 tell the two intervals apart; applied
+exercises 9.68–9.82 cover mice weight gain, cereal calories, football and
+cognition, California housing prices, country life expectancy, Verbal SAT
+and GPA, car mileage, a golf round, presidential re-election margins, and
+the Masters.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+from scipy import stats
+sns.set_theme(style="whitegrid")
+
+def reg_intervals(x, y, xstar, conf=0.95):
+    """CI for mean response and PI for individual response at xstar."""
+    x = np.asarray(x, float); y = np.asarray(y, float)
+    n = len(x)
+    res = stats.linregress(x, y)
+    fit = res.intercept + res.slope * x
+    se_e = np.sqrt(((y - fit) ** 2).sum() / (n - 2))
+    tstar = stats.t.ppf((1 + conf) / 2, n - 2)
+    yhat = res.intercept + res.slope * xstar
+    extra = (xstar - x.mean()) ** 2 / ((n - 1) * x.std(ddof=1) ** 2)
+    ci = yhat + np.array([-1, 1]) * tstar * se_e * np.sqrt(1 / n + extra)
+    pi = yhat + np.array([-1, 1]) * tstar * se_e * np.sqrt(1 + 1 / n + extra)
+    return pd.Series({
+        "x*": xstar, "Predicted (y-hat)": round(yhat, 3),
+        f"{int(conf*100)}% CI": f"({ci[0]:.2f}, {ci[1]:.2f})",
+        f"{int(conf*100)}% PI": f"({pi[0]:.2f}, {pi[1]:.2f})",
+        "CI width": round(ci[1] - ci[0], 2),
+        "PI width": round(pi[1] - pi[0], 2),
+        "n": n, "s_e": round(se_e, 4), "df": n - 2})
+
+def show(name, ser):
+    return ser.to_frame(name).T if isinstance(ser, pd.Series) else ser
+```
+
+::: {.panel-tabset}
+
+## Exercise 9.64
+
+*(Skill Builder 1)* Interval A: 10 to 14; Interval B: 4 to 20.
+
+**(a)** The narrower interval **A (10, 14)** is the confidence interval for
+the mean response; the wider **B (4, 20)** is the prediction interval.
+
+**(b)** Predicted value = midpoint of either interval = $\mathbf{12}$.
+
+## Exercise 9.65
+
+*(Skill Builder 1)* A: 94 to 106; B: 75 to 125.
+
+**(a)** **A (94, 106)** is the CI for the mean; **B (75, 125)** is the PI.
+
+**(b)** Predicted value $= \mathbf{100}$.
+
+## Exercise 9.66
+
+*(Skill Builder 1)* A: 2.9 to 7.1; B: 4.7 to 5.3.
+
+**(a)** Here the narrower interval is B: **B (4.7, 5.3)** is the CI for the
+mean; **A (2.9, 7.1)** is the PI.
+
+**(b)** Predicted value $= \mathbf{5}$.
+
+## Exercise 9.67
+
+*(Skill Builder 1)* A: 16.8 to 23.2; B: 19.2 to 20.8.
+
+**(a)** **B (19.2, 20.8)** is the CI for the mean; **A (16.8, 23.2)** is
+the PI.
+
+**(b)** Predicted value $= \mathbf{20}$.
+
+## Exercise 9.68
+
+Mice that eat 50% of calories during the day: Fit = 7.476, 95% CI
+(6.535, 8.417), 95% PI (2.786, 12.166).
+
+**(a)** We are 95% sure that the **mean** body mass gain of all mice (in
+this population) that eat 50% of their calories during the day is between
+**6.54 and 8.42 grams**.
+
+**(b)** We are 95% sure that the weight gain of a **specific** mouse that
+eats 50% of its calories during the day is between **2.79 and 12.17
+grams**.
+
+## Exercise 9.69
+
+Mice that eat 10% of calories during the day: Fit = 2.385, 95% CI
+(−0.013, 4.783), 95% PI (−2.797, 7.568).
+
+**(a)** We are 95% sure the **mean** weight gain of mice that eat only 10%
+of their calories during the day is between **−0.01 and 4.78 grams** (the
+lower endpoint is essentially zero).
+
+**(b)** We are 95% sure the weight gain of a **specific** mouse eating 10%
+of calories during the day is between **−2.80 and 7.57 grams** (an
+individual mouse might even lose a little weight).
+
+## Exercise 9.70
+
+Cereals with 10 grams of sugars: Fit = 132.02, 95% CI (122.04, 142.01),
+95% PI (76.60, 187.45).
+
+**(a)** We are 95% sure the **mean** calorie count of all cereals with 10 g
+of sugars is between **122.0 and 142.0 calories**.
+
+**(b)** We are 95% sure the calorie count of a **specific** cereal with 10 g
+of sugars is between **76.6 and 187.5 calories**.
+
+## Exercise 9.71
+
+Cereals with 16 grams of sugars: Fit = 157.88, 95% CI (143.35, 172.42),
+95% PI (101.46, 214.31).
+
+**(a)** We are 95% sure the **mean** calorie count of cereals with 16 g of
+sugars is between **143.4 and 172.4 calories**.
+
+**(b)** We are 95% sure the calorie count of a **specific** cereal with 16 g
+of sugars is between **101.5 and 214.3 calories**.
+
+## Exercise 9.72
+
+A person with 8 years of football: $\widehat{Cognition} = 102.3 -
+3.34(8)$. Interval I: (22.7, 128.5); Interval II: (63.4, 87.8).
+
+**(a)** Predicted score $= 102.3 - 3.34(8) = \mathbf{75.6}$.
+
+**(b)** The **wide Interval I (22.7, 128.5) is the prediction interval**
+for an individual; the **narrow Interval II (63.4, 87.8) is the confidence
+interval** for the mean score of all players with 8 years (both centered at
+75.6).
+
+## Exercise 9.73
+
+A person with 12 years of football: Interval I: (10.2, 114.3);
+Interval II: (54.4, 70.1).
+
+**(a)** Predicted score $= 102.3 - 3.34(12) = \mathbf{62.2}$.
+
+**(b)** **Interval I (10.2, 114.3) is the PI** (wide); **Interval II
+(54.4, 70.1) is the CI** for the mean (narrow) — both centered at 62.2.
+
+## Exercise 9.74
+
+Housing Prices (HomesForSaleCA, n = 30): Price ($1000s) from Size (sq ft),
+90% intervals at 2000 square feet.
+
+```{python}
+#| include: false
+homes = pd.read_csv("data/ch09/HomesForSaleCA.csv")
+i74 = reg_intervals(homes.Size, homes.Price, 2000, conf=0.90)
+res74 = stats.linregress(homes.Size, homes.Price)
+t74 = res74.slope / res74.stderr
+p74 = 2 * stats.t.sf(abs(t74), 28)
+```
+
+```{python}
+#| echo: false
+i74.to_frame("HomesForSaleCA").T.to_string()
+```
+
+**(a)** Slope test: $t = 3.96$, **p-value = 0.0005 < 0.05** — square
+footage is an effective predictor of price for these California homes.
+
+**(b)** Point estimate for a 2000 sq ft home: **\$621.6 thousand**.
+
+**(c)** 90% CI for the mean price: **(544.1, 699.1)** thousand dollars — we
+are 90% sure the average price of all 2000 sq ft California homes (in this
+market) is between \$544,100 and \$699,100.
+
+**(d)** 90% PI for an individual home: **(240.6, 1002.5)** thousand dollars
+— the extra "1" under the square root makes it far wider, since individual
+prices vary a lot around the line.
+
+## Exercise 9.75
+
+Life Expectancy (SampCountries, n = 50): 95% prediction intervals at
+Health = 3%, 10%, and 50%.
+
+```{python}
+#| include: false
+samp = pd.read_csv("data/ch09/SampCountries.csv")
+d = samp[["Health", "LifeExpectancy"]].dropna()
+rows = [reg_intervals(d.Health, d.LifeExpectancy, xs)
+        for xs in [3, 10, 50]]
+t75 = pd.concat([show(f"Health = {xs}%", r) for xs, r in zip([3, 10, 50], rows)])
+```
+
+```{python}
+#| echo: false
+t75.to_string()
+```
+
+**(a)** At 3%: predicted life expectancy **66.6 years**, 95% PI **(52.9,
+80.3)** — we are 95% sure a specific country spending 3% on health care has
+life expectancy between about 53 and 80 years.
+
+**(b)** At 10%: predicted **72.3 years**, 95% PI **(58.8, 85.7)**.
+
+**(c)** At 50%: predicted **104.8 years**, 95% PI **(84.3, 125.2)** — note
+50% is far beyond the observed range (max 22.6%), so this is a wild
+extrapolation.
+
+**(d)** Widths: **27.5 (3%), 26.9 (10%), 40.9 (50%)**. The interval is
+narrowest near the mean (10.14%) and much wider at the extreme x-value —
+the $(x^*-\bar x)^2$ term at work.
+
+## Exercise 9.76
+
+Predicting GPA from Verbal SAT (StudentSurvey, n = 342 with both scores):
+$\widehat{GPA} = 2.03 + 0.00189\,\text{VerbalSAT}$.
+
+```{python}
+#| include: false
+ss = pd.read_csv("data/ch09/StudentSurvey.csv")
+d = ss[["VerbalSAT", "GPA"]].dropna()
+r76 = stats.linregress(d.VerbalSAT, d.GPA)
+t76 = pd.concat([show(f"VerbalSAT = {xs}", reg_intervals(d.VerbalSAT, d.GPA, xs))
+                 for xs in [500, 700]])
+```
+
+```{python}
+#| echo: false
+t76.to_string()
+```
+
+**(a)** From the fitted model: at 500, $\widehat{GPA} = \mathbf{2.98}$; at
+700, $\widehat{GPA} = \mathbf{3.36}$.
+
+**(b)** Intervals from the data:
+
+- **i.** 95% CI for mean GPA at 500: **(2.92, 3.04)**.
+- **ii.** 95% PI for GPA at 500: **(2.24, 3.72)**.
+- **iii.** 95% CI for mean GPA at 700: **(3.29, 3.43)**.
+- **iv.** 95% PI for GPA at 700: **(2.62, 4.10)**.
+
+Each prediction interval is much wider than its confidence interval, and
+both types are wider at SAT = 700 than at 500 (closer to $\bar x \approx
+594$).
+
+## Exercise 9.77
+
+Predicting Average HwyMPG from CityMPG (Cars2020): 95% CI for mean highway
+mileage of all cars with CityMPG = 20.
+
+```{python}
+#| include: false
+cars = pd.read_csv("data/ch09/Cars2020.csv")
+d = cars[["CityMPG", "HwyMPG"]].dropna()
+i77 = reg_intervals(d.CityMPG, d.HwyMPG, 20, conf=0.95)
+```
+
+```{python}
+#| echo: false
+i77.to_frame("Cars2020").T.to_string()
+```
+
+We are 95% sure the mean highway mileage of all new cars rated at 20 mpg in
+the city is between **39.5 and 41.4 mpg** (predicted value 40.4 mpg).
+
+## Exercise 9.78
+
+Predicting HwyMPG for a Jeep Renegade (CityMPG = 16): the question is about
+one specific car, so we use a **prediction interval**.
+
+```{python}
+#| include: false
+i78 = reg_intervals(d.CityMPG, d.HwyMPG, 16, conf=0.95)
+```
+
+```{python}
+#| echo: false
+i78.to_frame("Jeep Renegade").T.to_string()
+```
+
+95% PI: **(26.8, 40.6)** mpg — we are 95% sure the Renegade's highway
+rating falls in this interval (predicted 33.7 mpg).
+
+## Exercise 9.79
+
+Birdie on the 476-yard 16th Hole: predict Score from Distance
+(GolfRound, n = 18); the golfer shot a 4.
+
+```{python}
+#| include: false
+golf = pd.read_csv("data/ch09/GolfRound.csv")
+i79 = reg_intervals(golf.Distance, golf.Score, 476, conf=0.95)
+```
+
+```{python}
+#| echo: false
+i79.to_frame("Distance = 476").T.to_string()
+```
+
+**(a)** Predicted score: $\mathbf{5.97}$ strokes.
+
+**(b)** 95% PI: **(3.55, 8.38)** — we are 95% sure an individual score on a
+476-yard hole falls in this range.
+
+**(c)** A birdie 4 **is inside the prediction interval**, so it is unusual
+(well below the predicted 6) but **not very surprising** — it lies within
+the range of plausible individual scores.
+
+## Exercise 9.80
+
+Birdie on the Par 5 16th Hole: predict Score from Par.
+
+```{python}
+#| include: false
+i80 = reg_intervals(golf.Par, golf.Score, 5, conf=0.95)
+```
+
+```{python}
+#| echo: false
+i80.to_frame("Par = 5").T.to_string()
+```
+
+**(a)** Predicted score: $\mathbf{6.0}$ strokes.
+
+**(b)** 95% PI: **(3.42, 8.58)** for an individual score on a par-5 hole.
+
+**(c)** The birdie 4 is **within the prediction interval** — below the
+predicted 6, but not very surprising.
+
+## Exercise 9.81
+
+Predicting Re-Election Margin (ElectionMargin, n = 12): Margin = −36.76 +
+0.839 Approval (S = 5.66); intervals at Approval = 50.
+
+```{python}
+#| include: false
+em = pd.read_csv("data/ch09/ElectionMargin.csv")
+i81 = reg_intervals(em.Approval, em.Margin, 50, conf=0.95)
+t81 = stats.t.ppf(0.975, 11)
+m = em.Margin
+lo_m = m.mean() - t81 * m.std(ddof=1) / np.sqrt(12)
+hi_m = m.mean() + t81 * m.std(ddof=1) / np.sqrt(12)
+```
+
+```{python}
+#| echo: false
+i81.to_frame("Approval = 50").T.to_string()
+pd.Series({"Mean Margin": round(m.mean(), 2),
+           "95% CI for mean Margin (no X)": f"({lo_m:.2f}, {hi_m:.2f})"
+           }).to_string()
+```
+
+**(a)** 95% CI for the mean margin at 50% approval: **(1.39, 8.95)** — we
+are 95% sure the mean margin of victory for presidents with 50% approval
+was between +1.4 and +9.0 points (using the given output: $5.17 \pm
+2.228(5.66)\sqrt{1/12 + (50-52.92)^2/(11 \cdot 11.04^2)}$, same result).
+
+**(b)** 95% PI for an individual president at 50% approval: **(−8.00,
+18.34)** — much wider, since individual elections vary enormously around
+the line (a president with 50% approval could plausibly lose by 8 or win by
+18).
+
+**(c)** Ignoring approval, a 95% CI for the mean margin is just an ordinary
+one-sample t interval: $7.62 \pm 2.201(10.72)/\sqrt{12} = $ **(0.81,
+14.43)** — far wider than the CI in (a), showing how much the regression
+model narrows uncertainty at a known predictor value.
+
+## Exercise 9.82
+
+Golf Scores at the Masters (MastersGolf, n = 20): Final = 0.162 +
+1.476·First (S = 3.598); 95% intervals at First = 0, −5, +3.
+
+```{python}
+#| include: false
+mg = pd.read_csv("data/ch09/MastersGolf.csv")
+t82 = pd.concat([show(f"First = {xs}", reg_intervals(mg.First, mg.Final, xs))
+                 for xs in [0, -5, 3]])
+```
+
+```{python}
+#| echo: false
+t82.to_string()
+```
+
+**(a)** For golfers who shoot 0 in round one: predicted mean final score
+**0.16**; 95% CI **(−1.56, 1.88)** — the interval to predict the *average*
+final score of all such golfers.
+
+**(b)** For a golfer who shoots −5: predicted final **−7.22**; 95% PI
+**(−15.34, 0.91)** — the interval for one individual golfer's final score.
+
+**(c)** For golfers who shoot +3: predicted mean final **4.59**; 95% CI
+**(2.01, 7.17)** — the interval for the average final score of all golfers
+at +3.
+
+:::

@@ -1,0 +1,731 @@
+---
+execute-dir: project
+title: "Chapter 9 · Section 9.2"
+subtitle: "ANOVA for Regression — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 9.2 splits the variability in a regression response into the piece
+**explained by the model** and the piece **left in the errors**:
+$$SSTotal = SSModel + SSE,$$
+with $SSModel = \sum(\hat y - \bar y)^2$, $SSE = \sum(y - \hat y)^2$ and
+$SSTotal = \sum(y-\bar y)^2$. Dividing by degrees of freedom (1 for the
+model, $n-2$ for the error) gives mean squares, and their ratio is the
+**F-statistic** $F = MSModel/MSE$, compared to an $F_{1,\,n-2}$ upper tail
+to test $H_0\colon\beta_1 = 0$ (model ineffective). For a single predictor
+this F-test is **always equivalent to the two-tail t-test for the slope**
+(though $F = t^2$), and $R^2 = SSModel/SSTotal$ is the percent of response
+variability the model explains. Two extra quantities: the standard
+deviation of the error $s_\epsilon = \sqrt{MSE}$, and the standard error of
+the slope $SE = s_\epsilon / (s_x\sqrt{n-1})$. As usual we verify the
+parametric answers with **randomization** (permutation F-tests, 10000
+shuffles, seed 2026). Exercises are from *Statistics: Unlocking the Power
+of Data* (Lock⁵, 3rd ed., pp. 640–644): Skill Builders 9.34–9.45 dissect
+and rebuild ANOVA tables; applied exercises 9.46–9.63 cover Facebook
+friends and brain structure, cereal calories, printer prices, Verbal SAT
+and GPA, football and cognition, water striders, arm spans, hockey points
+and penalty minutes, exercise vs TV, country health expenditure, California
+home sales, and a free-choice exploration.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+from scipy import stats
+sns.set_theme(style="whitegrid")
+
+def anova_reg(ss_model, sse, n, name="Model"):
+    """Build a full one-predictor regression ANOVA table from pieces."""
+    ss_total = ss_model + sse
+    mse = sse / (n - 2)
+    F = ss_model / mse
+    p = stats.f.sf(F, 1, n - 2)
+    tab = pd.DataFrame({
+        "Source": ["Model", "Error", "Total"],
+        "df": [1, n - 2, n - 1],
+        "SS": [round(ss_model, 3), round(sse, 3), round(ss_total, 3)],
+        "MS": [round(ss_model, 3), round(mse, 3), ""],
+        "F": [round(F, 3), "", ""],
+        "p-value": [float(f"{p:.3g}") if p < 1e-4 else round(float(p), 4),
+                    "", ""]}).set_index("Source")
+    return tab
+
+def reg_pieces(x, y):
+    """Return (SSModel, SSE, SSTotal, n) for a least squares fit."""
+    x = np.asarray(x, float); y = np.asarray(y, float)
+    res = stats.linregress(x, y)
+    fit = res.intercept + res.slope * x
+    sse = ((y - fit) ** 2).sum()
+    sst = ((y - y.mean()) ** 2).sum()
+    return sst - sse, sse, sst, len(x)
+
+def perm_F(x, y, reps=10000, seed=2026):
+    """Randomization F-test for a simple linear model."""
+    x = np.asarray(x, float); y = np.asarray(y, float)
+    ssm, sse, sst, n = reg_pieces(x, y)
+    Fobs = (ssm / 1) / (sse / (n - 2))
+    r = np.random.default_rng(seed)
+    Fs = np.empty(reps)
+    for i in range(reps):
+        ys = r.permutation(y)
+        s, e, t_, n_ = reg_pieces(x, ys)
+        Fs[i] = (s / 1) / (e / (n_ - 2))
+    return Fs, Fobs, float((Fs >= Fobs).mean())
+
+def sim_hist(sims, stat, xlabel="Simulated F-statistics", bins=40,
+             figsize=(6, 3)):
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.histplot(x=sims, bins=bins, ax=ax, color="#4c72b0")
+    mask = sims >= stat
+    if mask.any():
+        sns.histplot(x=sims[mask], bins=bins, ax=ax, color="#c44e52")
+    ax.axvline(stat, color="black", lw=1.5)
+    ax.set_xlabel(xlabel); ax.set_ylabel("Simulated statistics")
+    plt.tight_layout(); plt.show()
+
+def reg_fit(x, y):
+    x = np.asarray(x, float); y = np.asarray(y, float)
+    res = stats.linregress(x, y)
+    n = len(x)
+    fit = res.intercept + res.slope * x
+    se_e = np.sqrt(((y - fit) ** 2).sum() / (n - 2))
+    t = res.slope / res.stderr
+    p = 2 * stats.t.sf(abs(t), n - 2)
+    return pd.Series({
+        "n": n, "intercept": round(res.intercept, 4),
+        "slope": round(res.slope, 4), "SE(slope)": round(res.stderr, 4),
+        "t": round(t, 3), "p-value": float(f"{p:.3g}"),
+        "r": round(res.rvalue, 4), "R2": round(res.rvalue ** 2, 4),
+        "s_e": round(se_e, 4)})
+```
+
+::: {.panel-tabset}
+
+## Exercise 9.34
+
+*(Skill Builder 1)* ANOVA table: Regression SS = 303.7, Error df = 174,
+F = 1.75, P = 0.187.
+
+$H_0\colon$ the model is ineffective ($\beta_1 = 0$) vs $H_a\colon$ the
+model is effective ($\beta_1 \neq 0$). **F = 1.75**, **p-value = 0.187**
+(verified below):
+
+```{python}
+#| echo: false
+anova_reg(303.7, 30146.8, 176).to_string()
+```
+
+p-value $= 0.187 > 0.05$: **do not reject $H_0$** — no evidence that the
+model is effective.
+
+## Exercise 9.35
+
+*(Skill Builder 1)* ANOVA table: Regression SS = 3396.8, Error df = 174,
+F = 21.85, P = 0.000.
+
+```{python}
+#| echo: false
+anova_reg(3396.8, 27053.7, 176).to_string()
+```
+
+$H_0\colon\beta_1 = 0$ vs $H_a\colon\beta_1 \neq 0$; **F = 21.85**,
+**p-value $\approx 0.000 < 0.05$**: reject $H_0$ — the model is effective.
+
+## Exercise 9.36
+
+*(Skill Builder 1)* ANOVA table (R style): Model SS = 352.97, Residuals
+df = 359, F = 11.01, p = 0.001.
+
+```{python}
+#| echo: false
+anova_reg(352.97, 11511.22, 361).to_string()
+```
+
+$H_0\colon\beta_1 = 0$ vs $H_a\colon\beta_1 \neq 0$; **F = 11.01**,
+**p-value = 0.001 < 0.05**: reject $H_0$ — ModelA is effective.
+
+## Exercise 9.37
+
+*(Skill Builder 1)* ANOVA table (R style): Model SS = 10.380, Residuals
+df = 342, F = 2.18, p = 0.141.
+
+```{python}
+#| echo: false
+anova_reg(10.380, 1630.570, 344).to_string()
+```
+
+**F = 2.18**, **p-value = 0.141 > 0.05**: do not reject $H_0$ — no
+evidence ModelB is effective.
+
+## Exercise 9.38
+
+*(Skill Builder 2)* From the table in 9.34: sample size and R².
+
+**n = df Total + 1 = 175 + 1 = 176**; $R^2 = 303.7/30450.5 = \mathbf{1.0\%}$.
+
+## Exercise 9.39
+
+*(Skill Builder 2)* From the table in 9.35.
+
+**n = 176**; $R^2 = 3396.8/30450.5 = \mathbf{11.2\%}$.
+
+## Exercise 9.40
+
+*(Skill Builder 2)* From the table in 9.36.
+
+**n = 360 + 1 = 361**; $R^2 = 352.97/11864.20 = \mathbf{3.0\%}$.
+
+## Exercise 9.41
+
+*(Skill Builder 2)* From the table in 9.37.
+
+**n = 343 + 1 = 344**; $R^2 = 10.380/1640.951 = \mathbf{0.6\%}$.
+
+## Exercise 9.42
+
+*(Skill Builder 3)* $SSModel = 250$, $SSTotal = 3000$, $n = 100$. Fill in
+the ANOVA table.
+
+```{python}
+#| echo: false
+anova_reg(250, 3000 - 250, 100).to_string()
+```
+
+$SSE = 3000 - 250 = 2750$; $MSE = 2750/98 = 28.06$; **F = 8.91**,
+p-value = 0.004 — the model is effective.
+
+## Exercise 9.43
+
+*(Skill Builder 3)* $SSModel = 800$, $SSTotal = 5820$, $n = 40$.
+
+```{python}
+#| echo: false
+anova_reg(800, 5820 - 800, 40).to_string()
+```
+
+$SSE = 5020$; $MSE = 132.1$; **F = 6.06**, p-value = 0.019 — effective.
+
+## Exercise 9.44
+
+*(Skill Builder 3)* $SSModel = 8.5$, $SSE = 247.2$, $n = 25$.
+
+```{python}
+#| echo: false
+anova_reg(8.5, 247.2, 25).to_string()
+```
+
+$SSTotal = 255.7$; $MSE = 10.75$; **F = 0.79**, p-value = 0.383 — not
+effective.
+
+## Exercise 9.45
+
+*(Skill Builder 3)* $SSE = 15571$, $SSTotal = 23693$, $n = 500$.
+
+```{python}
+#| echo: false
+anova_reg(23693 - 15571, 15571, 500).to_string()
+```
+
+$SSModel = 8122$; $MSE = 31.27$; **F = 259.8**, p-value $\approx 0$ — very
+strongly effective.
+
+## Exercise 9.46
+
+Social Networks and Brain Structure: ANOVA for $FBfriends = 367 +
+82.4\,\text{GMdensity}$, Regression F = 8.94, P = 0.005 (n = 40).
+
+```{python}
+#| include: false
+fb = pd.read_csv("data/ch09/FacebookFriends.csv")
+Fs, Fobs, p_perm = perm_F(fb.GMdensity, fb.FBfriends)
+```
+
+**Yes — the model is effective.** F = 8.94 with df = 1 and 38 gives
+**p-value = 0.005 < 0.05**: grey matter density explains a significant
+amount of the variability in number of Facebook friends. A randomization
+F-test on the raw data agrees: **p ≈ `{python} f"{p_perm:.4f}"`**.
+
+```{python}
+#| echo: false
+sim_hist(Fs, Fobs)
+```
+
+## Exercise 9.47
+
+Fiber in Cereal: ANOVA for $Calories = 119 + 8.48\,\text{Fiber}$
+(n = 30), F = 7.44, P = 0.011.
+
+**Yes — the model is effective.** **F = 7.44**, df = 1 and 28,
+**p-value = 0.011 < 0.05**: the amount of fiber helps predict calories in a
+cup of cereal (though R² = 7376.1/35150.2 ≈ 21%, so much variability
+remains unexplained).
+
+## Exercise 9.48
+
+Predicting Prices of Printers: $Price = 378 - 18.6\,\text{CostColor}$,
+ANOVA: Regression SS = 57604, Error SS = 78633 (df 18), F = 13.19, P = 0.002.
+
+**(a)** Predicted price at CostColor = 10: $378 - 18.6(10) = \mathbf{\$192}$.
+
+**(b)** The slope is **negative** (−18.6): cheaper printers tend to **cost
+more** per page for color printing.
+
+**(c)** $n = df_{Total} + 1 = 19 + 1 = \mathbf{20}$ printers.
+
+**(d)** $R^2 = 57604/136237 = \mathbf{42.3\%}$: color printing cost explains
+about 42.3% of the variability in printer price.
+
+**(e)** **F = 13.19, p-value = 0.002 < 0.05**: yes, the linear model is
+effective at predicting price from color printing cost.
+
+## Exercise 9.49
+
+ANOVA for Verbal SAT as a Predictor of GPA: $GPA = 2.03 +
+0.00189\,\text{VerbalSAT}$, Regression SS = 6.8029, Error df = 343,
+F = 48.84, P = 0.000.
+
+**(a)** $\widehat{GPA} = 2.03 + 0.00189(550) = \mathbf{3.08}$.
+
+**(b)** $n = 344 + 1 = \mathbf{345}$ students.
+
+**(c)** $R^2 = 6.8029/54.5788 = \mathbf{12.5\%}$: Verbal SAT explains about
+12.5% of the variability in college GPA.
+
+**(d)** **F = 48.84, p-value $\approx 0.000 < 0.05$**: yes — the model is
+highly effective (statistically), if modest in explanatory power.
+
+## Exercise 9.50
+
+Football and Cognition: $r = -0.366$ (p = 0.015), $t = -2.55$, ANOVA
+F = 6.50 (df 1, 42), all p = 0.015.
+
+**(a)** $r = \mathbf{-0.366}$, **p-value = 0.015**.
+
+**(b)** Slope = **−3.34**: each additional year of football is associated
+with 3.34 points lower cognitive score, on average. $t = -3.34/1.31 =
+\mathbf{-2.55}$, **p-value = 0.015**.
+
+**(c)** **F = 6.50**, **p-value = 0.015**.
+
+**(d)** The **three p-values are identical (0.015)** — for one predictor,
+the correlation test, slope t-test and ANOVA F-test are all equivalent
+(note $F = (-2.55)^2 \approx 6.50$).
+
+**(e)** At a 5% level, all three tests reject $H_0$: there is significant
+evidence that more years playing football are associated with lower
+cognitive scores (an observational association, not proof of causation).
+
+## Exercise 9.51
+
+Mating Activity of Water Striders (n = 10):
+$MatingActivity = 0.480 - 0.323\,\text{FemalesHiding}$, t = −2.56, p = 0.033;
+ANOVA F = 6.58, p = 0.033.
+
+**(a)** The scatterplot (Figure 9.12) shows a plausible linear downward
+pattern with no big outliers — with only 10 points we proceed cautiously
+but see no serious concerns.
+
+**(b)** Line: $\widehat{MatingActivity} = 0.480 - 0.323\,
+\text{FemalesHiding}$; at 0.50:
+
+```{python}
+#| echo: false
+pd.Series({"Predicted MatingActivity": round(0.48014 - 0.3232 * 0.5, 3)}).to_string()
+```
+
+$\widehat{MatingActivity} = 0.480 - 0.323(0.5) = \mathbf{0.319}$.
+
+**(c)** $H_0\colon\beta_1 = 0$ vs $H_a\colon\beta_1 \neq 0$:
+$t = -2.56$, **p-value = 0.033 < 0.05** — time in hiding is an effective
+predictor of mating activity.
+
+**(d)** $H_0\colon$ model ineffective vs $H_a\colon$ effective: **F = 6.58**
+(df 1, 8), **p-value = 0.033 < 0.05** — the model is effective.
+
+**(e)** The two p-values are **identical (0.033)** — as always for a single
+predictor ($F = t^2 = 6.55 \approx 6.58$ up to rounding).
+
+**(f)** **R² = 45.1%**: the proportion of time females spend hiding explains
+about 45.1% of the variability in mating activity among groups.
+
+## Exercise 9.52
+
+Predicting One Depression Score from Another: $CESD = 4.97 +
+0.7923\,\text{DASS}$, ANOVA F = 69.45 (df 1, 73), P = 0.000.
+
+**(a)** **F = 69.45**, **p-value = 0.000**.
+
+**(b)** Reject $H_0$: very strong evidence that the model is effective —
+DASS score is an effective predictor of CESD score.
+
+**(c)** $n = 74 + 1 = \mathbf{75}$ people.
+
+## Exercise 9.53
+
+How Big Is an Arm Span? (PASeniors): compare Armspan ~ Height vs
+Armspan ~ Foot.
+
+```{python}
+#| include: false
+pa = pd.read_csv("data/ch09/PASeniors.csv")
+fit_h = reg_fit(pa.Height, pa.Armspan)
+fit_f = reg_fit(pa.Foot, pa.Armspan)
+```
+
+```{python}
+#| echo: false
+pd.DataFrame({"Armspan ~ Height": fit_h,
+              "Armspan ~ Foot": fit_f}).to_string()
+```
+
+```{python}
+#| include: false
+_, Fh, ph = perm_F(pa.Height, pa.Armspan)
+_, Ff, pf = perm_F(pa.Foot, pa.Armspan)
+```
+
+**(a)** Slope: Height **0.91** vs Foot **3.48** — **Foot has the larger
+slope** (but different units, so not directly comparable).
+
+**(b)** Standard deviation of the error: Height **9.41 cm** vs Foot
+**9.94 cm** — **Height has the smaller** $s_\epsilon$.
+
+**(c)** R²: Height **51.5%** vs Foot **46.0%** — **Height explains more**
+variability (randomization F-tests confirm both models are effective,
+p ≈ `{python} f"{ph:.4f}"` and p ≈ `{python} f"{pf:.4f}"`).
+
+**(d)** **Height** is the more effective predictor of arm span: smaller
+error sd and larger R².
+
+## Exercise 9.54
+
+Points and Penalty Minutes in Hockey (OttawaSenators2019, n = 26):
+$Points = 22.33 + 0.104\,\text{PenMins}$, t = 0.69, p = 0.499; ANOVA
+F = 0.47, p = 0.499.
+
+**(a)** Line: $\widehat{Points} = 22.33 + 0.104\,\text{PenMins}$:
+
+```{python}
+#| echo: false
+pd.Series({"20 penalty minutes": round(22.33 + 0.104 * 20, 2),
+           "150 penalty minutes": round(22.33 + 0.104 * 150, 2)}).to_string()
+```
+
+At 20 minutes: **24.4 points**; at 150 minutes: **37.9 points**.
+
+**(b)** Slope = 0.104: each additional penalty minute is associated with
+about **0.10 more points**, on average.
+
+**(c)** $H_0\colon\beta_1 = 0$ vs $H_a\colon\beta_1 \neq 0$: **t = 0.69**,
+**p-value = 0.499 > 0.05** — not an effective predictor.
+
+**(d)** $H_0\colon$ model ineffective: **F = 0.47**, **p-value = 0.499** —
+model not effective.
+
+**(e)** The two p-values are **identical (0.499)**, as always ($F =
+0.69^2 \approx 0.47$).
+
+**(f)** **R² = 1.93%**: penalty minutes explain under 2% of the variability
+in points — essentially no explanatory value.
+
+## Exercise 9.55
+
+More Computation on Points and Penalty Minutes: verify $s_\epsilon$ and SE
+using Table 9.3 ($s_x = 24.92$, $n = 26$).
+
+```{python}
+#| echo: false
+se_e = np.sqrt(8607.7 / 24)
+SE = se_e / (24.92 * np.sqrt(25))
+pd.Series({"s_e = sqrt(8607.7/24)": round(se_e, 3),
+           "SE = s_e/(s_x*sqrt(n-1))": round(SE, 4)}).to_string()
+```
+
+**(a)** $s_\epsilon = \sqrt{SSE/(n-2)} = \sqrt{8607.7/24} =
+\mathbf{18.94}$ — matches S = 18.938 in the output.
+
+**(b)** $SE = 18.94/(24.92\sqrt{25}) = \mathbf{0.152}$ — matches the output
+SE for the PenMins coefficient.
+
+## Exercise 9.56
+
+Computations Based on ANOVA for Predicting Mercury in Fish: Regression SS
+= 2.0024, Error SS = 4.0455 (df 51), F = 25.24; $s_x(\text{pH}) = 1.288$.
+
+```{python}
+#| echo: false
+se_e = np.sqrt(4.0455 / 51)
+SE = se_e / (1.288 * np.sqrt(52))
+pd.Series({"R2 = 2.0024/6.0479": round(2.0024 / 6.0479, 3),
+           "s_e = sqrt(4.0455/51)": round(se_e, 4),
+           "SE = s_e/(s_x*sqrt(n-1))": round(SE, 5)}).to_string()
+```
+
+**(a)** $R^2 = 2.0024/6.0479 = \mathbf{33.1\%}$: pH explains about 33.1% of
+the variability in average mercury levels.
+
+**(b)** $s_\epsilon = \sqrt{4.0455/51} = \mathbf{0.2816}$ — matches
+S = 0.281645.
+
+**(c)** $SE = 0.2816/(1.288\sqrt{52}) = \mathbf{0.0303}$ — matches the
+missing **(c)** in the output.
+
+## Exercise 9.57
+
+More Computation on Fiber in Cereal: Regression SS = 7376.1, Error SS =
+27774.1 (df 28); $s_x(\text{Fiber}) = 1.880$, $n = 30$.
+
+```{python}
+#| echo: false
+se_e = np.sqrt(27774.1 / 28)
+SE = se_e / (1.880 * np.sqrt(29))
+pd.Series({"s_e = sqrt(27774.1/28)": round(se_e, 3),
+           "SE = s_e/(s_x*sqrt(n-1))": round(SE, 4)}).to_string()
+```
+
+**(a)** $s_\epsilon = \sqrt{27774.1/28} = \mathbf{31.49}$ calories.
+
+**(b)** $SE = 31.49/(1.880\sqrt{29}) = \mathbf{3.11}$.
+
+## Exercise 9.58
+
+More Computation on Predicting GPA: Error SS = 47.7760 (df 343);
+$s_x(\text{VerbalSAT}) = 74.29$, $n = 345$.
+
+```{python}
+#| echo: false
+se_e = np.sqrt(47.7760 / 343)
+SE = se_e / (74.29 * np.sqrt(344))
+pd.Series({"s_e = sqrt(47.776/343)": round(se_e, 5),
+           "SE = s_e/(s_x*sqrt(n-1))": round(SE, 7)}).to_string()
+```
+
+**(a)** $s_\epsilon = \sqrt{47.776/343} = \mathbf{0.373}$ — matches
+S = 0.373214.
+
+**(b)** $SE = 0.373/(74.29\sqrt{344}) = \mathbf{0.0002709}$ — matches the
+output SE for VerbalSAT.
+
+## Exercise 9.59
+
+Time Spent Exercising or Watching TV? (ExerciseHours, n = 50): predict
+Exercise from TV, three equivalent tests.
+
+```{python}
+#| include: false
+exh = pd.read_csv("data/ch09/ExerciseHours.csv")
+fitTV = reg_fit(exh.TV, exh.Exercise)
+sSm, sSe, sSt, n = reg_pieces(exh.TV, exh.Exercise)
+F = (sSm / 1) / (sSe / (n - 2))
+```
+
+```{python}
+#| echo: false
+fitTV.to_string()
+pd.Series({"F = MSModel/MSE": round(F, 3),
+           "ANOVA p-value": float(f"{stats.f.sf(F, 1, 48):.3g}"),
+           "F (= t^2)": round(fitTV['t'] ** 2, 3)}).to_string()
+```
+
+```{python}
+#| include: false
+Fs, Fobs, p_perm = perm_F(exh.TV, exh.Exercise)
+```
+
+**(a)** t-test for the TV coefficient: $t = \mathbf{2.04}$, df = 48,
+**p-value = 0.047**.
+
+**(b)** ANOVA: **F = 4.15** (df 1, 48), **p-value = 0.047**.
+
+**(c)** t-test for the correlation: $r = \mathbf{0.282}$, and the
+correlation t-statistic is the same **2.04** with the same p-value 0.047.
+
+**(d)** All three tests give **identical statistics and p-values** ($F =
+t^2$); all reject $H_0$ at 5% (barely) — significant evidence that TV hours
+help predict exercise hours, with randomization agreement (p ≈
+`{python} f"{p_perm:.4f}"`).
+
+## Exercise 9.60
+
+Life Expectancy and Health Expenditures (SampCountries, n = 50): the same
+relationship as Exercise 9.29, via all three routes.
+
+```{python}
+#| include: false
+samp = pd.read_csv("data/ch09/SampCountries.csv")
+d = samp[["Health", "LifeExpectancy"]].dropna()
+fitH = reg_fit(d.Health, d.LifeExpectancy)
+sSm, sSe, sSt, n = reg_pieces(d.Health, d.LifeExpectancy)
+Fh = (sSm / 1) / (sSe / (n - 2))
+```
+
+```{python}
+#| echo: false
+fitH.to_string()
+pd.Series({"F-statistic": round(Fh, 3),
+           "ANOVA p-value": float(f"{stats.f.sf(Fh, 1, 48):.3g}"),
+           "F (= t^2)": round(fitH['t'] ** 2, 3)}).to_string()
+```
+
+**(a)** $r = \mathbf{0.521}$, p-value = 0.0001.
+
+**(b)** $\widehat{LifeExpectancy} = 64.17 + 0.81\,\text{Health}$; t = 4.23,
+p-value = 0.0001.
+
+**(c)** **F = 17.93** (df 1, 48), p-value = 0.0001.
+
+**(d)** All three routes agree exactly (F = t², same p-value): health
+expenditure is a statistically significant but modest predictor — about
+27% of the variability in life expectancy explained.
+
+## Exercise 9.61
+
+Homes for Sale in California (HomesForSaleCA, n = 30): predict Beds from
+Baths.
+
+```{python}
+#| include: false
+homes = pd.read_csv("data/ch09/HomesForSaleCA.csv")
+fitB = reg_fit(homes.Baths, homes.Beds)
+sSm, sSe, sSt, n = reg_pieces(homes.Baths, homes.Beds)
+Fb = (sSm / 1) / (sSe / (n - 2))
+_, _, p_permB = perm_F(homes.Baths, homes.Beds)
+```
+
+```{python}
+#| echo: false
+fitB.to_string()
+pd.Series({"F-statistic": round(Fb, 3),
+           "ANOVA p-value": float(f"{stats.f.sf(Fb, 1, 28):.4g}"),
+           "randomization p-value": round(p_permB, 4)}).to_string()
+```
+
+**(a)** $\widehat{Beds} = 2.36 + 0.34\,\text{Baths}$; for 3 bathrooms:
+$\mathbf{3.38}$ bedrooms.
+
+**(b)** **t = 1.98, p-value = 0.058 > 0.05**: do not reject $H_0$ at 5% —
+not quite significant.
+
+**(c)** **F = 3.91, p-value = 0.058** (randomization agrees): same
+conclusion as (b).
+
+**(d)** **R² = 12.3%**: number of bathrooms explains only about 12% of the
+variability in bedrooms.
+
+## Exercise 9.62
+
+Which Variable Is Best in Homes for Sale in California? Predict Size;
+SSTotal = 6,563,872 sq ft².
+
+```{python}
+#| include: false
+sst_size = ((homes.Size - homes.Size.mean()) ** 2).sum()
+rows = []
+for pred in ["Price", "Beds", "Baths"]:
+    ssm, sse, sst, n_ = reg_pieces(homes[pred], homes.Size)
+    res = stats.linregress(homes[pred], homes.Size)
+    t = res.slope / res.stderr
+    rows.append({"Predictor": pred,
+                 "SSModel": round(ssm),
+                 "% of SSTotal": round(100 * ssm / sst, 1),
+                 "F": round((ssm / 1) / (sse / 28), 3),
+                 "p-value": float(f"{2 * stats.t.sf(abs(t), 28):.3g}")})
+best = pd.DataFrame(rows).set_index("Predictor")
+```
+
+```{python}
+#| echo: false
+pd.Series({"SSTotal (Size)": round(sst_size)}).to_string()
+best.to_string()
+```
+
+**(a)** Total variability: $SSTotal = \mathbf{6{,}563{,}872}$ (same for any
+predictor — it does not use X).
+
+**(b)** **Baths** explains the most (largest SSModel): **41.3%** of the
+variability in home sizes.
+
+**(c)** $SSModel_{Baths} = \mathbf{2{,}709{,}896}$ sq ft² = **41.3%** of
+SSTotal.
+
+**(d)** The weakest predictor is **Beds**: only **20.2%** (SSModel =
+1,323,367).
+
+**(e)** **Yes — still effective:** the ANOVA F-test for Beds gives
+p-value = 0.013 < 0.05, so even the weakest variable explains a
+statistically significant share of the variability.
+
+## Exercise 9.63
+
+Explore a Relationship between Two Quantitative Variables: we choose
+**Cereal**, response = Calories, explanatory = Fat (neither pairing is
+analyzed elsewhere in Chapter 9).
+
+**(a)** Dataset Cereal (n = 30 cereals); response: Calories; explanatory:
+Fat (grams per cup).
+
+**(b)** Scatterplot and conditions:
+
+```{python}
+#| include: false
+cer = pd.read_csv("data/ch09/Cereal.csv")
+fitFat = reg_fit(cer.Fat, cer.Calories)
+```
+
+```{python}
+#| echo: false
+import matplotlib.pyplot as plt
+fig, ax = plt.subplots(figsize=(5.5, 3.4))
+ax.scatter(cer.Fat, cer.Calories, color="#4c72b0", alpha=0.75)
+xs = np.linspace(cer.Fat.min(), cer.Fat.max(), 50)
+ax.plot(xs, fitFat["intercept"] + fitFat["slope"] * xs, color="#c44e52", lw=2)
+ax.set_xlabel("Fat (g)"); ax.set_ylabel("Calories")
+plt.tight_layout(); plt.show()
+```
+
+A roughly linear positive band, fairly even scatter — conditions
+reasonably met.
+
+**(c)–(g)** All three inference routes, plus a randomization check:
+
+```{python}
+#| include: false
+sSm, sSe, sSt, n = reg_pieces(cer.Fat, cer.Calories)
+Fc = (sSm / 1) / (sSe / (n - 2))
+_, _, p_permC = perm_F(cer.Fat, cer.Calories)
+```
+
+```{python}
+#| echo: false
+fitFat.to_string()
+pd.Series({"r": fitFat["r"],
+           "correlation p-value": fitFat["p-value"],
+           "F-statistic": round(Fc, 3),
+           "F (= t^2)": round(fitFat["t"] ** 2, 3),
+           "randomization p-value": round(p_permC, 4)}).to_string()
+```
+
+**(c)** $r = \mathbf{0.681}$, p-value $\approx 0.00004$.
+
+**(d)** $\widehat{Calories} = 106.1 + 21.6\,\text{Fat}$; t = 4.91,
+p-value $\approx 0.00004$.
+
+**(e)** **F = 24.13** (df 1, 28), p-value $\approx 0.00004$.
+
+**(f)** **R² = 46.3%**: fat content explains about 46% of the variability
+in calories.
+
+**(g)** The model is clearly effective (all three equivalent tests agree,
+and the randomization F-test concurs, p ≈ `{python} f"{p_permC:.4f}"`),
+with fat the strongest single nutrient predictor of calories in these
+cereals — though over half the variability remains unexplained.
+
+:::
