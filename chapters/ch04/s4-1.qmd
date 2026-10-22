@@ -1,0 +1,766 @@
+---
+execute-dir: project
+title: "Chapter 4 · Section 4.1"
+subtitle: "Introducing Hypothesis Tests — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 4.1 of Lock⁵ introduces the **hypothesis test**, the second big
+inference tool of the book. A test weighs evidence for a *claim* about a
+population — the **alternative hypothesis** ($H_a$) — against a default
+**null hypothesis** ($H_0$) of *nothing going on* (no difference, no effect,
+no association). Hypotheses are always statements about population
+**parameters** (a mean $\mu$, a proportion $p$, a correlation $\rho$, or a
+difference of two of these), never about sample statistics, and the null
+hypothesis carries the equality. The logic is the same random-chance
+reasoning as the bootstrap, run in reverse: we **simulate what sample
+statistics would look like if $H_0$ were true** — for a randomized
+experiment by re-assigning (permuting) the treatment labels at random, for
+other tests by simulating from the null value — to build a
+**randomization distribution** centered at the null value. If the observed
+sample statistic falls in the unlikely tail of that null distribution, the
+data provide evidence *against* $H_0$ and *for* $H_a$; Section 4.2 turns
+that tail area into a formal **p-value**. The alternative may be
+**one-sided** ($>$ or $<$, when the claim has a direction) or
+**two-sided** ($\neq$, when it does not). The exercises below are from
+*Statistics: Unlocking the Power of Data* (Lock⁵, 3rd ed., pp. 289–295):
+Skill Builders 4.1–4.15 practice reading strength of evidence, stating
+hypotheses, and checking their validity; 4.16–4.32 apply the ideas to real
+studies; 4.33–4.39 ask whether an analysis even involves a statistical
+test; 4.40–4.41 compare two ways of influencing voters. Where the printed
+counts make it possible we run an actual randomization simulation
+(10,000 permutations, seed 2026), and the ICU exercises use the
+`ICUAdmissions` data from Data 2.3.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+sns.set_theme(style="whitegrid")
+
+def randomize(groups, stat_fn, reps=10000, seed=2026):
+    """Randomization distribution: pool all values, permute them into groups
+    of the original sizes (consistent with the null hypothesis of no
+    difference between groups), apply `stat_fn` to the list of permuted
+    groups, repeat `reps` times."""
+    rng = np.random.default_rng(seed)
+    pooled = np.concatenate(groups)
+    sizes = [len(g) for g in groups]
+    out = np.empty(reps)
+    for i in range(reps):
+        perm = rng.permutation(pooled)
+        res, pos = [], 0
+        for s in sizes:
+            res.append(perm[pos:pos + s])
+            pos += s
+        out[i] = stat_fn(res)
+    return out
+
+def rand_plot(boots, observed, xlabel, bins=30, figsize=(6, 3)):
+    """Histogram of a randomization distribution with the observed statistic
+    marked by a vertical line."""
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.histplot(x=boots, bins=bins, ax=ax, color="#4c72b0")
+    ax.axvline(observed, color="#c44e52", lw=2)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Randomization statistics")
+    plt.tight_layout()
+    plt.show()
+
+def rand_row(label, stat, boots, alternative="two-sided", digits=3):
+    """One-row summary: observed statistic and randomization p-value."""
+    if alternative == "two-sided":
+        p = float((np.abs(boots) >= abs(stat)).mean())
+    else:  # greater
+        p = float((boots >= stat).mean())
+    pdisp = "< 0.001" if p < 0.001 else round(p, 3)
+    return pd.Series({label: round(float(stat), digits),
+                      f"p-value ({alternative})": pdisp})
+
+def yes_no(n_yes, n_no):
+    """Binary array: 1 = yes/success, 0 = no."""
+    return np.repeat([1.0, 0.0], [n_yes, n_no])
+```
+
+::: {.panel-tabset}
+
+## Exercise 4.1
+
+*(Skill Builder 1: testing whether the mean mathematics placement score is
+greater than 25; dotplots of the four samples in Figure 4.4.)* Evidence
+for "mean $> 25$" comes from samples centered *above* 25 — the further
+above 25 (and the less the values straddle 25), the stronger the evidence.
+
+- **(a) Sample A provides the most evidence.** Its scores run from about 24
+  to 36 with a center near 30 — every part of the distribution sits above
+  25, so a mean above 25 is hardly surprising even if scores vary.
+- **(b) Sample C provides no evidence.** Its scores run from about 17 to 28
+  with a center near 22 — *below* 25, the opposite direction from the claim.
+  Samples B (center ≈ 26–27) and D (center ≈ 26–27) do point the right way
+  and offer some evidence, but their values overlap 25, so the evidence is
+  weaker than for Sample A.
+
+## Exercise 4.2
+
+*(Skill Builder 1: testing whether the mean service time at Restaurant #1
+is less than at Restaurant #2; same-size samples, boxplots in Figure 4.5
+with sample means shown as circles.)* Read off the circles: Sample A —
+$\bar x_1 \approx 6$ vs $\bar x_2 \approx 9.5$; Sample B — $\approx 4.5$ vs
+$\approx 12$; Sample C — $\approx 9$ vs $\approx 6$; Sample D —
+$\approx 7.5$ vs $\approx 5.5$.
+
+- **(a) Sample B provides the most evidence.** Its Restaurant #1 mean
+  (≈ 4.5) is far below its Restaurant #2 mean (≈ 12) and the two boxplots
+  barely overlap — a difference that big is hard to blame on chance.
+- **(b) Samples C and D provide no evidence.** In both, the Restaurant #1
+  mean is *higher* than the Restaurant #2 mean — the wrong direction for
+  the claim. Sample A points the right way ($6 < 9.5$) but the heavy
+  overlap means the evidence is only mild.
+
+## Exercise 4.3
+
+*(Skill Builder 1: testing whether the correlation between exam grades and
+hours playing video games is negative; scatterplots in Figure 4.6.)*
+
+- **(a) Sample A provides the most evidence.** Its points fall in a strong,
+  tight downward trend — a clearly negative sample correlation.
+- **(b) Samples B and C provide no evidence.** Both show clear *upward*
+  (positive) trends — the opposite direction from the claim. Sample D is
+  negative but scattered, so it offers some evidence, just not strong.
+
+## Exercise 4.4
+
+*(Skill Builder 1: testing whether the proportion of US citizens who can
+name the capital of Canada is greater than 0.75, based on samples of 40.)*
+The sample results are A: 31/40 = 0.775, B: 34/40 = 0.85, C: 27/40 = 0.675,
+D: 38/40 = 0.95.
+
+- **(a) Sample D provides the most evidence** — 0.95 is far above 0.75.
+- **(b) Sample C provides no evidence** — 0.675 is *below* 0.75, the wrong
+  direction entirely.
+- The simulation below shows why B is only moderate evidence: if truly
+  $p = 0.75$, getting 34 of 40 correct happens about 9% of the time by
+  chance, while 38 of 40 (Sample D) is very rare and 31 of 40 (Sample A)
+  is common.
+
+```{python}
+#| echo: false
+#| fig-cap: Null distribution of the sample proportion when p = 0.75 and n = 40, with the four sample results marked
+rng = np.random.default_rng(2026)
+null_p = rng.binomial(40, 0.75, 10000) / 40
+fig, ax = plt.subplots(figsize=(6, 3))
+sns.histplot(x=null_p, bins=30, ax=ax, color="#4c72b0")
+for x, name in [(27/40, "C"), (31/40, "A"), (34/40, "B"), (38/40, "D")]:
+    ax.axvline(x, color="#c44e52", ls="--", lw=1)
+ax.set_xlabel("Null sample proportions if p = 0.75 (n = 40), samples A-D marked")
+plt.tight_layout()
+plt.show()
+```
+
+```{python}
+#| echo: false
+samples = pd.DataFrame({"Sample": ["A", "B", "C", "D"],
+                        "Successes of 40": [31, 34, 27, 38],
+                        "Sample proportion": [31/40, 34/40, 27/40, 38/40]})
+samples["P-value if p = 0.75"] = [round(float((null_p >= ph).mean()), 3)
+                                  for ph in samples["Sample proportion"]]
+samples.round(3).to_string(index=False)
+```
+
+## Exercise 4.5
+
+*(Skill Builder 2: state the hypotheses.)* Let $\mu_A$ and $\mu_B$ be the
+mean of group A and of group B:
+
+$$H_0: \mu_A = \mu_B \quad \text{vs} \quad H_a: \mu_A \neq \mu_B$$
+
+The claim ("not the same") is nondirectional, so the alternative is
+two-sided and the equality goes in the null.
+
+## Exercise 4.6
+
+*(Skill Builder 2)* Let $p$ be the population proportion:
+
+$$H_0: p = 0.3 \quad \text{vs} \quad H_a: p > 0.3$$
+
+## Exercise 4.7
+
+*(Skill Builder 2)* Let $\mu$ be the population mean:
+
+$$H_0: \mu = 50 \quad \text{vs} \quad H_a: \mu < 50$$
+
+## Exercise 4.8
+
+*(Skill Builder 2)* Let $\rho$ be the population correlation between the
+two variables:
+
+$$H_0: \rho = 0 \quad \text{vs} \quad H_a: \rho < 0$$
+
+## Exercise 4.9
+
+*(Skill Builder 3: define the parameters, then state the hypotheses.)*
+Parameters: $p_M$, the proportion of *all males* who smoke, and $p_F$, the
+proportion of *all females* who smoke.
+
+$$H_0: p_M = p_F \quad \text{vs} \quad H_a: p_M > p_F$$
+
+## Exercise 4.10
+
+*(Skill Builder 3)* Parameter: $\rho$, the correlation between height and
+salary in the population.
+
+$$H_0: \rho = 0 \quad \text{vs} \quad H_a: \rho \neq 0$$
+
+"Significant (different than zero)" is nondirectional, so the test is
+two-sided.
+
+## Exercise 4.11
+
+*(Skill Builder 3)* Parameter: $p$, the proportion of the population that
+watches the Home Shopping Network.
+
+$$H_0: p = 0.20 \quad \text{vs} \quad H_a: p < 0.20$$
+
+## Exercise 4.12
+
+*(Skill Builder 3)* Parameters: $\mu_S$, the mean sales in *all* stores
+where customers are approached by salespeople, and $\mu_N$, the mean sales
+where they are not.
+
+$$H_0: \mu_S = \mu_N \quad \text{vs} \quad H_a: \mu_S > \mu_N$$
+
+## Exercise 4.13
+
+*(Skill Builder 3)* Parameters: $\mu_{FY}$, the mean weekly study time for
+*all* first-year students, and $\mu_{UC}$, the mean for *all* upperclass
+students.
+
+$$H_0: \mu_{FY} = \mu_{UC} \quad \text{vs} \quad H_a: \mu_{FY} \neq \mu_{UC}$$
+
+"Different between" is nondirectional, so the alternative is two-sided.
+
+## Exercise 4.14
+
+*(Skill Builder 4: are these valid hypotheses?)*
+
+- **(a) $H_0: \mu = 15$ vs $H_a: \mu \neq 15$ — Valid.** Hypotheses about a
+  parameter, equality in the null, complementary and exhaustive.
+- **(b) $H_0: p \neq 0.5$ vs $H_a: p = 0.5$ — Not valid.** The equality
+  must appear in the *null* hypothesis; here the null contains no equality
+  (and the "nothing different" statement sits in the alternative).
+- **(c) $H_0: p_1 < p_2$ vs $H_a: p_1 > p_2$ — Not valid.** Neither
+  hypothesis contains an equality, so together they leave out the case
+  $p_1 = p_2$; the null hypothesis must include it.
+- **(d) $H_0: \bar x_1 = \bar x_2$ vs $H_a: \bar x_1 \neq \bar x_2$ — Not
+  valid.** Hypotheses are statements about population *parameters*, not
+  about the sample means $\bar x_1$ and $\bar x_2$ (which are known once
+  the sample is taken — no test needed).
+
+## Exercise 4.15
+
+*(Skill Builder 4)*
+
+- **(a) $H_0: \rho = 0$ vs $H_a: \rho < 0$ — Valid.**
+- **(b) $H_0: \hat p = 0.3$ vs $H_a: \hat p \neq 0.3$ — Not valid.** The
+  hypotheses are written about the sample statistic $\hat p$ rather than
+  the population parameter $p$.
+- **(c) $H_0: \mu_1 \neq \mu_2$ vs $H_a: \mu_1 = \mu_2$ — Not valid.** The
+  null hypothesis must contain the equality ("no difference"); here it is
+  in the alternative instead.
+- **(d) $H_0: p = 25$ vs $H_a: p \neq 25$ — Not valid.** A proportion must
+  lie between 0 and 1, so $p = 25$ is impossible (presumably 0.25 was
+  intended).
+
+## Exercise 4.16
+
+**How Compassionate Is Your Dog?** Dogs could push open a magnetic door to
+reach their owner; owners were randomly assigned to call *help* in a
+distressed tone (with crying sounds) or in a neutral tone (with humming).
+
+- **(a)** Parameters: $p_D$, the proportion of all dogs in the *distress*
+  condition that would open the door, and $p_C$, the proportion in the
+  *control* condition:
+  $$H_0: p_D = p_C \quad \text{vs} \quad H_a: p_D > p_C$$
+- **(b)** Not strong enough evidence means the sample results are not
+  surprising if the null is true: a difference in door-opening rates as
+  large as (or larger than) the one observed could plausibly happen just by
+  random chance, even if distress has no real effect. The data do not
+  convince us that dogs open the door more often for a distressed owner.
+- **(c)** Parameters: $\mu_D$, the mean time to open the door for all dogs
+  in the distress condition, and $\mu_C$, the mean for the control dogs:
+  $$H_0: \mu_D = \mu_C \quad \text{vs} \quad H_a: \mu_D < \mu_C$$
+- **(d)** Strong evidence means a difference in mean opening times this
+  extreme is unlikely to occur by random chance alone when $H_0$ is true —
+  dogs really do react faster (open the door sooner) when their owner is
+  distressed.
+
+## Exercise 4.17
+
+**Active Learning vs Passive Learning: Comparing Outcomes** Students in a
+physics course were randomly assigned to an active-learning or a
+passive-learning class period.
+
+- **(a)** Parameters: $\mu_A$, the mean test score for all students taught
+  with active learning, and $\mu_P$, the mean for passive learning:
+  $$H_0: \mu_A = \mu_P \quad \text{vs} \quad H_a: \mu_A > \mu_P$$
+- **(b)** Evidence supporting $H_a$ means active learners really do score
+  higher on average — active learning leads to better actual learning of
+  the material (not plausibly explained by random assignment chance).
+- **(c)** For feelings of learning:
+  $$H_0: \mu_A = \mu_P \quad \text{vs} \quad H_a: \mu_A < \mu_P$$
+  where $\mu_A$ and $\mu_P$ are now the mean *feelings-of-learning*
+  ratings for active and passive learners.
+- **(d)** Evidence supporting this $H_a$ means students in the active
+  classroom *feel* they learned less, on average, than students in the
+  passive lecture.
+- **(e)** **Active** learning appears best for actual learning, but the
+  **passive** lecture makes students (incorrectly) think they learned more.
+
+## Exercise 4.18
+
+**Pesticides and ADHD** Urinary dialkyl phosphate (DAP, a pesticide marker)
+was measured for 1139 US children, whose ADHD diagnostic status (Yes/No)
+was also recorded — an observational study.
+
+- **(a)** Parameters: $p_H$, the proportion of all children with *high*
+  pesticide levels who would be diagnosed with ADHD, and $p_L$, the
+  proportion with *low* levels:
+  $$H_0: p_H = p_L \quad \text{vs} \quad H_a: p_H > p_L$$
+- **(b) No.** The sample difference could be due to random chance — that is
+  exactly the question a hypothesis test addresses: how likely is a
+  difference this large in a sample of this size if the population
+  proportions were really equal? Only if such a difference is unlikely
+  under $H_0$ may we generalize the difference to the population.
+- **(c)** Evidence supporting $H_a$ means chance is a poor explanation: in
+  the population, children with high pesticide levels really are more
+  likely to be diagnosed with ADHD. (The study is observational, so this
+  establishes an association, not that pesticides *cause* ADHD.)
+
+## Exercise 4.19
+
+**Beer and Mosquitoes** In a randomized experiment in Burkina Faso, 25
+volunteers drank a liter of beer and 18 drank a liter of water; mosquito
+traps counted attractiveness to mosquitoes before and after consumption.
+
+- **(a)** Parameters: $\mu_B$, the mean number of mosquitoes caught after
+  consumption for all people who drink beer, and $\mu_W$, the mean for all
+  who drink water:
+  $$H_0: \mu_B = \mu_W \quad \text{vs} \quad H_a: \mu_B > \mu_W$$
+- **(b)** Before consumption the beer group averaged
+  $434/25 = 17.36$ mosquitoes and the water group $337/18 \approx 18.72$ —
+  the beer group was actually slightly *lower*. The two means are
+  different, but since the drinks had not yet been consumed, the
+  difference must be the result of random chance in how volunteers were
+  assigned — a good reminder that random assignment never balances groups
+  perfectly.
+- **(c)** After consumption the beer group averaged
+  $590/25 = 23.60$ and the water group $345/18 \approx 19.17$ — the beer
+  group is now higher by about 4.4 mosquitoes. This difference is the one
+  the test targets; given the size of the study and that nothing changed
+  for the water group, it is not the kind of difference we expect from
+  random assignment alone.
+- **(d)** If the part (c) difference is convincing, we conclude that beer
+  drinkers attract more mosquitoes on average — the beer group's
+  attractiveness went up after drinking, relative to the water group.
+- **(e) Yes.** Volunteers were *randomly assigned* to beer or water, so the
+  groups are alike in every other way; the only systematic explanation for
+  the after-consumption difference is the drink itself. This randomized
+  experiment supports the causal conclusion that beer consumption
+  increases mosquito attraction.
+
+*Dataset unavailable — EDA skipped.* Only the totals printed in the
+exercise are used:
+
+```{python}
+#| echo: false
+mosq = pd.DataFrame({"Beer (n = 25)": [434/25, 590/25],
+                     "Water (n = 18)": [337/18, 345/18]},
+                    index=["Before", "After"])
+mosq.round(2).to_string()
+```
+
+## Exercise 4.20
+
+**Guilty Verdicts in Court Cases** A reporter claimed 95% of court cases
+that go to trial end in a guilty verdict; we sample 2000 such cases.
+
+- **(a)** Parameter: $p$, the proportion of *all* court cases that go to
+  trial and result in a guilty verdict. Statistic: $\hat p$, the proportion
+  found guilty in the sample of 2000 cases.
+- **(b)** The claim to be checked is $p = 0.95$, with no direction:
+  $$H_0: p = 0.95 \quad \text{vs} \quad H_a: p \neq 0.95$$
+- **(c)** Assessing evidence means asking: *if* truly 95% of all cases end
+  in a guilty verdict, how likely is a sample proportion as far from 0.95
+  as the one we observed, just by random chance of which 2000 cases land
+  in our sample? If such a $\hat p$ is reasonably likely, the claim stands;
+  if it is very unlikely, we have evidence that the true proportion is not
+  0.95.
+
+## Exercise 4.21
+
+**Exercise and the Brain** Mice with access to a running wheel were
+compared to sedentary mice on brain chemistry.
+
+- **(a)** Parameters: $\mu_E$, the mean BMP level in the brains of all mice
+  allowed to exercise, and $\mu_S$, the mean for sedentary mice:
+  $$H_0: \mu_E = \mu_S \quad \text{vs} \quad H_a: \mu_E < \mu_S$$
+- **(b)** Parameters: $\mu_E$ and $\mu_S$, now the mean *noggin* levels for
+  exercising and sedentary mice:
+  $$H_0: \mu_E = \mu_S \quad \text{vs} \quad H_a: \mu_E > \mu_S$$
+- **(c)** Parameter: $\rho$, the correlation between BMP level and noggin
+  level in the brains of mice:
+  $$H_0: \rho = 0 \quad \text{vs} \quad H_a: \rho < 0$$
+
+## Exercise 4.22
+
+**Taste Test** 100 people taste two diet colas; we test whether *more*
+people prefer Brand A.
+
+- **(a)** Parameter: $p$, the proportion of all people (like these tasters)
+  who prefer Brand A:
+  $$H_0: p = 0.5 \quad \text{vs} \quad H_a: p > 0.5$$
+  (No preference means a 50/50 split.)
+- **(b) Strong evidence:** e.g., 90 choose Brand A and 10 choose Brand B —
+  if preferences were really 50/50, a 90–10 split in 100 tastes would be
+  almost impossible by chance.
+- **(c) No evidence:** e.g., 48 choose Brand A and 52 choose Brand B — the
+  result is on the wrong side of an even split.
+- **(d) Inconclusive (some evidence, not strong):** e.g., 58 choose Brand A
+  and 42 choose Brand B — more than half prefer A, but a 58–42 split could
+  plausibly occur by random chance even with no real preference.
+
+## Exercise 4.23
+
+**ICU Admissions: mean heart rate by sex.** Parameters: $\mu_M$, the mean
+heart rate of all male ICU patients at this hospital, and $\mu_F$, the mean
+for all female ICU patients:
+
+$$H_0: \mu_M = \mu_F \quad \text{vs} \quad H_a: \mu_M > \mu_F$$
+
+In the sample of 200 patients (`data/ch03/ICUAdmissions.csv`):
+
+```{python}
+#| echo: false
+icu = pd.read_csv("data/ch03/ICUAdmissions.csv")
+pd.Series({"Male mean HR (n = 124)": round(icu.loc[icu.Sex == 0, "HeartRate"].mean(), 1),
+           "Female mean HR (n = 76)": round(icu.loc[icu.Sex == 1, "HeartRate"].mean(), 1)}).to_string()
+```
+
+## Exercise 4.24
+
+**ICU Admissions: CPR by race.** Parameters: $p_W$, the proportion of all
+white ICU patients who receive CPR, and $p_B$, the proportion of all black
+ICU patients who do:
+
+$$H_0: p_W = p_B \quad \text{vs} \quad H_a: p_W \neq p_B$$
+
+"Is there a difference" is two-sided. In the sample:
+
+```{python}
+#| echo: false
+cw = icu.loc[icu.Race == 1, "CPR"]
+cb = icu.loc[icu.Race == 2, "CPR"]
+pd.Series({"White patients: CPR (of n)": f"{int(cw.sum())} of {len(cw)}",
+           "Black patients: CPR (of n)": f"{int(cb.sum())} of {len(cb)}"}).to_string()
+```
+
+## Exercise 4.25
+
+**ICU Admissions: systolic blood pressure and heart rate.** Parameter:
+$\rho$, the correlation between systolic blood pressure and heart rate in
+the population of ICU patients:
+
+$$H_0: \rho = 0 \quad \text{vs} \quad H_a: \rho > 0$$
+
+The claim is a *positive* linear association, so the alternative is
+one-sided. (In this sample the correlation is actually slightly negative,
+so the data give no support to the claim.)
+
+```{python}
+#| echo: false
+pd.Series({"Sample correlation (Systolic, HeartRate)": round(icu.Systolic.corr(icu.HeartRate), 3)}).to_string()
+```
+
+## Exercise 4.26
+
+**ICU Admissions: sex breakdown.** Parameter: $p$, the proportion of all
+ICU patients at this hospital who are male:
+
+$$H_0: p = 0.5 \quad \text{vs} \quad H_a: p \neq 0.5$$
+
+"Over-represented" could apply to either sex, so the alternative is
+two-sided. In the sample, 124 of 200 patients (0.62) are male.
+
+```{python}
+#| echo: false
+pd.Series({"Males (of 200)": int((icu.Sex == 0).sum()),
+           "Sample proportion male": round(float((icu.Sex == 0).mean()), 3)}).to_string()
+```
+
+## Exercise 4.27
+
+**ICU Admissions: average age.** Parameter: $\mu$, the mean age of all ICU
+patients at this hospital:
+
+$$H_0: \mu = 50 \quad \text{vs} \quad H_a: \mu > 50$$
+
+The sample mean age is 57.5 years, above the null value.
+
+```{python}
+#| echo: false
+pd.Series({"Sample mean age": round(icu.Age.mean(), 1),
+           "Sample st dev": round(icu.Age.std(ddof=1), 1)}).to_string()
+```
+
+## Exercise 4.28
+
+**Income East and West of the Mississippi** Annual household income,
+east/west location, and number of children recorded for a random sample of
+US households.
+
+- **(a)** Parameters: $\mu_E$, the mean annual household income for *all*
+  households east of the Mississippi, and $\mu_W$, the mean for all
+  households west of it:
+  $$H_0: \mu_E = \mu_W \quad \text{vs} \quad H_a: \mu_E \neq \mu_W$$
+  ("whether there is a difference" — no direction — gives a two-sided
+  alternative.)
+- **(b)** The statistic that estimates the difference is
+  $\bar x_E - \bar x_W$, the difference in sample mean incomes.
+
+## Exercise 4.29
+
+**Relationship between Income and Number of Children**
+
+- **(a)** Parameter: $\rho$, the correlation between household income and
+  number of children in the population of US households:
+  $$H_0: \rho = 0 \quad \text{vs} \quad H_a: \rho \neq 0$$
+- **(b) $r = 0.75$** shows more evidence of a relationship — the further a
+  sample correlation is from 0, the harder it is to explain by random
+  chance when $\rho = 0$.
+- **(c) Neither — they show equal evidence.** $r = 0.50$ and $r = -0.50$
+  are the same distance from 0; strength of evidence depends on the
+  *magnitude* $|r|$, not the sign (the sign only gives the direction of
+  the association).
+
+## Exercise 4.30
+
+**Red Wine and Weight Loss** In a hypothetical primate study, one group
+gets a resveratrol supplement and the other a placebo; we test whether
+resveratrol increases the mean metabolism rate.
+
+- **(a)** Parameters: $\mu_R$, the mean resting metabolism rate for all
+  individuals of this species given resveratrol, and $\mu_P$, the mean for
+  those given a placebo:
+  $$H_0: \mu_R = \mu_P \quad \text{vs} \quad H_a: \mu_R > \mu_P$$
+- **(b)** In Figure 4.7(a) (Species A) the resveratrol mean (≈ 60) *is*
+  slightly greater than the placebo mean (≈ 57) — but **no**, we cannot
+  necessarily conclude resveratrol works: the two boxplots overlap heavily
+  and the mean difference (about 3) is tiny compared to the individual
+  variability, so a gap this small could easily be random chance.
+- **(c) Species B.** The sample sizes are the same and the resveratrol
+  group again has the higher mean, but in Species B the gap is larger
+  (≈ 57 vs ≈ 44) and the distributions barely overlap — with much less
+  variability, random chance is a far less plausible explanation, so the
+  evidence is stronger.
+
+## Exercise 4.31
+
+**The Lady Tasting Tea** Muriel Bristol-Roach claimed she could tell
+whether milk or tea was poured into a cup first; Fisher designed an
+experiment to test her.
+
+- **(a)** In plain English: the null hypothesis is that Muriel has **no
+  ability** to tell — she is just guessing, so she gets each cup right half
+  the time by luck. The alternative is that she **can** tell the
+  difference — she gets it right more often than chance would allow.
+- **(b)** With $p$ the true proportion of times she guesses correctly:
+  $$H_0: p = 0.5 \quad \text{vs} \quad H_a: p > 0.5$$
+
+## Exercise 4.32
+
+**Flaxseed and Omega-3** A company advertises that a tablespoon of milled
+flaxseed contains, on average, at least 3800 mg of ALNA. Let $\mu$ be the
+mean ALNA content per tablespoon (in the population of all tablespoons).
+
+- **(a)** The company wants evidence that the average is *higher* than
+  3800 mg (so the claim is safely supported):
+  $$H_0: \mu = 3800 \quad \text{vs} \quad H_a: \mu > 3800$$
+- **(b)** The consumer organization acts only if there is evidence the
+  average is *less* than 3800 mg:
+  $$H_0: \mu = 3800 \quad \text{vs} \quad H_a: \mu < 3800$$
+
+Same data, opposite alternatives — which hypothesis is "the claim to
+disprove" depends on who is running the test.
+
+## Exercise 4.33
+
+**Polling to determine average TV hours.** **No statistical test.** There
+is no claim to assess — the poll simply estimates the average number of
+hours a day people watch television with a confidence interval (or just
+reports $\bar x$). Nothing is being challenged, so no null hypothesis.
+
+## Exercise 4.34
+
+**Polling about mobile homes.** **Yes, a statistical test.** Parameter:
+$p$, the proportion of all people in the community living in a mobile
+home; statistic: $\hat p$ from the 1000 people polled.
+
+$$H_0: p = 0.10 \quad \text{vs} \quad H_a: p > 0.10$$
+
+## Exercise 4.35
+
+**Using the census about mobile homes.** **No statistical test.** The
+census includes *every* resident, so the population percentage is known
+exactly — if it is not greater than 10%, no evidence is needed; if it is,
+no inference from a sample is required. (A hypothesis test only makes
+sense when we must generalize from a sample to a population.)
+
+## Exercise 4.36
+
+**Right- vs left-hand reaction time.** **Yes, a statistical test.** Each
+participant uses both hands, so the parameter is the mean *difference* in
+reaction time: $\mu_d = \mu_R - \mu_L$, the mean (right − left) reaction
+time for the population:
+
+$$H_0: \mu_d = 0 \quad \text{vs} \quad H_a: \mu_d < 0$$
+
+(The alternative is negative because "the right hand reacts faster" means
+a *shorter* time for the right hand.)
+
+## Exercise 4.37
+
+**Braking reaction time in a simulator.** **No statistical test.** As in
+Exercise 4.33, there is no claim to test — the study just estimates the
+average reaction time.
+
+## Exercise 4.38
+
+**Coke/Pepsi taste test in New York City.** **Yes, a statistical test.**
+Parameter: $p$, the proportion of all people (in NYC) who prefer Pepsi;
+statistic: $\hat p$ from the random sample of tasters.
+
+$$H_0: p = 0.5 \quad \text{vs} \quad H_a: p > 0.5$$
+
+## Exercise 4.39
+
+**Complete voting records of a county.** **No statistical test.** The
+records cover *all* eligible voters in the county, so the proportion who
+voted is known exactly — there is no sample and nothing to generalize.
+Either more than 50% voted or they did not; no evidence is needed.
+
+## Exercise 4.40
+
+**Influencing Voters** 500 voters are randomly split: 250 get a recorded
+phone call from the candidate, 250 get a mailed flyer; we test whether the
+proportions who will vote for the candidate differ between the methods.
+
+- **(a)** Parameters: $p_c$, the proportion of all voters who would support
+  the candidate after a phone call, and $p_f$, the proportion after a
+  flyer:
+  $$H_0: p_c = p_f \quad \text{vs} \quad H_a: p_c \neq p_f$$
+- **(b)** Sample A (Table 4.3):
+  $\hat p_c = 152/250 = 0.608$ and $\hat p_f = 145/250 = 0.580$ — a
+  difference of just 0.028.
+- **(c)** Sample B (Table 4.4):
+  $\hat p_c = 188/250 = 0.752$ and $\hat p_f = 120/250 = 0.480$ — a
+  difference of 0.272.
+- **(d) Sample B offers much stronger evidence.** If the two methods were
+  equally effective, the success counts would be split between the 500
+  voters essentially at random; the simulation below (pooling the
+  successes and re-dealing the 250/250 group labels 10,000 times) shows
+  that a difference of 0.028 (Sample A) is very ordinary under $H_0$ —
+  $p \approx 0.59$ — while a difference of 0.272 (Sample B) never comes
+  close to occurring by chance — $p < 0.001$.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distributions of the difference in proportions under the null of no difference, for Sample A and Sample B
+phone_a = yes_no(152, 98)
+flyer_a = yes_no(145, 105)
+phone_b = yes_no(188, 62)
+flyer_b = yes_no(120, 130)
+boots_a = randomize([phone_a, flyer_a], lambda r: r[0].mean() - r[1].mean())
+boots_b = randomize([phone_b, flyer_b], lambda r: r[0].mean() - r[1].mean())
+fig, axes = plt.subplots(1, 2, figsize=(7, 3))
+for ax, b, obs, name in [
+        (axes[0], boots_a, 152/250 - 145/250, "Sample A (diff = 0.028)"),
+        (axes[1], boots_b, 188/250 - 120/250, "Sample B (diff = 0.272)")]:
+    sns.histplot(x=b, bins=30, ax=ax, color="#4c72b0")
+    ax.axvline(obs, color="#c44e52", lw=2)
+    ax.set_title(name, fontsize=10)
+    ax.set_xlabel("Randomization differences in proportions")
+plt.tight_layout()
+plt.show()
+```
+
+```{python}
+#| echo: false
+pd.concat([rand_row("Sample A difference (phone - flyer)", 152/250 - 145/250, boots_a),
+           rand_row("Sample B difference (phone - flyer)", 188/250 - 120/250, boots_b)],
+          axis=1).to_string()
+```
+
+## Exercise 4.41
+
+**Influencing Voters: Is a Phone Call More Effective?** Now 200 voters:
+100 get the flyer, 100 get the phone call, and we specifically test
+whether the phone call is *more* effective.
+
+- **(a)** Parameters: $p_c$, the proportion of all voters who would support
+  the candidate after a phone call, and $p_f$, the proportion after a
+  flyer:
+  $$H_0: p_c = p_f \quad \text{vs} \quad H_a: p_c > p_f$$
+- **(b) Clear evidence** — a large difference in the right direction, e.g.:
+
+  | Will vote for candidate | Yes | No |
+  |---|---|---|
+  | Phone call | 85 | 15 |
+  | Flyer | 50 | 50 |
+
+  A 0.35 advantage for the phone call would essentially never occur by
+  random deal-out of the 200 voters if the methods were equally effective.
+- **(c) No evidence at all** — the phone group does no better, e.g.:
+
+  | Will vote for candidate | Yes | No |
+  |---|---|---|
+  | Phone call | 50 | 50 |
+  | Flyer | 52 | 48 |
+
+  The difference is 0.02 in the *wrong* direction, so it cannot support
+  the claim.
+- **(d) Not clear** — some evidence, but plausibly chance, e.g.:
+
+  | Will vote for candidate | Yes | No |
+  |---|---|---|
+  | Phone call | 58 | 42 |
+  | Flyer | 50 | 50 |
+
+  The phone group does 0.08 better, but the simulation below shows a gap
+  this size or larger happens in about a fifth of random deal-outs — some
+  evidence, likely not strong enough to generalize.
+
+```{python}
+#| echo: false
+examples = {"Clear evidence (85 vs 50)": (85, 50),
+            "No evidence (50 vs 52)": (50, 52),
+            "Unclear (58 vs 50)": (58, 50)}
+rows = {}
+for name, (nc, nf) in examples.items():
+    b = randomize([yes_no(nc, 100 - nc), yes_no(nf, 100 - nf)],
+                  lambda r: r[0].mean() - r[1].mean())
+    obs = nc / 100 - nf / 100
+    p = float((b >= obs).mean())
+    rows[name] = [round(obs, 2), ("< 0.001" if p < 0.001 else round(p, 3))]
+pd.DataFrame(rows, index=["Observed difference (phone - flyer)",
+                          "p-value (one-sided)"]).to_string()
+```
+
+:::

@@ -1,0 +1,884 @@
+---
+execute-dir: project
+title: "Chapter 4 · Section 4.4"
+subtitle: "A Closer Look at Testing — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 4.4 of Lock⁵ asks what actually happens when we run a hypothesis
+test. Every test can end in one of **two errors**: a **Type I error** rejects
+a null hypothesis $H_0$ that is actually true, and a **Type II error** fails
+to reject an $H_0$ that is actually false. The **significance level**
+$\alpha$ is the price we set in advance for a Type I error — if $H_0$ is
+true, results this extreme occur with probability $\alpha$, so about
+$\alpha$ of all tests run on true nulls will wrongly find significance
+(run 100 tests at $\alpha = 0.05$ on situations where nothing is going on
+and about 5 will be "significant" by chance alone). The probability of a
+Type II error is $\beta$, and the **power** of a test, $1 - \beta$, is its
+ability to detect an effect that is really there. Power grows with the
+**sample size** (less chance noise, smaller standard errors) and with the
+**effect size** (bigger effects hide less easily), and it also depends on
+how much variability there is in the population and on the significance
+level chosen. Two further themes run through this section: a small
+**p-value is evidence, not proof** — it is the probability, computed
+*assuming* $H_0$ is true, of seeing a statistic as extreme as the one
+observed, and it is never the probability that $H_0$ is true — and
+**statistical significance is not practical significance**: with a big
+enough sample even a trivial effect becomes "significant." Running **many
+tests** makes all of this worse: at level $\alpha$, about $\alpha$ × (number
+of tests) false positives are expected when all nulls are true, so a single
+significant hit out of dozens of attempts deserves suspicion, and results
+earn trust only through **replication**.
+The exercises below are from *Statistics: Unlocking the Power of Data*
+(Lock⁵, 3rd ed., pp. 343–348). Skill Builders 4.147–4.150 watch the same
+statistic gain strength as sample sizes grow; 4.151–4.154 count expected
+false positives; 4.155–4.159 interpret p-values and choose sensible
+significance levels; 4.160–4.165 pick large or small $\alpha$ in context;
+4.166–4.175 translate Type I and Type II errors into real situations;
+and 4.176–4.183 confront the problem of multiple tests and replication,
+with a full randomization analysis of the `MateChoice` fruit fly data.
+All p-values below come from randomization distributions simulated with
+seed 2026 (10,000 replicates unless noted); for tests of a proportion the
+null distribution is simulated directly, and for differences in proportions
+the shuffle is computed exactly through the hypergeometric count of
+successes landing in one group.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+sns.set_theme(style="whitegrid")
+
+REPS = 10000
+
+def rand_prop_p(k, n, seed=2026):
+    """P-value (one-tailed, Ha: p > 0.5) for a test of H0: p = 0.5, using the
+    randomization distribution of the sample proportion."""
+    r = np.random.default_rng(seed)
+    sims = r.binomial(n, 0.5, REPS) / n
+    return float((sims >= k / n - 1e-12).mean())
+
+def shuffle_diff_stats(k1, n1, k2, n2, seed=2026):
+    """Randomization distribution of p-hat1 - p-hat2 under H0: p1 = p2,
+    by shuffling the pooled successes (exact hypergeometric shuffle)."""
+    r = np.random.default_rng(seed)
+    N, K = n1 + n2, k1 + k2
+    s1 = r.hypergeometric(K, N - K, n1, REPS)
+    return s1 / n1 - (K - s1) / n2
+
+def rand_diff_p(k1, n1, k2, n2, two=False, seed=2026):
+    """P-value for a difference in proportions from the shuffle distribution."""
+    stat = shuffle_diff_stats(k1, n1, k2, n2, seed)
+    obs = k1 / n1 - k2 / n2
+    if two:
+        return float((np.abs(stat) >= abs(obs) - 1e-12).mean())
+    return float((stat >= obs - 1e-12).mean())
+
+def rand_plot(stats_list, obs_list, titles, xlabel, figsize=(7, 2.6)):
+    """Row of randomization-distribution histograms with observed statistic lines."""
+    fig, axes = plt.subplots(1, len(stats_list), figsize=figsize)
+    for ax, st, ob, ti in zip(np.atleast_1d(axes), stats_list, obs_list, titles):
+        sns.histplot(x=st, bins=30, ax=ax, color="#4c72b0")
+        ax.axvline(ob, color="#c44e52", lw=2)
+        ax.set_title(ti, fontsize=10)
+        ax.set_xlabel(xlabel)
+    plt.tight_layout()
+    plt.show()
+```
+
+::: {.panel-tabset}
+
+## Exercise 4.147
+
+*(Skill Builder 1: the same statistic, three sample sizes.)* Testing
+$H_0: p = 0.5$ vs $H_a: p > 0.5$ using $\hat p = 0.55$ every time. The
+statistic never changes — what changes is the **standard error**. A larger
+$n$ makes the randomization distribution (centered at 0.5) narrower, so the
+observed 0.55 falls deeper into its tail:
+
+- **(a) $n = 100$: p-value ≈ 0.19 — not significant at a 5% level.**
+- **(b) $n = 500$: p-value ≈ 0.013 — significant at a 5% level.**
+- **(c) $n = 1000$: p-value ≈ 0.001 — significant, and the strongest
+  evidence.**
+- **The largest sample size, (c), provides the strongest evidence** for
+  $H_a$: same statistic, smaller SE, more extreme, smaller p-value.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distributions of the sample proportion 0.55 when p = 0.5, for sample sizes 100, 500 and 1000
+rng = np.random.default_rng(2026)
+fig, axes = plt.subplots(1, 3, figsize=(7, 2.6))
+for ax, n, lab in [(axes[0], 100, "n = 100: p-value = 0.19"),
+                   (axes[1], 500, "n = 500: p-value = 0.013"),
+                   (axes[2], 1000, "n = 1000: p-value = 0.001")]:
+    sims = rng.binomial(n, 0.5, REPS) / n
+    sns.histplot(x=sims, bins=30, ax=ax, color="#4c72b0")
+    ax.axvline(0.55, color="#c44e52", lw=2)
+    ax.set_title(lab, fontsize=10)
+    ax.set_xlabel("Randomization sample proportions")
+plt.tight_layout()
+plt.show()
+```
+
+```{python}
+#| echo: false
+pd.DataFrame({
+    "Case": ["(a)", "(b)", "(c)"],
+    "Sample size": [100, 500, 1000],
+    "Statistic": ["55/100 = 0.55", "275/500 = 0.55", "550/1000 = 0.55"],
+    "Randomization p-value": [f"{rand_prop_p(k, n):.3f}"
+                              for k, n in [(55, 100), (275, 500), (550, 1000)]],
+    "Significant at 5%?": ["No", "Yes", "Yes (strongest)"],
+}).to_string()
+```
+
+## Exercise 4.148
+
+*(Skill Builder 1)* Testing $H_0: p = 0.5$ vs $H_a: p > 0.5$ using
+$\hat p = 0.58$:
+
+- **(a) $n = 50$: p-value ≈ 0.16 — not significant.** With only 50 flips,
+  a proportion of 0.58 is well within the reach of chance.
+- **(b) $n = 500$: p-value ≈ 0.0002 — highly significant.** The same
+  $\hat p$, but five times the data, pushes it far into the tail.
+- Again the **larger sample size (b) gives the stronger evidence**.
+
+```{python}
+#| echo: false
+pd.DataFrame({
+    "Case": ["(a)", "(b)"],
+    "Sample size": [50, 500],
+    "Statistic": ["29/50 = 0.58", "290/500 = 0.58"],
+    "Randomization p-value": [f"{rand_prop_p(k, n):.4f}"
+                              for k, n in [(29, 50), (290, 500)]],
+    "Significant at 5%?": ["No", "Yes (strongest)"],
+}).to_string()
+```
+
+## Exercise 4.149
+
+*(Skill Builder 1: difference in proportions.)* Testing
+$H_0: p_1 = p_2$ vs $H_a: p_1 > p_2$ using
+$\hat p_1 - \hat p_2 = 0.8 - 0.7 = 0.10$:
+
+- **(a) $n_1 = 30$, $n_2 = 20$: p-value ≈ 0.32 — not significant.** The
+  shuffle distribution is wide (and quite discrete at these sizes; a normal
+  approximation would put the p-value near 0.21 — either way, nowhere near
+  0.05).
+- **(b) $n_1 = 300$, $n_2 = 200$: p-value ≈ 0.007 — significant.**
+- The **larger samples (b) give the stronger evidence** — the same 0.10
+  difference is much harder to explain by chance with ten times the data.
+
+```{python}
+#| echo: false
+pd.DataFrame({
+    "Case": ["(a)", "(b)"],
+    "Sample sizes": ["n1 = 30, n2 = 20", "n1 = 300, n2 = 200"],
+    "Statistic": ["24/30 - 14/20 = 0.10", "240/300 - 140/200 = 0.10"],
+    "Randomization p-value": [
+        f"{rand_diff_p(24, 30, 14, 20):.3f}",
+        f"{rand_diff_p(240, 300, 140, 200):.3f}",
+    ],
+    "Significant at 5%?": ["No", "Yes (strongest)"],
+}).to_string()
+```
+
+## Exercise 4.150
+
+*(Skill Builder 1)* Testing $H_0: p_1 = p_2$ vs $H_a: p_1 > p_2$ using
+$\hat p_1 - \hat p_2 = 0.45 - 0.30 = 0.15$:
+
+- **(a) $n_1 = n_2 = 20$: p-value ≈ 0.26 — not significant.**
+- **(b) $n_1 = n_2 = 200$: p-value ≈ 0.001 — significant.**
+- **(c) $n_1 = n_2 = 2000$: p-value essentially 0 — significant, by far the
+  strongest evidence.**
+- Same story, three sizes: the difference of 0.15 is fixed, and the
+  evidence strengthens as the samples grow.
+
+```{python}
+#| echo: false
+pd.DataFrame({
+    "Case": ["(a)", "(b)", "(c)"],
+    "Sample sizes": ["n1 = n2 = 20", "n1 = n2 = 200", "n1 = n2 = 2000"],
+    "Statistic": ["9/20 - 6/20 = 0.15", "90/200 - 60/200 = 0.15",
+                  "900/2000 - 600/2000 = 0.15"],
+    "Randomization p-value": [
+        f"{rand_diff_p(9, 20, 6, 20):.3f}",
+        f"{rand_diff_p(90, 200, 60, 200):.4f}",
+        f"{rand_diff_p(900, 2000, 600, 2000):.5f}",
+    ],
+    "Significant at 5%?": ["No", "Yes", "Yes (strongest)"],
+}).to_string()
+```
+
+## Exercise 4.151
+
+*(Skill Builder 2: many tests, all nulls true.)* 100 tests at a 5%
+significance level: if every $H_0$ is true, each test still has a 5% chance
+of rejecting by chance, so **about $100 \times 0.05 = 5$ of the tests will
+incorrectly find significance**. The simulation below runs 10,000 tests in
+which the null really is true (testing a mean with a randomization test)
+and rejects 4.9% of them — right at the promised rate:
+
+```{python}
+#| echo: false
+rng = np.random.default_rng(2026)
+n, n_studies, chunk, reps = 20, 10000, 250, 1000
+pvals = []
+for start in range(0, n_studies, chunk):
+    X = rng.standard_normal((chunk, n))            # data with H0 true
+    obs = np.abs(X.mean(axis=1))
+    signs = rng.choice([-1.0, 1.0], size=(chunk, reps, n))
+    null = np.abs((X[:, None, :] * signs).mean(axis=2))
+    pvals.append((null >= obs[:, None] - 1e-12).mean(axis=1))
+pvals = np.concatenate(pvals)
+f"Empirical Type I error rate over {n_studies} tests: {(pvals <= 0.05).mean():.3f} (nominal alpha = 0.05)"
+```
+
+```{python}
+#| echo: false
+#| fig-cap: p-values from 10000 tests in which the null hypothesis is true, with the 5 percent cutoff marked
+fig, ax = plt.subplots(figsize=(6, 2.6))
+sns.histplot(x=pvals, bins=20, ax=ax, color="#4c72b0")
+ax.axvline(0.05, color="#c44e52", ls="--", lw=1.5)
+ax.set_xlabel("p-value (null hypothesis true)")
+ax.set_ylabel("Number of tests")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 4.152
+
+*(Skill Builder 2)* 300 tests at a 1% significance level: each true null
+has a 1% chance of a false rejection, so **about $300 \times 0.01 = 3$**
+of the tests will incorrectly find significance. Even a strict level like
+1% cannot protect a batch of hundreds of tests from yielding a few false
+positives.
+
+## Exercise 4.153
+
+*(Skill Builder 2)* 40 tests at a 10% significance level: **about
+$40 \times 0.10 = 4$** of the tests will incorrectly find significance.
+A loose significance level produces false positives at a rate that adds up
+quickly even in a modest batch of tests.
+
+## Exercise 4.154
+
+*(Skill Builder 2)* 800 tests at a 5% significance level: **about
+$800 \times 0.05 = 40$** of the tests will incorrectly find significance.
+The expected number of wrong conclusions grows with *both* the number of
+tests and the significance level — a first warning about fishing for
+significance in large batches.
+
+## Exercise 4.155
+
+**Interpreting a p-value.** Which statements are proper interpretations of
+what a p-value measures?
+
+- **(a) No.** The p-value is computed *assuming* $H_0$ is true; it says
+  nothing about the probability that $H_0$ is true.
+- **(b) No.** Same reason — the p-value is not the probability that $H_a$
+  is true.
+- **(c) Yes.** This is the definition: assuming $H_0$ is true, the
+  probability of seeing a statistic as extreme as (or more extreme than)
+  the one observed.
+- **(d) No.** If $H_0$ is true, the probability of making a Type I error is
+  the significance level $\alpha$ (the chance of rejecting a true null),
+  not the p-value.
+- **(e) No.** If $H_a$ is true, the probability of a Type II error is
+  $\beta$, which depends on the true effect size and sample size — not the
+  p-value.
+
+## Exercise 4.156
+
+**Translating information to other significance levels.** A two-tailed
+test of $H_0: \rho = 0$ vs $H_a: \rho \neq 0$ rejects $H_0$ at the 5%
+level (p-value $\le 0.05$). Which conclusions also definitely hold?
+
+- **(a) Reject at a 1% level: not necessarily.** A p-value of, say, 0.03
+  rejects at 5% but not at 1%; we only know p $\le 0.05$.
+- **(b) Reject at a 10% level: definitely valid.** If p $\le 0.05$ then
+  certainly p $\le 0.10$.
+- **(c) Reject in favor of the one-tailed $H_a: \rho > 0$ at 5% (with
+  positive sample correlation): definitely valid.** For the symmetric
+  randomization distribution, the one-tailed p-value is half the two-tailed
+  one, so it is at most $0.05/2 = 0.025 < 0.05$.
+
+## Exercise 4.157
+
+**Euchre.** Two teams play a series of games; the series stops when one
+team is *statistically significantly* better than the other.
+
+- **(a) Parameter:** $p$, the long-run proportion of games that team A
+  would win against team B.
+- **(b) Hypotheses:** $H_0: p = 0.5$ (the teams are equally good) vs
+  $H_a: p \neq 0.5$ (one team is better — either one, so two-tailed).
+- **(c) Statistic:** $\hat p$, the running proportion of games won by
+  team A (recorded game by game as the series goes on).
+- **(d) No.** After one or two games the evidence cannot possibly be
+  strong: even two straight wins give a two-tailed p-value of
+  $2(1/4) = 0.5$. Chance produces short winning streaks all the time, so
+  the winner cannot be determined that quickly.
+- **(e) The 1% level makes the series last longer.** Demanding stronger
+  evidence (smaller $\alpha$) means waiting for a more extreme winning
+  record — more games. (Note $\alpha$ here is exactly the chance of
+  stopping the series and crowding a champion who is really no better.)
+
+## Exercise 4.158
+
+**Flying Home for the Holidays, On Time.** December flights: of 1000 Delta
+flights, 45 arrived more than 30 minutes late; of 1000 United flights, 114
+did. Is the proportion of over-30-minute-late flights different between the
+airlines?
+
+- **(a)** $H_0: p_U = p_D$ (the proportion of flights over 30 minutes late
+  is the same for United and Delta) vs $H_a: p_U \neq p_D$ (the proportions
+  differ — two-tailed).
+- **(b)** The statistic recorded for each randomization sample is the
+  difference in proportions $\hat p_U - \hat p_D$; for the observed sample
+  it equals $114/1000 - 45/1000 = 0.114 - 0.045 = 0.069$.
+- **(c)** The shuffle distribution (below, left) is centered at 0 with
+  SE ≈ 0.012; the observed 0.069 lies far beyond every one of the 10,000
+  shuffles — **p-value essentially 0**.
+- **(d)** Since $0.0000 < \alpha = 0.01$: **reject $H_0$.** There is strong
+  evidence that the proportion of flights arriving more than 30 minutes
+  late differs between United and Delta (United's is higher).
+- **(e) No — the conclusion changes.** With only 88 flights per airline but
+  roughly the same proportions (10/88 vs 4/88), the observed difference is
+  still about 0.068, but the shuffle distribution (below, right) is much
+  wider and the p-value rises to about 0.17. At $\alpha = 0.01$ we **do not
+  reject $H_0$**: smaller samples carry less information, and the same
+  difference is no longer convincing.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distributions of the difference in late-flight proportions, full samples and samples of size 88
+big = shuffle_diff_stats(114, 1000, 45, 1000)
+small = shuffle_diff_stats(10, 88, 4, 88)
+rand_plot([big, small], [114/1000 - 45/1000, 10/88 - 4/88],
+          ["n = 1000 per airline", "n = 88 per airline"],
+          "Randomization differences in proportions")
+```
+
+```{python}
+#| echo: false
+pd.DataFrame({
+    "Sample sizes": ["1000 and 1000", "88 and 88"],
+    "Observed statistic": [f"{114/1000 - 45/1000:.3f}", f"{10/88 - 4/88:.3f}"],
+    "Two-tailed p-value": [f"{rand_diff_p(114, 1000, 45, 1000, two=True):.4f}",
+                           f"{rand_diff_p(10, 88, 4, 88, two=True):.4f}"],
+    "Reject at alpha = 0.01?": ["Yes", "No"],
+}).to_string()
+```
+
+## Exercise 4.159
+
+**Flaxseed and Omega-3.** A company advertises that its milled flaxseed
+contains, on average, at least 3800 mg of ALA per tablespoon. Which
+standard significance level — 1%, 5%, or 10% — makes most sense?
+
+- **(a) 10%.** The company is running an internal double-check, is eager to
+  find evidence *for* its own claim, and faces no real consequences either
+  way; using a larger $\alpha$ makes it easier to find the evidence it
+  hopes for, at little cost.
+- **(b) 1%.** A consumer organization planning a lawsuit should demand very
+  strong evidence before accusing the company: a small $\alpha$ keeps the
+  risk of wrongly rejecting the claim (and triggering an unjustified suit)
+  as low as possible.
+
+## Exercise 4.160
+
+**Dangerous new drug.** Testing whether a drug with potentially dangerous
+side effects is significantly better than the current drug, where approval
+means prescribing it to millions: use a **relatively small significance
+level (such as $\alpha = 0.01$)**. A Type I error — switching millions of
+patients to a drug that is not really better but has dangerous side
+effects — is very costly, so strong evidence should be required first.
+
+## Exercise 4.161
+
+**TV watching by sex.** Using a statistics class as a sample to look for a
+male–female difference in weekly TV hours: use a **relatively large
+significance level (such as $\alpha = 0.10$)**. This is a low-stakes,
+exploratory look at class data; wrongly finding a difference has essentially
+no consequences, while a small $\alpha$ would make it easy to miss anything
+that is there.
+
+## Exercise 4.162
+
+**Wii bowling bragging rights.** Ten games each to see if your average
+score is significantly more than your friend's: use a **relatively large
+significance level (such as $\alpha = 0.10$)**. Only bragging rights are at
+stake; there is no real cost to a false alarm, and a strict level would just
+drag out the bet.
+
+## Exercise 4.163
+
+**Is a well-known company lying in its advertising?** Evidence would lead
+the Federal Trade Commission to file a lawsuit: use a **relatively small
+significance level (such as $\alpha = 0.01$)**. Accusing — and suing — a
+company wrongly is a serious Type I error, so the evidence should be strong
+before taking legal action.
+
+## Exercise 4.164
+
+**Vitamin supplement with no known side effects.** Testing whether a daily
+supplement has significant health benefits: use a **relatively large
+significance level (such as $\alpha = 0.10$)**. With no known harmful side
+effects, a Type I error (taking a supplement that does nothing) is cheap,
+while a Type II error (failing to detect a real benefit) means missing out
+on something helpful.
+
+## Exercise 4.165
+
+**Expensive new drug.** A pharmaceutical company tests whether its new
+(expensive) drug is significantly better than the existing drug:
+
+- **The company would prefer a larger significance level** (such as 10%):
+  it is easier to conclude that the new drug is better, which helps get it
+  approved and sold at the higher price.
+- **The consumer would prefer a smaller significance level** (such as 1%):
+  switching to the pricier drug is only worthwhile if the improvement is
+  real, so the consumer wants strong evidence that the new drug is actually
+  better.
+
+## Exercise 4.166
+
+*(Type I and Type II errors in the situation of Exercise 4.160 — the new
+drug with dangerous side effects.)* $H_0$: the new drug is not more
+effective than the current one; $H_a$: it is.
+
+- **Type I error:** concluding the new drug is better when it is not —
+  millions of people are switched to a drug with dangerous side effects for
+  no benefit. **Personally, this is the worse error** here.
+- **Type II error:** failing to detect that the new drug really is better —
+  patients keep using the old, less effective drug.
+
+## Exercise 4.167
+
+*(Errors in the situation of Exercise 4.161 — TV watching by sex.)*
+$H_0$: there is no difference in the mean number of weekly TV hours between
+male and female students; $H_a$: there is a difference.
+
+- **Type I error:** concluding that male and female students differ in TV
+  watching when, in the population, they do not.
+- **Type II error:** failing to notice a difference that really exists.
+- Which is worse is a matter of taste here — the stakes are trivial either
+  way (a wrong claim in a class discussion vs a missed fun fact).
+
+## Exercise 4.168
+
+*(Errors in the situation of Exercise 4.162 — Wii bowling.)* $H_0$: my
+average score is not higher than my friend's; $H_a$: mine is higher.
+
+- **Type I error:** claiming I am the better bowler when, in the long run,
+  I am not (bragging unjustifiably).
+- **Type II error:** failing to detect that I really am better (forfeiting
+  deserved bragging rights).
+
+## Exercise 4.169
+
+*(Errors in the situation of Exercise 4.163 — lying in advertising.)*
+$H_0$: the company is not lying in its ads; $H_a$: the company is lying.
+
+- **Type I error:** concluding the company is lying when it is not — a
+  wrongful lawsuit against an honest company. **Personally, this is the
+  worse error**: the accusation itself does real damage.
+- **Type II error:** failing to convict a company that is lying —
+  consumers keep being misled.
+
+## Exercise 4.170
+
+*(Errors in the situation of Exercise 4.164 — the vitamin supplement.)*
+$H_0$: the supplement has no health benefits; $H_a$: it has benefits.
+
+- **Type I error:** concluding the supplement helps when it does not —
+  people take a useless pill (a fairly harmless mistake, given no side
+  effects).
+- **Type II error:** missing a supplement that genuinely helps — people
+  forgo a real health benefit. **Personally, this is the worse error** in
+  this setting, which is exactly why a larger $\alpha$ made sense.
+
+## Exercise 4.171
+
+**Influencing voters.** Testing whether a recorded phone call is more
+effective than a mailed flyer at gaining candidate support, with
+$\alpha = 0.05$.
+
+- **(a)** A p-value of 0.027 is below 0.05: **reject $H_0$** — the data
+  provide evidence that the recorded phone call is more effective than the
+  mailed flyer at winning voter support.
+- **(b) A Type I error.** We rejected $H_0$, so if $H_0$ is actually true
+  we have erred. Here that means concluding that the phone call is more
+  effective when, in reality, it is not.
+- **(c)** A p-value of 0.18 is above 0.05: **do not reject $H_0$** — there
+  is no evidence that the recorded phone call is more effective than the
+  flyer.
+- **(d) A Type II error.** We failed to reject $H_0$, so if $H_a$ is
+  actually true we have erred. Here that means missing a real advantage of
+  the phone call and concluding there is no difference when there is one.
+
+## Exercise 4.172
+
+**Significant and insignificant results.**
+
+- **(a) Significant results (we rejected $H_0$):** two possible realities —
+  (i) $H_0$ is actually false and we are right (a correct conclusion), or
+  (ii) $H_0$ is actually true and we have made a **Type I error**.
+- **(b) Insignificant results (we did not reject $H_0$):** two possible
+  realities — (i) $H_0$ is actually true and we are right, or (ii) $H_0$ is
+  actually false and we have made a **Type II error**.
+- **(c)** We can never know which reality holds because the truth about the
+  population is never observed: the whole point of a test is that data are
+  consistent with more than one reality. We can control the *long-run
+  probabilities* of the errors ($\alpha$ and $\beta$), but for any single
+  study the underlying truth stays hidden — that uncertainty is built into
+  statistical inference.
+
+## Exercise 4.173
+
+**Weight loss program.** A company advertises an average first-month loss
+of 8 pounds; the FTC will sue for false advertising if the average is
+lower.
+
+- **(a)** $H_0: \mu = 8$ (patrons lose an average of 8 pounds the first
+  month) vs $H_a: \mu < 8$ (the average loss is less than advertised).
+- **(b)** With $\bar x = 7.9$ and p-value 0.006: reject $H_0$ at any usual
+  level — the result is **statistically significant**, and the FTC has
+  strong evidence that the mean weight loss is less than the advertised
+  8 pounds.
+- **(c) Not practically significant.** The estimated mean is 7.9 pounds vs
+  the advertised 8.0 — a tenth of a pound, which no patron would notice or
+  care about. With a very large sample, even trivially small differences
+  become statistically significant; the p-value measures the strength of
+  *evidence against $H_0$*, not the *size or importance* of the effect.
+  A lawsuit over 0.1 pounds would be a poor use of "significance."
+
+## Exercise 4.174
+
+**Do iPads help kindergartners learn: a subtest.** In the Auburn, Maine
+experiment, half the kindergarten classes got iPads in September and the
+rest in December; the test compares mean scores on the HRSIW subtest.
+
+- **(a)** Let $\mu_I$ and $\mu_C$ be the mean HRSIW scores (for all
+  kindergarten children in settings like these) with the iPads
+  (intervention) and without them (control). $H_0: \mu_I = \mu_C$ vs
+  $H_a: \mu_I > \mu_C$.
+- **(b)** p-value = 0.02 < 0.05: **reject $H_0$** — the results are
+  statistically significant at the 5% level, providing evidence that the
+  iPad group scored higher on the HRSIW subtest than the control group.
+- **(c)** The school board member means that an effect of about **two
+  points** on this subtest is tiny in educational terms. Even though the
+  difference is unlikely to be chance (statistically significant), it may
+  be too small to matter for children's actual learning — or to justify
+  the cost of iPads for every class. Statistical significance answers "is
+  the effect real?", not "is the effect big enough to care about?"
+
+## Exercise 4.175
+
+**Do iPads help kindergartners learn: a series of tests.** The HRSIW result
+was significant, but it was 1 of 10 subtests tested (the other 9 were not
+significant).
+
+- If iPads have **no** effect at all, each of the 10 tests at
+  $\alpha = 0.05$ still has a 5% chance of a false positive, so about
+  $10 \times 0.05 = 0.5$ significant results are expected by chance, and
+  the chance of at least one is $1 - 0.95^{10} \approx 0.40$.
+- Seeing exactly **one significant result out of ten** is precisely the
+  pattern that chance produces when nothing is going on. Before buying
+  iPads for all kindergartners, we should hesitate: the single hit may well
+  be a Type I error among the many tests, and genuine effects would more
+  convincingly show up across several subtests.
+
+## Exercise 4.176
+
+**Vitamin C for sepsis.** A randomized experiment compared high-dose
+intravenous vitamin C to a placebo in sepsis patients; many outcomes were
+measured.
+
+- **(a)** The test that was **not** significant (days on a ventilator) goes
+  with **p = 0.15**, and the test that **was** significant (days out of the
+  ICU) goes with **p = 0.03** — only 0.03 falls below the 0.05 threshold
+  (0.15 does not).
+- **(b)** In all, 46 tests were run and only 3 were significant at 5%. If
+  vitamin C has no effect, chance alone produces about
+  $46 \times 0.05 = 2.3$ significant results — almost exactly the 3
+  observed. So the significant hits are about what randomness predicts, and
+  we should hesitate to credit vitamin C for them (the classic
+  multiple-testing trap).
+
+## Exercise 4.177
+
+**Impact of arts education.** A randomized experiment with over 10,000
+students produced 72 hypothesis tests (6 outcomes × 12 groups) about the
+impact of arts education.
+
+- **(a)** If arts education has no effect, at the 5% level we expect about
+  $72 \times 0.05 = \mathbf{3.6}$ significant tests just by chance; at the
+  1% level, about $72 \times 0.01 = \mathbf{0.72}$.
+- **(b)(i) Absences, math, reading, science (48 tests):** 1 significant at
+  5% vs 2.4 expected, 0 at 1% vs 0.48 expected — **fewer than chance**.
+  No, increased arts education does not appear to have an impact in these
+  areas.
+- **(b)(ii) Discipline and writing (24 tests):** 15 significant at 5% vs
+  1.2 expected, 6 at 1% vs 0.24 expected — **far more than chance**. Yes,
+  the evidence here goes well beyond what randomness would produce, so
+  arts education does appear to have a real (positive) impact on discipline
+  and writing.
+
+## Exercise 4.178
+
+**Eating breakfast cereal and conceiving boys.** Researchers tested 133
+foods for a difference in the proportion conceiving boys; only breakfast
+cereal was significant, at $\alpha = 0.01$.
+
+- **(a)** If none of the foods has any effect, each test at 1% still has a
+  1% chance of a false positive, so about $133 \times 0.01 = \mathbf{1.33}$
+  — roughly one (possibly two) of the 133 foods — would be expected to show
+  significance just by chance. Note the hint's point: the *small*
+  significance level, not the number of foods, drives this expectation.
+- **(b) Possibly, and we cannot rule it out.** One significant food out of
+  133 tests is exactly the pattern chance is expected to produce (about
+  1.33 hits), so a Type I error on cereal is a very live possibility — we
+  simply cannot know from this study alone.
+- **(c) No.** Even granting that the association is real, the study is
+  **observational** — women chose their own diets. Cereal eaters may differ
+  from non-eaters in many other ways (overall diet, income, lifestyle), so
+  the headline's causal wording ("boost chances") overreaches: an
+  association between cereal and boy births does not show that cereal
+  *causes* boys.
+
+## Exercise 4.179
+
+**Approval from the FDA for antidepressants.** The FDA requires two
+significant results (at 5%) from randomized double-blind experiments but
+puts no limit on how many times a company can try.
+
+- If the drug is useless, every single trial still has a 5% chance of a
+  false positive. Over many tries the false positives pile up: about
+  $0.05 \times (\text{number of trials})$ of them will be "significant,"
+  and the chance of eventually collecting two grows with every retry —
+  after 20 trials, for instance, the probability of at least two
+  significant results is about 0.26 (computed below).
+- So under the current rule, a company that simply keeps running trials
+  will, with high probability, eventually get its two hits — even for a
+  drug that does nothing. The FDA might require **all** trials to be
+  reported, cap the number of attempts, pre-register trials, or tighten the
+  criterion to account for the number of tries.
+
+```{python}
+#| echo: false
+f"P(at least 2 of 20 independent trials significant at 5% | drug useless) = {1 - 0.95**20 - 20 * 0.05 * 0.95**19:.2f}"
+```
+
+## Exercise 4.180
+
+**Does massage really help reduce inflammation in muscles?** The headline
+result (reduced interleukin-6 at 2.5 hours, significant at 5%) came from a
+study that actually ran 42 tests: 21 compounds × 2 times.
+
+- **(a) Yes, we should have less confidence.** With 42 tests at 5%, chance
+  alone produces about $42 \times 0.05 = 2.1$ significant results — so the
+  single highlighted result could easily be one of those chance hits rather
+  than a real effect.
+- **(b) No.** Sixteen tests on muscle metabolites produced **zero**
+  significant results — exactly consistent with massage having no effect on
+  metabolites. (No false accusations needed here: nothing was found.)
+- **(c) Reasonably safe, yes.** Eight tests on inflammation produced
+  **four** significant results — vastly more than the
+  $8 \times 0.05 = 0.4$ expected by chance. Such a cluster is unlikely to
+  be a randomness fluke, so massage plausibly does reduce muscle
+  inflammation (ideally we would also check that the significant tests
+  point consistently in the anti-inflammatory direction).
+
+## Exercise 4.181
+
+**Cat ownership and schizophrenia.** Exercise 4.146 found an association
+between childhood cat ownership and later schizophrenia; the same paper
+provided three datasets (Table 4.15). Testing $H_0: p_S = p_C$ vs
+$H_a: p_S > p_C$ (higher proportion of cat owners among schizophrenics)
+for each dataset:
+
+| Year | Schizophrenics | Controls |
+|---|---|---|
+| 1982 | 1075/2125 = 0.506 | 2065/4847 = 0.426 |
+| 1992 | 84/165 = 0.509 | 65/165 = 0.394 |
+| 1997 | 136/262 = 0.519 | 220/522 = 0.421 |
+
+- **(a) Yes, it strengthens credibility.** Statistics naturally vary from
+  sample to sample, but all three datasets point the same way (about 0.51
+  vs about 0.42). Consistency across independent samples, collected in
+  different years with different control groups, makes a fluke in any one
+  dataset less plausible — this is replication working as intended.
+- **(b)** The randomization p-values (below) are **1982: essentially 0;
+  1992: ≈ 0.023; 1997: ≈ 0.006.**
+- **(c) Yes, all three are significant at the 5% level** — and that
+  **decreases** the suspicion that any single result was a Type I error:
+  chance would rarely misfire the same way three independent times.
+- **(d) Sample size, not the difference, drives these p-values.** The 1982
+  dataset is huge ($n = 2125 + 4847$), so its standard error is tiny and
+  even the smallest difference (0.080) sits far in the tail — the lowest
+  p-value. The 1992 dataset is small ($n = 165 + 165$), so its standard
+  error is large and even the biggest difference (0.115) is only
+  moderately extreme — the highest p-value.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distributions of the difference in proportions of cat owners, schizophrenics minus controls, for the three datasets
+s82 = shuffle_diff_stats(1075, 2125, 2065, 4847)
+s92 = shuffle_diff_stats(84, 165, 65, 165)
+s97 = shuffle_diff_stats(136, 262, 220, 522)
+rand_plot([s82, s92, s97],
+          [1075/2125 - 2065/4847, 84/165 - 65/165, 136/262 - 220/522],
+          ["1982: p = 0.000", "1992: p = 0.023", "1997: p = 0.006"],
+          "Randomization differences in proportions", figsize=(7, 2.8))
+```
+
+```{python}
+#| echo: false
+pd.DataFrame({
+    "Dataset": ["1982", "1992", "1997"],
+    "Schizophrenics": ["1075/2125 = 0.506", "84/165 = 0.509", "136/262 = 0.519"],
+    "Controls": ["2065/4847 = 0.426", "65/165 = 0.394", "220/522 = 0.421"],
+    "Difference": [f"{1075/2125 - 2065/4847:.3f}", f"{84/165 - 65/165:.3f}",
+                   f"{136/262 - 220/522:.3f}"],
+    "Randomization p-value": [
+        f"{rand_diff_p(1075, 2125, 2065, 4847):.4f}",
+        f"{rand_diff_p(84, 165, 65, 165):.4f}",
+        f"{rand_diff_p(136, 262, 220, 522):.4f}",
+    ],
+    "Significant at 5%?": ["Yes", "Yes", "Yes"],
+}).to_string()
+```
+
+## Exercise 4.182
+
+**Mating choice and offspring fitness.** The original *Nature* study
+concluded that mate choice increases offspring fitness in fruit flies
+(p < 0.02); a replication experiment gave 10,000 larvae per group: 6067
+survived with mate choice, 5976 without.
+
+- **(a)** Testing $H_0: p_C = p_{NC}$ vs $H_a: p_C > p_{NC}$ with
+  $\hat p_C - \hat p_{NC} = 0.6067 - 0.5976 = 0.0091$: the shuffle
+  distribution has SE ≈ 0.0069, and the p-value is **≈ 0.10** (below).
+- **(b)** Since $0.10 > \alpha = 0.05$: **do not reject $H_0$.** This
+  replication provides no evidence that mate choice improves offspring
+  fitness.
+- **(c)** Treating each of the 50 runs as a case, the response is the
+  per-run difference (Choice − NoChoice) in surviving larvae
+  (`MateChoice` data, loaded below): $\bar x_d = 1.82$ larvae with
+  $s = 15.8$. Randomizing the signs of the 50 differences gives a p-value
+  of **≈ 0.21** for $H_0: \mu_d = 0$ vs $H_a: \mu_d > 0$.
+- **(d)** Since $0.21 > 0.05$: **do not reject $H_0$** — no evidence that
+  the average per-run difference is greater than 0.
+- **(e) Type II error.** If mate choice really does improve fitness
+  ($H_a$ true) and the follow-up study failed to reject $H_0$, it missed a
+  real effect.
+- **(f) Type I error.** If mate choice really does not help ($H_0$ true)
+  and the original *Nature* study rejected $H_0$, it found significance
+  that was not real — exactly why the controversial result needed the
+  replication in the first place.
+
+*Data:* `data/ch04/MateChoice.csv`, from
+<https://www.lock5stat.com/datasets3e/MateChoice.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Shuffle distribution for the pooled larva counts and the distribution of the 50 per-run survival differences
+mc = pd.read_csv("data/ch04/MateChoice.csv")
+diffs = mc["Difference"].to_numpy(float)
+pooled = shuffle_diff_stats(6067, 10000, 5976, 10000)
+fig, axes = plt.subplots(1, 2, figsize=(7, 2.8))
+sns.histplot(x=pooled, bins=30, ax=axes[0], color="#4c72b0")
+axes[0].axvline(6067/10000 - 5976/10000, color="#c44e52", lw=2)
+axes[0].set_title("Shuffle p-hat difference (p = 0.10)", fontsize=10)
+axes[0].set_xlabel("Randomization differences in proportions")
+sns.histplot(x=diffs, bins=15, ax=axes[1], color="#4c72b0")
+axes[1].axvline(diffs.mean(), color="#c44e52", lw=2)
+axes[1].set_title("50 per-run differences (p = 0.21)", fontsize=10)
+axes[1].set_xlabel("Choice minus NoChoice larvae")
+plt.tight_layout()
+plt.show()
+```
+
+```{python}
+#| echo: false
+r = np.random.default_rng(2026)
+signs = r.choice([-1.0, 1.0], size=(REPS, len(diffs)))
+p_sign = float(((signs * diffs).mean(axis=1) >= diffs.mean() - 1e-12).mean())
+pd.DataFrame({
+    "Analysis": ["Pooled larvae (a)-(b)", "Paired runs (c)-(d)"],
+    "Statistic": [f"{6067/10000 - 5976/10000:.4f}",
+                  f"mean difference = {diffs.mean():.2f} larvae"],
+    "Spread": [f"SE = {pooled.std(ddof=1):.4f}", f"s = {diffs.std(ddof=1):.2f}"],
+    "p-value": [f"{rand_diff_p(6067, 10000, 5976, 10000):.4f}", f"{p_sign:.4f}"],
+    "Reject at 5%?": ["No", "No"],
+}).to_string()
+```
+
+## Exercise 4.183
+
+**Mating choice and offspring fitness: mini-experiments.** The replication
+was actually a series of experiments, each made of 50 mini-experiments
+(runs), 10 per day for 5 days.
+
+- **(a)** If mate choice has no impact, each of the 50 runs at
+  $\alpha = 0.05$ still has a 5% chance of significance, so **about
+  $50 \times 0.05 = 2.5$** of the 50 p-values would be significant by
+  chance.
+- **(b)** Scanning the 50 p-values below: **8 are significant at 0.05**
+  (0.01 on day 2; 0.02, 0.00, 0.01, 0.00 on day 3; 0.01 on day 4; 0.03 and
+  0.02 on day 5) — more than the 2.5 expected, but scattered, not a
+  consistent story.
+- **(c) No — neither appropriate nor ethical.** Reporting only the single
+  run with p = 0.0001, after having seen all 50 results, is cherry-picking
+  (p-hacking): it hides the 49 runs that found nothing and presents a
+  chance-selected extreme as if it were the whole story. The honest
+  analysis combines all 50 runs — which, as Exercise 4.182 showed, show no
+  effect — and selective reporting of this kind misleads readers about the
+  actual weight of evidence.
+- **(d) Yes.** A p-value near 1.00 for $H_a: p_C > p_{NC}$ means the run's
+  data fell at the extreme *opposite* end of the randomization
+  distribution. For the opposite alternative $H_a: p_C < p_{NC}$ those same
+  two runs give p-values near 0 — apparently highly significant evidence
+  that *preventing* mate choice improves fitness. The two "1.00" runs are
+  the mirror image of the tiny p-values: extreme results, whichever way
+  they point.
+- **(e)** With 50 tests and no real effect, about 2.5 significant results
+  are expected by chance, and if there is a tiny effect only some runs are
+  lucky enough to detect it. A handful of tiny p-values scattered among
+  mostly large ones — sometimes pointing each way — is exactly what many
+  small noisy tests look like, so contradictory conclusions across runs
+  are unsurprising: the multiple-testing problem guarantees mixed results.
+- **(f)** Replication is the immune system of science: repeating a study in
+  a different setting, with different researchers (and here, different
+  mutant competitors and species), guards against Type I errors, sampling
+  flukes, and over-generalization from one context. When replications
+  agree — as in Exercise 4.181 — trust grows; when they contradict each
+  other — as here — that too is informative, revealing that an effect is
+  fragile or context-dependent and that no single study (even a *Nature*
+  paper) should be taken at face value.
+
+```{python}
+#| echo: false
+pv = pd.DataFrame({
+    "Day 1": [0.96, 0.85, 0.14, 0.54, 0.76, 0.98, 0.33, 0.84, 0.21, 0.89],
+    "Day 2": [0.89, 0.66, 0.67, 0.88, 1.00, 0.01, 1.00, 0.77, 0.95, 0.27],
+    "Day 3": [0.58, 0.11, 0.02, 0.00, 0.62, 0.01, 0.79, 0.08, 0.96, 0.00],
+    "Day 4": [0.89, 0.13, 0.34, 0.18, 0.11, 0.66, 0.01, 0.31, 0.69, 0.19],
+    "Day 5": [0.42, 0.06, 0.31, 0.24, 0.24, 0.16, 0.17, 0.03, 0.02, 0.11],
+}).T
+pv.columns = [f"Run {i + 1}" for i in range(10)]
+print(pv.to_string())
+f"Runs with p-value <= 0.05: {(pv.to_numpy() <= 0.05).sum()} of 50 (about 2.5 expected by chance)"
+```
+
+:::

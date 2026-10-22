@@ -1,0 +1,1178 @@
+---
+execute-dir: project
+title: "Chapter 4 · Section 4.2"
+subtitle: "Measuring Evidence with P-values — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 4.2 of Lock⁵ turns a randomization distribution into a number: the
+**p-value**. If the null hypothesis is true, the randomization distribution
+shows what values of the sample statistic would occur by random chance alone,
+and the **p-value is the probability of getting a statistic as extreme as the
+one observed** — extreme in the direction of the alternative hypothesis. It is
+read off as the **tail area** beyond the observed statistic: a one-tailed
+alternative ($H_a\colon \mu > \mu_0$ or $\mu < \mu_0$) uses one tail, a
+two-tailed alternative ($H_a\colon \mu \ne \mu_0$) uses both. Two facts do
+most of the work in this section: a randomization distribution is always
+**centered at the null value** of the parameter (that is the "if $H_0$ is
+true" world), and **the smaller the p-value, the stronger the evidence
+against $H_0$** — a small p-value means the observed statistic would rarely
+arise by chance if $H_0$ were true, *not* that the effect is large.
+The exercises below are from *Statistics: Unlocking the Power of Data*
+(Lock⁵, 3rd ed., pp. 306–316). Skill Builders 4.42–4.46 pick the statistic to
+record on each randomization sample; 4.47–4.51 locate the center and the tail
+of a randomization distribution; 4.52–4.60 judge how unlikely sample results
+are and match them to p-values; 4.61–4.70 and the applied exercises
+4.71–4.94 compute and interpret p-values with real Lock⁵ datasets where the
+book provides them; 4.95–4.96 probe tails and two-sided logic on
+random-digit examples. All randomizations below use 10000 simulated samples
+with seed 2026, so every p-value is reproducible; the book's StatKey answers
+agree up to Monte Carlo wobble.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+sns.set_theme(style="whitegrid")
+
+def rand_prop(n, p0, x, tail, reps=10000, seed=2026):
+    """Randomization distribution for a single proportion: simulate `reps`
+    samples of size n with success probability p0 (the null value) and record
+    the sample proportion in each. Returns (proportions, p-value)."""
+    r = np.random.default_rng(seed)
+    counts = r.binomial(n, p0, reps)
+    props = counts / n
+    if tail == "right":
+        p = (counts >= x).mean()
+    elif tail == "left":
+        p = (counts <= x).mean()
+    else:  # two-tailed: double the tail on the side of the observed statistic
+        p = 2 * ((counts >= x).mean() if x / n >= p0 else (counts <= x).mean())
+    return props, p
+
+def shuffle_stats(pooled, n1, stat_fn, reps=10000, seed=2026):
+    """Randomization distribution by shuffling group labels: permute `pooled`,
+    give the first n1 values to group 1, and apply stat_fn(group1, group2)."""
+    r = np.random.default_rng(seed)
+    pooled = np.asarray(pooled, float)
+    out = np.empty(reps)
+    for i in range(reps):
+        perm = r.permutation(pooled)
+        out[i] = stat_fn(perm[:n1], perm[n1:])
+    return out
+
+def signflip_stats(diffs, reps=10000, seed=2026):
+    """Randomization distribution for paired differences: flip the sign of each
+    difference at random (null: differences are symmetric about zero)."""
+    r = np.random.default_rng(seed)
+    d = np.asarray(diffs, float)
+    out = np.empty(reps)
+    for i in range(reps):
+        out[i] = (d * r.choice([-1.0, 1.0], len(d))).mean()
+    return out
+
+def tail_plot(boots, observed, tail, xlabel, null=0.0, bins=40, figsize=(6, 3)):
+    """Histogram of a randomization distribution with the p-value tail shaded."""
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.histplot(x=boots, bins=bins, ax=ax, color="#4c72b0")
+    if tail == "right":
+        mask = boots >= observed
+    elif tail == "left":
+        mask = boots <= observed
+    else:
+        mask = np.abs(boots - null) >= abs(observed - null)
+    if mask.any():
+        sns.histplot(x=boots[mask], bins=bins, ax=ax, color="#c44e52")
+    ax.axvline(observed, color="black", lw=1.5)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Simulated statistics")
+    plt.tight_layout()
+    plt.show()
+
+def p_row(label, stat, boots, tail, null=0.0, digits=4):
+    """One-row summary: statistic and randomization p-value."""
+    if tail == "right":
+        p = (boots >= stat).mean()
+    elif tail == "left":
+        p = (boots <= stat).mean()
+    else:
+        p = (np.abs(boots - null) >= abs(stat - null)).mean()
+    return pd.Series({label: round(float(stat), 4),
+                      "Randomization p-value": round(float(p), digits),
+                      "Simulated samples": len(boots)})
+```
+
+::: {.panel-tabset}
+
+## Exercise 4.42
+
+*(Skill Builder 1)* $H_0\colon p = 0.5$ vs $H_a\colon p \ne 0.5$.
+
+**Statistic: $\hat p$**, the sample proportion. Each randomization sample
+mimics the original sample under the null, and the statistic we record must
+estimate the same quantity the hypotheses are about — here a proportion.
+
+## Exercise 4.43
+
+*(Skill Builder 1)* $H_0\colon \mu = 15$ vs $H_a\colon \mu < 15$.
+
+**Statistic: $\bar x$**, the sample mean.
+
+## Exercise 4.44
+
+*(Skill Builder 1)* $H_0\colon \rho = 0$ vs $H_a\colon \rho \ne 0$.
+
+**Statistic: $r$**, the sample correlation. Randomization samples are built
+by breaking up (scrambling) the pairing of the two variables, and each gives
+a correlation to compare with the observed $r$.
+
+## Exercise 4.45
+
+*(Skill Builder 1)* $H_0\colon \mu_1 = \mu_2$ vs $H_a\colon \mu_1 > \mu_2$.
+
+**Statistic: $\bar x_1 - \bar x_2$**, the difference in sample means.
+
+## Exercise 4.46
+
+*(Skill Builder 1)* $H_0\colon p_1 = p_2$ vs $H_a\colon p_1 \ne p_2$.
+
+**Statistic: $\hat p_1 - \hat p_2$**, the difference in sample proportions.
+
+## Exercise 4.47
+
+*(Skill Builder 2)* $H_0\colon p = 0.5$ vs $H_a\colon p < 0.5$; sample
+$\hat p = 0.4$, $n = 30$; randomization statistic $\hat p$.
+
+- **Center: 0.5** — the null value of $p$. The randomization samples are
+  generated with $p = 0.5$, so their proportions cluster at 0.5 regardless
+  of what the real sample gave.
+- **Tail: left-tail test** — $H_a$ points down ($p < 0.5$), so small values
+  of $\hat p$ are evidence against $H_0$.
+
+## Exercise 4.48
+
+*(Skill Builder 2)* $H_0\colon \mu = 10$ vs $H_a\colon \mu > 10$; sample
+$\bar x = 12$, $s = 3.8$, $n = 40$; randomization statistic $\bar x$.
+
+- **Center: 10** — the null value of $\mu$ (the values $\bar x = 12$,
+  $s = 3.8$ describe the real sample; they do not move the center).
+- **Tail: right-tail test** — $H_a$ points up.
+
+## Exercise 4.49
+
+*(Skill Builder 2)* $H_0\colon \rho = 0$ vs $H_a\colon \rho \ne 0$; sample
+$r = -0.29$, $n = 50$; randomization statistic $r$.
+
+- **Center: 0** — the null value of the correlation.
+- **Tail: two-tailed test** — either positive or negative correlations far
+  from 0 count as evidence for $H_a\colon \rho \ne 0$.
+
+## Exercise 4.50
+
+*(Skill Builder 2)* $H_0\colon \mu_1 = \mu_2$ vs $H_a\colon \mu_1 \ne \mu_2$;
+sample $\bar x_1 = 2.7$ and $\bar x_2 = 2.1$; randomization statistic
+$\bar x_1 - \bar x_2$.
+
+- **Center: 0** — under $H_0$ the two means are equal, so the differences in
+  means from randomization samples cluster at 0.
+- **Tail: two-tailed test.**
+
+## Exercise 4.51
+
+*(Skill Builder 2)* $H_0\colon p_1 = p_2$ vs $H_a\colon p_1 > p_2$; sample
+$\hat p_1 = 0.3$, $n_1 = 20$ and $\hat p_2 = 0.167$, $n_2 = 12$; randomization
+statistic $\hat p_1 - \hat p_2$.
+
+- **Center: 0** — under $H_0$ both groups share one common proportion, so
+  $\hat p_1 - \hat p_2$ averages 0 across randomization samples.
+- **Tail: right-tail test** — $H_a$ points up.
+
+## Exercise 4.52
+
+*(Skill Builder 3: Figure 4.15(a), a randomization distribution for testing
+$H_0\colon p = 0.30$; the dots run from about 0.13 to 0.46, centered at 0.30.)*
+Classify how likely each value is when $H_0$ is true:
+
+- **(a) $\hat p = 0.1$ — (ii) unusual but might occur occasionally.** It sits
+  just past the left edge of the simulated dots, out in the far-left tail —
+  far from the center, but still within the reach of the shown distribution.
+- **(b) $\hat p = 0.35$ — (i) reasonably likely to occur.** It is close to
+  the center 0.30, right in the main body of the distribution.
+- **(c) $\hat p = 0.6$ — (iii) extremely unlikely to ever occur.** It lies
+  beyond every dot shown (the dots stop near 0.46) — nothing like it appears
+  anywhere in the randomization distribution.
+
+## Exercise 4.53
+
+*(Skill Builder 3: Figure 4.15(b), a randomization distribution for testing
+$H_0\colon \mu = 300$; the dots run from about 288 to 313, centered at 300.)*
+
+- **(a) $\bar x = 250$ — (iii) extremely unlikely to ever occur.** It is way
+  out beyond the left end of the entire distribution (and off the plotted
+  axis, which starts at 285).
+- **(b) $\bar x = 305$ — (i) reasonably likely to occur.** Near the center.
+- **(c) $\bar x = 315$ — (ii) unusual but might occur occasionally.** It is
+  at the very right edge of the distribution, where the last few dots still
+  appear.
+
+## Exercise 4.54
+
+*(Skill Builder 4: Figure 4.16, randomization distribution of sample means
+for testing $H_0\colon \mu = 50$ vs $H_a\colon \mu > 50$; centered at 50,
+spread over roughly 26 to 74.)* Right-tailed, so the p-value is the area to
+the **right** of the observed mean:
+
+- **(a) $\bar x = 68$: the p-value is closest to 0.01.** 68 sits far out in
+  the right tail — only a tiny sliver of the 1000 simulated means is larger.
+- **(b) $\bar x = 54$: the p-value is closest to 0.30.** 54 is only a little
+  right of the center 50, so roughly the upper 30% of the distribution is at
+  least that large.
+- **(c) $\bar x = 63$: the p-value is closest to 0.05.** 63 is well out in
+  the tail — about 5% of the simulated means reach that far.
+
+## Exercise 4.55
+
+*(Skill Builder 4: Figure 4.17, randomization distribution of sample
+proportions for testing $H_0\colon p = 0.3$ vs $H_a\colon p < 0.3$; centered
+at 0.3, spread over roughly 0.05 to 0.65.)* Left-tailed, so the p-value is
+the area to the **left** of the observed proportion:
+
+- **(a) $\hat p = 0.25$: the p-value is closest to 0.30.** Just below the
+  center — the lower 30% or so of the distribution is at least that small.
+- **(b) $\hat p = 0.15$: the p-value is closest to 0.04.** Well out in the
+  left tail.
+- **(c) $\hat p = 0.35$: the p-value is closest to 0.70.** For a left-tailed
+  test a statistic *above* the null gives a large p-value — about 70% of the
+  simulated proportions are at or below 0.35, so seeing 0.35 or less would
+  happen most of the time by chance.
+
+## Exercise 4.56
+
+*(Skill Builder 4: Figure 4.18, randomization distribution of differences in
+means $D = \bar x_1 - \bar x_2$ for testing $H_0\colon \mu_1 = \mu_2$ vs
+$H_a\colon \mu_1 \ne \mu_2$; centered at 0, spread over roughly −3 to 3.)*
+Two-tailed, so the p-value counts simulated differences at least as far from
+0 as the observed one, in **either** direction:
+
+- **(a) $D = -2.9$: the p-value is closest to 0.01.** Almost 3 units from the
+  center — only about 1% of the simulated differences are that extreme on
+  either side.
+- **(b) $D = 1.2$: the p-value is closest to 0.30.** Moderately far from 0;
+  combining both tails gives roughly 30% of the distribution at least that
+  extreme.
+
+## Exercise 4.57
+
+*(Skill Builder 5: Figure 4.18, two-tailed test, statistic $D$.)*
+
+- **(a)** For $D = 2.8$: sketch the curve, mark 2.8, and shade both tails —
+  the area beyond +2.8 on the right **and** beyond −2.8 on the left. For
+  $D = 1.3$: same sketch, but shade both tails beyond ±1.3 — a much larger
+  shaded area.
+- **(b) $D = 2.8$ provides the stronger evidence against $H_0$.** It is
+  farther from the center 0, so the shaded tail area — the p-value — is
+  smaller.
+
+## Exercise 4.58
+
+*(Skill Builder 5)*
+
+- **(a)** For $D = 0.7$: shade the two tails beyond ±0.7 — most of the
+  distribution is inside, so the p-value is large. For $D = -1.3$: shade the
+  tails beyond ±1.3 — a smaller area.
+- **(b) $D = -1.3$ provides the stronger evidence against $H_0$.** Even
+  though it is negative, the test is two-tailed: what matters is distance
+  from 0, and $|-1.3| = 1.3 > 0.7$.
+
+## Exercise 4.59
+
+*(Skill Builder 5)* Convert each pair to the statistic
+$D = \bar x_1 - \bar x_2$:
+
+- $\bar x_1 = 17.3,\ \bar x_2 = 18.7$ gives $D = -1.4$;
+  $\bar x_1 = 19.0,\ \bar x_2 = 15.4$ gives $D = 3.6$.
+- **(a)** For $D = -1.4$ shade both tails beyond ±1.4; for $D = 3.6$ shade
+  both tails beyond ±3.6 — barely any area.
+- **(b) $D = 3.6$ (from $\bar x_1 = 19.0,\ \bar x_2 = 15.4$) provides the
+  stronger evidence against $H_0$** — it lies much farther out in the
+  randomization distribution.
+
+## Exercise 4.60
+
+*(Skill Builder 5)*
+
+- $\bar x_1 = 95.7,\ \bar x_2 = 93.5$ gives $D = 2.2$;
+  $\bar x_1 = 94.1,\ \bar x_2 = 96.3$ gives $D = -2.2$.
+- **(a)** Both sketches shade the two tails beyond ±2.2 — the shaded areas
+  are identical.
+- **(b) Neither — the two samples provide equally strong evidence against
+  $H_0$.** The test is two-tailed, so only the distance from 0 matters, and
+  both statistics are exactly 2.2 units from the center (one above, one
+  below).
+
+## Exercise 4.61
+
+*(Skill Builder 6)* $H_0\colon p = 0.5$ vs $H_a\colon p > 0.5$; sample
+$\hat p = 30/50 = 0.60$, $n = 50$. Randomization samples of size 50 with
+$p = 0.5$ give a distribution of proportions centered at 0.5; the p-value is
+the right-tail area beyond 0.60.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of sample proportions when p = 0.5, observed 0.60 shaded in the right tail
+props, pval = rand_prop(50, 0.5, 30, "right")
+tail_plot(props, 0.60, "right", "Randomization sample proportions", bins=22)
+pd.Series({"Statistic": 0.60, "Randomization p-value": round(pval, 4),
+           "Simulated samples": len(props)}).to_string()
+```
+
+- **p-value ≈ 0.10** (StatKey agrees). If the true proportion is 0.5, about
+  10% of samples of size 50 give 30 or more successes — not that unusual, so
+  this sample provides only modest evidence for $H_a$.
+
+## Exercise 4.62
+
+*(Skill Builder 6)* $H_0\colon p = 0.5$ vs $H_a\colon p < 0.5$; sample
+$\hat p = 38/100 = 0.38$, $n = 100$.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of sample proportions when p = 0.5, observed 0.38 shaded in the left tail
+props, pval = rand_prop(100, 0.5, 38, "left")
+tail_plot(props, 0.38, "left", "Randomization sample proportions", bins=24)
+pd.Series({"Statistic": 0.38, "Randomization p-value": round(pval, 4),
+           "Simulated samples": len(props)}).to_string()
+```
+
+- **p-value ≈ 0.01.** If $p = 0.5$, only about 1% of samples of size 100
+  give 38 or fewer successes — the sample provides strong evidence that the
+  true proportion is less than 0.5.
+
+## Exercise 4.63
+
+*(Skill Builder 6)* $H_0\colon p = 0.7$ vs $H_a\colon p < 0.7$; sample
+$\hat p = 125/200 = 0.625$, $n = 200$.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of sample proportions when p = 0.7, observed 0.625 shaded in the left tail
+props, pval = rand_prop(200, 0.7, 125, "left")
+tail_plot(props, 0.625, "left", "Randomization sample proportions", bins=24)
+pd.Series({"Statistic": 0.625, "Randomization p-value": round(pval, 4),
+           "Simulated samples": len(props)}).to_string()
+```
+
+- **p-value ≈ 0.013.** When $p = 0.7$, a proportion of 0.625 or less occurs
+  in only about 1.3% of samples of size 200 — reasonably strong evidence for
+  $H_a\colon p < 0.7$.
+
+## Exercise 4.64
+
+*(Skill Builder 6)* $H_0\colon p = 0.6$ vs $H_a\colon p > 0.6$; sample
+$\hat p = 52/80 = 0.65$, $n = 80$.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of sample proportions when p = 0.6, observed 0.65 shaded in the right tail
+props, pval = rand_prop(80, 0.6, 52, "right")
+tail_plot(props, 0.65, "right", "Randomization sample proportions", bins=22)
+pd.Series({"Statistic": 0.65, "Randomization p-value": round(pval, 4),
+           "Simulated samples": len(props)}).to_string()
+```
+
+- **p-value ≈ 0.21.** If $p = 0.6$, about 21% of samples of size 80 give
+  0.65 or more — quite plausible by chance, so there is little evidence that
+  the true proportion exceeds 0.6.
+
+## Exercise 4.65
+
+*(Skill Builder 6)* $H_0\colon p = 0.5$ vs $H_a\colon p \ne 0.5$; sample
+$\hat p = 42/100 = 0.42$, $n = 100$. Two-tailed: count samples at least this
+far from 0.5 in **either** direction, which (for a symmetric null
+distribution) doubles the left-tail area.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of sample proportions when p = 0.5, observed 0.42 with both tails shaded
+props, pval = rand_prop(100, 0.5, 42, "two")
+tail_plot(props, 0.42, "two", "Randomization sample proportions", null=0.5, bins=24)
+pd.Series({"Statistic": 0.42, "Randomization p-value (two-tailed)": round(pval, 4),
+           "Simulated samples": len(props)}).to_string()
+```
+
+- **p-value ≈ 0.13** (twice the one-tailed area 0.066). A proportion of 0.42
+  or 0.58 or more extreme happens about 13% of the time when $p = 0.5$ — not
+  strong evidence against $H_0$.
+
+## Exercise 4.66
+
+*(Skill Builder 6)* $H_0\colon p = 0.5$ vs $H_a\colon p \ne 0.5$; sample
+$\hat p = 28/40 = 0.70$, $n = 40$. Two-tailed: double the right-tail area
+(0.70 is above the null 0.5).
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of sample proportions when p = 0.5, observed 0.70 with both tails shaded
+props, pval = rand_prop(40, 0.5, 28, "two")
+tail_plot(props, 0.70, "two", "Randomization sample proportions", null=0.5, bins=22)
+pd.Series({"Statistic": 0.70, "Randomization p-value (two-tailed)": round(pval, 4),
+           "Simulated samples": len(props)}).to_string()
+```
+
+- **p-value ≈ 0.016.** When $p = 0.5$, samples as extreme as 0.70 (or 0.30)
+  arise only about 1.6% of the time — fairly strong evidence that the true
+  proportion is not 0.5.
+
+## Exercise 4.67
+
+*(Skill Builder 7)* p-value = 0.90 or p-value = 0.08.
+
+**0.08** — the smaller p-value gives the stronger evidence against $H_0$ (a
+result with probability 0.08 by chance is less plausible than one with
+probability 0.90).
+
+## Exercise 4.68
+
+*(Skill Builder 7)* p-value = 0.04 or p-value = 0.62.
+
+**0.04.**
+
+## Exercise 4.69
+
+*(Skill Builder 7)* p-value = 0.007 or p-value = 0.13.
+
+**0.007.**
+
+## Exercise 4.70
+
+*(Skill Builder 7)* p-value = 0.02 or p-value = 0.0008.
+
+**0.0008** — results this extreme would occur by chance only about 8 times
+in 10000 if $H_0$ were true.
+
+## Exercise 4.71
+
+**Lead Toxicity in Drinking Water.** Testing $H_0\colon \mu = 15$ vs
+$H_a\colon \mu > 15$ (mean lead level in ppb); two possible sample means:
+A: $\bar x = 19.7$, B: $\bar x = 15.8$.
+
+- **(a) B** ($\bar x = 15.8$) will be closer to the center of the
+  randomization distribution, which is at the null value 15.
+- **(b) A** ($\bar x = 19.7$) will be farther out in the (right) tail.
+- **(c) A** provides the stronger evidence against $H_0$ and in support of
+  $H_a$ — its p-value is smaller.
+- **(d)** "Providing evidence against $H_0$ and in support of $H_a$" here
+  means: if the mean lead level really were at the EPA action level of
+  15 ppb, a sample mean as high as the one observed would rarely occur just
+  by random chance — so the data suggest the true mean lead contamination of
+  this water supply exceeds 15 ppb and action is warranted.
+
+## Exercise 4.72
+
+**Multitasking in the Classroom.** Testing $H_0\colon \mu_1 = \mu_2$ vs
+$H_a\colon \mu_1 > \mu_2$ (mean grade when devices are *not* allowed minus
+when they are); possible results: A: $\bar x_1 - \bar x_2 = 2.8$,
+B: $\bar x_1 - \bar x_2 = 5.7$.
+
+- **(a) A** (2.8) is closer to the center of the randomization distribution,
+  which is at 0 (no difference).
+- **(b) B** (5.7) is farther out in the right tail.
+- **(c) B** provides the stronger evidence against $H_0$.
+- **(d)** Here it means: if avoiding electronic devices had no effect on
+  learning, a difference in mean exam grades as large as the one observed
+  (students without devices outscoring students with devices) would rarely
+  happen by random chance alone — supporting the claim that distraction from
+  devices really lowers grades.
+
+## Exercise 4.73
+
+**Are Husbands Older Than Wives?** Ages of the two people on 105 marriage
+licenses (all male-female couples); for each couple we use the difference
+Husband's age − Wife's age, and the sample mean difference is
+$\bar x = 2.829$ years.
+
+- **(a)** $H_0\colon \mu = 0$ vs $H_a\colon \mu > 0$, where $\mu$ is the mean
+  difference in ages (husband minus wife) for all male-female married
+  couples.
+- **(b) Centered at 0** — the null value. Randomization samples are generated
+  as if the husband's and wife's ages carry no systematic difference: each
+  couple's difference is equally likely to be recorded as positive or
+  negative, so the simulated mean differences cluster at 0.
+- **(c)** Statistic: $\bar x = 2.829$ years. In Figure 4.19 (and in our
+  simulation below, which only reaches about ±1.9) it lies **way out beyond
+  the right tail**.
+- **(d) No.** If the mean difference were really 0, none of our 10000
+  randomized mean differences came anywhere near 2.829.
+- **(e) Yes** — the p-value is essentially 0, strong evidence for $H_a$.
+- **(f) Yes**, the evidence supports that, on average, husbands are older
+  than their wives.
+
+*Data:* `data/ch02/MarriageAges.csv`, from
+<https://www.lock5stat.com/datasets3e/MarriageAges.csv>:
+
+```{python}
+#| echo: false
+ma = pd.read_csv("data/ch02/MarriageAges.csv")
+agediff = (ma.Husband - ma.Wife).to_numpy(float)
+pd.Series({"n": len(agediff),
+           "Mean difference (Husband - Wife)": round(agediff.mean(), 3),
+           "Couples with older husband": int((agediff > 0).sum())}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the mean difference in spouse ages when the null mean difference is zero
+boots = signflip_stats(agediff)
+tail_plot(boots, agediff.mean(), "right", "Mean difference in ages (husband - wife)")
+p_row("Mean difference", agediff.mean(), boots, "right").to_string()
+```
+
+## Exercise 4.74
+
+**Are Husbands More Likely to Be Older Than Wives?** Same 105 couples, but
+now the variable is simply whether the husband is older: in the sample the
+husband is older in 71.4% of couples.
+
+- **(a)** $H_0\colon p = 0.5$ vs $H_a\colon p > 0.5$, where $p$ is the
+  proportion of all male-female married couples for which the husband is
+  older.
+- **(b) Centered at 0.5** — the null value ("equally likely"). Randomization
+  samples simulate 105 couples with each spouse equally likely to be older.
+- **(c)** Statistic: $\hat p = 0.714$ (75 of the 105 couples, confirmed from
+  the data). In Figure 4.20 (spread about 0.37 to 0.63) and in our
+  simulation below it lies **way out beyond the right tail**.
+- **(d) No.** If $p = 0.5$, the chance that at least 75 of 105 couples have
+  an older husband is about 7 in a million — our 10000 simulated samples
+  never got close to 0.714.
+- **(e) Yes** — the p-value is essentially 0.
+- **(f) Yes.** The evidence supports that the husband is more likely to be
+  the older spouse in male-female married couples.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the proportion of couples with an older husband when p = 0.5
+older = (agediff > 0).astype(float)
+props, pval = rand_prop(105, 0.5, 75, "right")
+tail_plot(props, older.mean(), "right", "Proportion of couples with older husband", bins=24)
+p_row("Proportion husband older", older.mean(), props, "right").to_string()
+```
+
+## Exercise 4.75
+
+**Finger Tapping and Caffeine.** Twenty students were randomly split into
+two groups of 10; one group got caffeinated coffee, the other decaffeinated,
+and finger-tapping rate (taps per minute) was measured after 2 hours
+(`CaffeineTaps` data). Figure 4.21 shows the randomization distribution of
+$\bar x_c - \bar x_n$ when $\mu_c = \mu_n$.
+
+- **(a)** $H_0\colon \mu_c = \mu_n$ vs $H_a\colon \mu_c > \mu_n$, where
+  $\mu_c$ and $\mu_n$ are the mean tap rates with caffeine and without.
+- **(b)** For $\bar x_c - \bar x_n = 1.6$: shade the right tail beyond 1.6.
+  **The p-value is closest to 0.11** — about 11% of the simulated
+  differences reach 1.6 or higher.
+- **(c)** For $\bar x_c - \bar x_n = 2.4$: shade the right tail beyond 2.4.
+  **The p-value is closest to 0.03.**
+- **(d) The difference of 2.4** provides the stronger evidence that caffeine
+  increases average finger-tapping rate — it is farther into the tail, with
+  the smaller p-value.
+
+*Data:* `data/ch04/CaffeineTaps.csv`, from
+<https://www.lock5stat.com/datasets3e/CaffeineTaps.csv>:
+
+```{python}
+#| echo: false
+ct = pd.read_csv("data/ch04/CaffeineTaps.csv")
+caf = ct.loc[ct.Group == "Caffeine", "Taps"].to_numpy(float)
+dec = ct.loc[ct.Group == "NoCaffeine", "Taps"].to_numpy(float)
+pd.Series({"Mean taps, caffeine": round(caf.mean(), 1),
+           "Mean taps, no caffeine": round(dec.mean(), 1),
+           "Observed difference": round(caf.mean() - dec.mean(), 1)}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in mean tap rates, caffeine minus no caffeine, with the hypothetical differences 1.6 and 2.4 marked
+boots = shuffle_stats(np.concatenate([caf, dec]), len(caf),
+                      lambda a, b: a.mean() - b.mean())
+fig, ax = plt.subplots(figsize=(6, 3))
+sns.histplot(x=boots, bins=28, ax=ax, color="#4c72b0")
+for v in (1.6, 2.4):
+    ax.axvline(v, color="#c44e52", lw=1.5)
+ax.set_xlabel("Difference in mean tap rates (caffeine - no caffeine)")
+plt.tight_layout()
+plt.show()
+pd.Series({"p-value if D = 1.6": round((boots >= 1.6).mean(), 3),
+           "p-value if D = 2.4": round((boots >= 2.4).mean(), 3),
+           "Actual observed D": round(caf.mean() - dec.mean(), 1),
+           "p-value for actual D": round((boots >= caf.mean() - dec.mean()).mean(), 4)}).to_string()
+```
+
+Our randomization of the real data reproduces the figure (centered at 0,
+SD ≈ 1.3) and the book's tail areas: p ≈ 0.11 for 1.6 and p ≈ 0.03 for 2.4.
+The actual experiment gave a difference of 3.5 taps per minute, with
+p ≈ 0.003 — evidence that caffeine really does increase average tap rate.
+
+## Exercise 4.76
+
+**Influencing Voters: Is a Phone Call Better Than a Flyer?** Testing
+$H_0\colon p_c = p_f$ vs $H_a\colon p_c > p_f$; Figure 4.22 shows the
+randomization distribution of $\hat p_c - \hat p_f$ (1000 randomizations,
+centered at 0, spread about −0.6 to 0.6).
+
+- **(a)** Sketch the curve, mark 0.3, and shade the **right tail** beyond
+  0.3 — the p-value for the one-tailed test.
+- **(b)** Larger statistics give smaller right-tail areas, so the match is:
+  **0.1 → 0.365;  0.3 → 0.085;  0.5 → 0.012;  0.65 → 0.001.**
+- **(c)** The p-value 0.001 (for $\hat p_c - \hat p_f = 0.65$) means: if a
+  phone call and a flyer were equally effective, a difference in sample
+  proportions of 0.65 or larger in favor of the phone call would occur in
+  only about 1 in 1000 random assignments of voters — essentially never by
+  random chance.
+- **(d) $\hat p_c - \hat p_f = 0.65$** provides the strongest evidence that a
+  phone call is more effective — it has the smallest p-value.
+
+## Exercise 4.77
+
+**Influencing Voters: Is There a Difference in Effectiveness?** Same
+distribution (Figure 4.22), but now two-tailed:
+$H_0\colon p_c = p_f$ vs $H_a\colon p_c \ne p_f$.
+
+- **(a)** Sketch the curve and shade **both** tails: beyond +0.2 and −0.2
+  for the first statistic; beyond +0.4 and −0.4 for the second. The second
+  shading is much smaller.
+- **(b)** Distances from 0 decide: $|\,-0.4\,| = 0.4$ is farther out than
+  $0.2$. Reading the two-tailed areas off the distribution:
+  **$\hat p_c - \hat p_f = 0.2$ → p-value ≈ 0.392** (roughly double the
+  one-tailed area beyond 0.2, about 0.18) and
+  **$\hat p_c - \hat p_f = -0.4$ → p-value ≈ 0.066** (roughly double the
+  one-tailed area beyond 0.4). The remaining values (0.008, 0.150, 0.842)
+  do not match either statistic.
+- **(c) $\hat p_c - \hat p_f = -0.4$** provides the strongest evidence that
+  the methods are not equally effective — smaller two-tailed p-value.
+
+## Exercise 4.78
+
+**If You Break an Arm, Use Your Brain!** 29 people with wrist
+immobilization: 15 did no mental imagery (mean strength loss 51.2%) and 14
+mentally imagined strong muscle contractions (mean loss 24.5%). Figure 4.23
+shows the randomization distribution of the difference in means (no imagery
+minus imagery) when $\mu_N = \mu_I$.
+
+- **(a)** $H_0\colon \mu_N = \mu_I$ vs $H_a\colon \mu_N > \mu_I$, where
+  $\mu_N$ and $\mu_I$ are the mean percent decreases in muscle strength for
+  people who do not use mental imagery and people who do.
+- **(b)** Statistic: $\bar x_N - \bar x_I = 51.2 - 24.5 = 26.7$ percentage
+  points.
+- **(c)** The distribution is centered at 0 and spreads over roughly −30 to
+  30, with only a handful of the 1000 dots beyond about 26. So
+  **p ≈ 0.01** (certainly less than 0.05): a difference this large would
+  rarely occur by random assignment chance alone, giving strong evidence
+  that mental imagery reduces muscle strength loss.
+
+## Exercise 4.79
+
+**Colonoscopy, Anyone?** People with colon polyps are expected to die from
+colon cancer at a rate of 0.01; in a 20-year follow-up of 2602 people who
+had polyps removed during colonoscopy, 12 died of colon cancer.
+
+- **(a)** $H_0\colon p = 0.01$ vs $H_a\colon p < 0.01$, where $p$ is the
+  proportion of people like these who would die of colon cancer after
+  having polyps removed in a colonoscopy.
+- **(b)** $\hat p = 12/2602 \approx 0.0046$.
+- **(c)** In Figure 4.24 the 1000 randomization proportions (samples of size
+  2602 with $p = 0.01$) center at 0.0100, and the observed 0.0046 is far out
+  in the left tail. Counting the dots at or below 0.0046 gives about 13 of
+  the 1000, so **p-value ≈ 0.013**: if colonoscopy patients died at the
+  expected rate, only about 1.3% of samples would show so few deaths. (A
+  direct binomial computation of the same probability,
+  $P(X \le 12)$ for $X \sim \text{Bin}(2602, 0.01)$, gives about 0.002 — the
+  dotplot is one particular simulation. Either way the p-value is far too
+  small to attribute to chance.)
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the colon cancer death proportion when p = 0.01, observed 0.0046 shaded in the left tail
+r = np.random.default_rng(2026)
+sims = r.binomial(2602, 0.01, 10000) / 2602
+tail_plot(sims, 12 / 2602, "left", "Randomization sample proportions", bins=30)
+p_row("Death proportion", 12 / 2602, sims, "left").to_string()
+```
+
+## Exercise 4.80
+
+**Arsenic in Chicken.** Testing $H_0\colon \mu = 80$ vs $H_a\colon \mu > 80$
+(mean arsenic level in ppb for a supplier's chicken). Supplier A:
+p-value = 0.0003; Supplier B: p-value = 0.3500.
+
+- **(a)** For Supplier A: if the mean arsenic level were really 80 ppb,
+  sample results as extreme as the one observed would occur by random chance
+  only about 3 times in 10000 samples — very unusual. For Supplier B: if the
+  mean were 80 ppb, results as extreme as the one observed would occur by
+  chance about 35% of the time — not unusual at all.
+- **(b) Supplier A's p-value (0.0003)** shows much stronger evidence for
+  $H_a\colon \mu > 80$: we have convincing evidence that the mean arsenic
+  level in Supplier A's chicken is above 80 ppb, while Supplier B's data are
+  entirely consistent with a mean of 80.
+- **(c) The chain should get chickens from Supplier B** — only Supplier A
+  shows evidence of too-high arsenic.
+
+## Exercise 4.81
+
+**Football Experience and Brain Size.** Control vs FBNoConcuss groups
+($n = 25$ each) from the `FootballBrain` study; we test whether mean
+hippocampus volume is larger for people who never played football.
+
+- **(a)** $H_0\colon \mu_C = \mu_F$ vs $H_a\colon \mu_C > \mu_F$, where
+  $\mu_C$ and $\mu_F$ are the mean hippocampus volumes (in μL) for all
+  healthy non-football-playing people and for all football players with no
+  history of concussions.
+- **(b)** Statistic: $\bar x_C - \bar x_F = 7602.6 - 6459.2 = 1143.4$ μL.
+- **(c)** Randomizing the 50 hippocampus volumes between the two groups:
+  **p-value ≈ 0.0001** — only 1 of our 10000 shuffles gave a difference at
+  least this large.
+- **(d) No.** A difference of 1143 μL is very unlikely to be just random
+  chance — the data suggest football experience (even without concussions)
+  is associated with a smaller hippocampus.
+
+*Data:* `data/ch02/FootballBrain.csv`, from
+<https://www.lock5stat.com/datasets3e/FootballBrain.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in mean hippocampus volume, control minus football players with no concussions
+fb = pd.read_csv("data/ch02/FootballBrain.csv")
+ctrl = fb.loc[fb.Group == "Control", "Hipp"].dropna().to_numpy(float)
+fbnc = fb.loc[fb.Group == "FBNoConcuss", "Hipp"].dropna().to_numpy(float)
+boots = shuffle_stats(np.concatenate([ctrl, fbnc]), len(ctrl),
+                      lambda a, b: a.mean() - b.mean())
+tail_plot(boots, ctrl.mean() - fbnc.mean(), "right",
+          "Difference in mean hippocampus volume (control - no concussions)")
+p_row("Mean difference (control - FBNoConcuss)",
+      ctrl.mean() - fbnc.mean(), boots, "right").to_string()
+```
+
+## Exercise 4.82
+
+**Concussions and Brain Size.** Now compare FBNoConcuss vs FBConcuss
+($n = 25$ each): is mean hippocampus volume larger for football players who
+have never had a concussion?
+
+- **(a)** $H_0\colon \mu_N = \mu_C$ vs $H_a\colon \mu_N > \mu_C$, where
+  $\mu_N$ and $\mu_C$ are the mean hippocampus volumes (in μL) for all
+  football players with no concussion history and with a concussion history.
+- **(b)** Statistic: $\bar x_N - \bar x_C = 6459.2 - 5734.6 = 724.6$ μL.
+- **(c)** Randomizing the 50 volumes between the two groups:
+  **p-value ≈ 0.0003** — only about 3 of 10000 shuffles reach 724.6 or
+  higher.
+- **(d) No.** This difference is also very unlikely to be due to random
+  chance alone — within football players, a concussion history is associated
+  with an even smaller hippocampus.
+
+*Data:* `data/ch02/FootballBrain.csv`, from
+<https://www.lock5stat.com/datasets3e/FootballBrain.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in mean hippocampus volume, football players with no concussions minus those with concussions
+fbcc = fb.loc[fb.Group == "FBConcuss", "Hipp"].dropna().to_numpy(float)
+boots = shuffle_stats(np.concatenate([fbnc, fbcc]), len(fbnc),
+                      lambda a, b: a.mean() - b.mean())
+tail_plot(boots, fbnc.mean() - fbcc.mean(), "right",
+          "Difference in mean hippocampus volume (no concussions - concussions)")
+p_row("Mean difference (FBNoConcuss - FBConcuss)",
+      fbnc.mean() - fbcc.mean(), boots, "right").to_string()
+```
+
+## Exercise 4.83
+
+**Do Rats Know How to Hide?** From Table 4.7 (rats playing hide-and-seek),
+only the 53 **hiding** rats: 38 picked an opaque box, 15 a transparent one.
+
+*Table 4.7, entered directly:*
+
+```{python}
+#| echo: false
+pd.DataFrame({"": ["Hiding", "Seeking", "Total"],
+              "Transparent": [15, 17, 32],
+              "Opaque": [38, 14, 52],
+              "Total": [53, 31, 84]}).to_string(index=False)
+```
+
+- **(a)** $H_0\colon p = 0.5$ vs $H_a\colon p > 0.5$, where $p$ is the
+  proportion of the time hiding rats would pick an opaque box (0.5 = no
+  preference between equally available box types).
+- **(b)** Statistic: $\hat p = 38/53 \approx 0.717$.
+- **(c)** Randomizing 53 choices with $p = 0.5$: **p-value ≈ 0.001** — only
+  about 1 in 1000 samples of 53 fair coin flips gives 38 or more opaque
+  choices. Hiding rats really do prefer opaque boxes.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the proportion choosing opaque boxes among 53 hiding rats when p = 0.5
+props, pval = rand_prop(53, 0.5, 38, "right")
+tail_plot(props, 38 / 53, "right", "Proportion choosing opaque boxes", bins=22)
+pd.Series({"Statistic": round(38 / 53, 3),
+           "Randomization p-value": round(pval, 4)}).to_string()
+```
+
+## Exercise 4.84
+
+**Do Seeking Rats Care Which Box?** Only the 31 **seeking** rats: 14 picked
+an opaque box, 17 a transparent one.
+
+- **(a)** $H_0\colon p = 0.5$ vs $H_a\colon p \ne 0.5$, where $p$ is the
+  proportion of the time seeking rats would pick an opaque box.
+- **(b)** Statistic: $\hat p = 14/31 \approx 0.452$.
+- **(c)** Two-tailed randomization with $p = 0.5$:
+  **p-value ≈ 0.72** — a proportion as far from 0.5 as 0.452 (in either
+  direction) happens in about 72% of samples of 31 fair coin flips. Seeking
+  rats show no detectable box preference.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the proportion choosing opaque boxes among 31 seeking rats when p = 0.5, two-tailed
+props, pval = rand_prop(31, 0.5, 14, "two")
+tail_plot(props, 14 / 31, "two", "Proportion choosing opaque boxes", null=0.5, bins=20)
+pd.Series({"Statistic": round(14 / 31, 3),
+           "Randomization p-value (two-tailed)": round(pval, 4)}).to_string()
+```
+
+## Exercise 4.85
+
+**Do Rats Behave Differently Between Hiding and Seeking?** All 84 rats:
+$\hat p_{\text{hiding}} - \hat p_{\text{seeking}} = 38/53 - 14/31 \approx
+0.717 - 0.452 = 0.264$.
+
+- **(a)** $H_0\colon p_h = p_s$ vs $H_a\colon p_h > p_s$, where $p_h$ and
+  $p_s$ are the proportions of opaque-box choices for all hiding rats and
+  all seeking rats (in settings like this one).
+- **(b)** Statistic: $\hat p_h - \hat p_s \approx 0.264$.
+- **(c)** Randomizing: pool the 84 box choices (52 opaque, 32 transparent),
+  shuffle, and assign 53 to "hiding" and 31 to "seeking":
+  **p-value ≈ 0.015** — only about 1.5% of shuffles give a difference of
+  0.264 or more. Reasonably strong evidence that hiding rats pick opaque
+  boxes more often than seeking rats do.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in proportions choosing opaque boxes, hiding minus seeking
+boxes = np.repeat([1.0, 0.0], [52, 32])
+boots = shuffle_stats(boxes, 53, lambda a, b: a.mean() - b.mean())
+tail_plot(boots, 38 / 53 - 14 / 31, "right",
+          "Difference in opaque-box proportions (hiding - seeking)")
+p_row("Difference (hiding - seeking)", 38 / 53 - 14 / 31, boots, "right").to_string()
+```
+
+## Exercise 4.86
+
+**Do You Own a Smartphone?** July 2015 survey of US adults: 688 of 989 men
+and 671 of 1012 women own a smartphone.
+
+- **(a)** $H_0\colon p_m = p_w$ vs $H_a\colon p_m \ne p_w$, where $p_m$ and
+  $p_w$ are the proportions of all US men and all US women who own a
+  smartphone.
+- **(b)** Statistic: $\hat p_m - \hat p_w = 688/989 - 671/1012 \approx
+  0.696 - 0.663 = 0.033$. **Men** have the higher smartphone ownership in
+  the sample.
+- **(c)** Randomizing the 2001 people (1359 owners, 642 non-owners) into
+  groups of 989 and 1012, two-tailed: **p-value ≈ 0.12.** Differences at
+  least this large in either direction happen in about 12% of random
+  splits — not convincing evidence of a difference in smartphone ownership
+  between men and women.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in smartphone ownership proportions, men minus women, two-tailed
+own = np.repeat([1.0, 0.0], [688 + 671, (989 + 1012) - (688 + 671)])
+boots = shuffle_stats(own, 989, lambda a, b: a.mean() - b.mean())
+tail_plot(boots, 688 / 989 - 671 / 1012, "two",
+          "Difference in ownership proportions (men - women)")
+p_row("Difference (men - women)", 688 / 989 - 671 / 1012, boots, "two").to_string()
+```
+
+## Exercise 4.87
+
+**Do You Own a Tablet?** June 2015 survey: 197 of 455 men and 235 of 504
+women own a tablet.
+
+- **(a)** $H_0\colon p_m = p_w$ vs $H_a\colon p_m \ne p_w$, where $p_m$ and
+  $p_w$ are the proportions of all US men and women who own a tablet.
+- **(b)** Statistic: $\hat p_m - \hat p_w = 197/455 - 235/504 \approx
+  0.433 - 0.466 = -0.033$. **Women** have the higher tablet ownership in the
+  sample.
+- **(c)** Randomizing the 959 people (432 owners, 527 non-owners) into
+  groups of 455 and 504, two-tailed: **p-value ≈ 0.33.** No evidence of a
+  difference in tablet ownership between men and women.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in tablet ownership proportions, men minus women, two-tailed
+own = np.repeat([1.0, 0.0], [197 + 235, (455 + 504) - (197 + 235)])
+boots = shuffle_stats(own, 455, lambda a, b: a.mean() - b.mean())
+tail_plot(boots, 197 / 455 - 235 / 504, "two",
+          "Difference in ownership proportions (men - women)")
+p_row("Difference (men - women)", 197 / 455 - 235 / 504, boots, "two").to_string()
+```
+
+## Exercise 4.88
+
+**Are Antimicrobial Ingredients Having the Opposite Effect?** Of 90 people
+whose noses were swabbed (Table 4.8): 24 of the 37 with detectable triclosan
+carried staph bacteria, and 15 of the 53 without triclosan did.
+
+*Table 4.8, entered directly:*
+
+```{python}
+#| echo: false
+pd.DataFrame({"": ["Triclosan", "No Triclosan", "Total"],
+              "Staph": [24, 15, 39],
+              "No Staph": [13, 38, 51],
+              "Total": [37, 53, 90]}).to_string(index=False)
+```
+
+- **(a)** With triclosan: $24/37 \approx 0.649$. Without triclosan:
+  $15/53 \approx 0.283$. Sample difference:
+  $\hat p_T - \hat p_N \approx 0.649 - 0.283 = 0.366$.
+- **(b)** $H_0\colon p_T = p_N$ vs $H_a\colon p_T > p_N$, where $p_T$ and
+  $p_N$ are the proportions of all people with and without triclosan who
+  carry staph bacteria.
+- **(c)** Randomizing the 90 people (39 staph carriers) into groups of 37
+  and 53: **p-value ≈ 0.0007** — fewer than 1 in 1000 shuffles gives a
+  difference of 0.366 or more. Strong evidence that people with triclosan
+  are *more* likely to carry staph — the opposite of what an antimicrobial
+  should do.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in staph infection proportions, triclosan minus no triclosan
+staph = np.repeat([1.0, 0.0], [24 + 15, 13 + 38])
+boots = shuffle_stats(staph, 37, lambda a, b: a.mean() - b.mean())
+tail_plot(boots, 24 / 37 - 15 / 53, "right",
+          "Difference in staph proportions (triclosan - no triclosan)")
+p_row("Difference (triclosan - no triclosan)", 24 / 37 - 15 / 53, boots, "right").to_string()
+```
+
+## Exercise 4.89
+
+**Testing the Lady Tasting Tea.** Muriel was presented with 8 cups and
+correctly identified the pouring order for every one of them; we assume she
+did not know beforehand how many cups had tea first. Testing
+$H_0\colon p = 0.5$ vs $H_a\colon p > 0.5$, where $p$ is the true proportion
+of times she guesses correctly.
+
+- **(a)** Statistic: $\hat p = 8/8 = 1.0$ — she got every cup right.
+- **(b)** Randomization samples are 8 fair coin flips ($p = 0.5$); the
+  p-value is the chance of guessing all 8 correctly by luck:
+  $P(X \ge 8)$ for $X \sim \text{Bin}(8, 0.5) = (1/2)^8 = 1/256 \approx
+  0.004$. If Muriel were just guessing, getting all 8 right would happen
+  only about 4 times in 1000 — impressive evidence for her claim.
+
+```{python}
+#| echo: false
+pd.Series({"Statistic": 1.0,
+           "p-value (probability of 8 correct guesses by chance)": 0.5 ** 8}).to_string()
+```
+
+## Exercise 4.90
+
+**Definition of a P-value.** By definition, the p-value is the probability
+of obtaining a sample statistic as extreme as the one observed, *if the
+null hypothesis is true*. A randomization distribution shows exactly what
+statistics would happen just by random chance when $H_0$ is true — each
+simulated sample is one draw from that "by chance" world, and every dot in
+the distribution is equally likely. The fraction of dots located as far out
+as (or farther out than) the observed statistic — that is, the **area in the
+tail beyond the observed statistic** — is therefore precisely the (estimated)
+probability of seeing a result that extreme by random chance. That is why
+the p-value is computed as a tail area: the tail gathers up all the
+randomization outcomes at least as supportive of $H_a$ as the one we
+actually saw.
+
+## Exercise 4.91
+
+**Weight Gain** (NIH ultra-processed foods study; `ProcessedFoods` data,
+differences ultra-processed − unprocessed for each of 20 adults, variable
+`WeightGain`).
+
+- **(a) Yes** — average weight gain was higher on the ultra-processed diet
+  by about **1.85 kg** (mean of the 20 differences).
+- **(b) Explanation (ii) is ruled out by the design.** Every participant ate
+  both diets (in randomized order) and each person serves as their own
+  control, so the two "groups" are the same people — systematic baseline
+  differences between groups cannot explain a within-person difference.
+- **(c) Yes.** Randomizing the sign of each person's difference (the null:
+  the diet makes no difference for the person), none of 10000 sign-flipped
+  mean differences come near 1.85: **p-value ≈ 0.0002** — strong evidence
+  against explanation (iii), random chance.
+- **(d) Yes.** With the baseline explanation ruled out by design and chance
+  ruled out by the tiny p-value, the data provide convincing evidence that
+  eating ultra-processed foods *causes* weight gain.
+
+*Data:* `data/ch04/ProcessedFoods.csv`, from
+<https://www.lock5stat.com/datasets3e/ProcessedFoods.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the mean weight gain difference, ultra-processed minus unprocessed, when the null mean is zero
+pf = pd.read_csv("data/ch04/ProcessedFoods.csv")
+gain = pf["WeightGain"].dropna().to_numpy(float)
+boots = signflip_stats(gain)
+tail_plot(boots, gain.mean(), "right", "Mean weight gain difference (kg)")
+p_row("Mean difference (kg)", gain.mean(), boots, "right").to_string()
+```
+
+## Exercise 4.92
+
+**Calories** (same study, variable `Kcal`, differences ultra-processed −
+unprocessed in daily caloric intake).
+
+- **(a) Yes** — average daily intake was higher on the ultra-processed diet
+  by about **508 kcal**.
+- **(b) No** — explanation (ii) cannot explain the difference, for the same
+  design reason as in Exercise 4.91 (randomized order, each person their own
+  control).
+- **(c) Yes, strongly.** Sign-flip randomization: **p-value ≈ 0.0000** — not
+  one of 10000 sign-flipped mean differences reached 508 kcal. Chance is
+  essentially ruled out.
+- **(d) Yes** — the data provide convincing evidence that ultra-processed
+  food *causes* people to consume more calories.
+
+*Data:* `data/ch04/ProcessedFoods.csv`, from
+<https://www.lock5stat.com/datasets3e/ProcessedFoods.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the mean calorie intake difference, ultra-processed minus unprocessed, when the null mean is zero
+kcal = pf["Kcal"].dropna().to_numpy(float)
+boots = signflip_stats(kcal)
+tail_plot(boots, kcal.mean(), "right", "Mean calorie intake difference (kcal)")
+p_row("Mean difference (kcal)", kcal.mean(), boots, "right").to_string()
+```
+
+## Exercise 4.93
+
+**Sugar** (same study, variable `Sugar`, differences in daily grams of
+sugar consumed, ultra-processed − unprocessed).
+
+- **(a)** People consumed about **3.25 g less** sugar per day on the
+  ultra-processed diet (mean difference −3.25 g).
+- **(b) No** — explanation (ii) is ruled out by the design, as before.
+- **(c) No.** Testing $H_a\colon \mu < 0$ (less sugar caused by the
+  ultra-processed diet), the sign-flip p-value is about **0.28**: a mean
+  difference of −3.25 g or less happens in about 28% of random sign flips —
+  easily explained by random chance.
+- **(d) No.** The observed difference is small and entirely plausible by
+  chance, so the data do **not** provide evidence that ultra-processed foods
+  cause people to eat less sugar.
+
+*Data:* `data/ch04/ProcessedFoods.csv`, from
+<https://www.lock5stat.com/datasets3e/ProcessedFoods.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the mean sugar intake difference, ultra-processed minus unprocessed, when the null mean is zero
+sugar = pf["Sugar"].dropna().to_numpy(float)
+boots = signflip_stats(sugar)
+tail_plot(boots, sugar.mean(), "left", "Mean sugar intake difference (g)")
+p_row("Mean difference (g)", sugar.mean(), boots, "left").to_string()
+```
+
+## Exercise 4.94
+
+**Glucagon** (same study, variable `Glucagon`, differences in glucagon
+level, ultra-processed − unprocessed; glucagon increases feelings of
+satiety).
+
+- **(a) Yes** — glucagon levels were about **1.25 units higher** on average
+  under the ultra-processed diet.
+- **(b) No** — explanation (ii) is ruled out by the randomized-order,
+  own-control design.
+- **(c) Not convincingly.** Testing $H_a\colon \mu > 0$, the sign-flip
+  p-value is about **0.09** — a mean difference of 1.25 or more happens in
+  about 9% of random sign flips. That is somewhat unusual but not rare.
+- **(d) Only weakly.** The p-value is smallish but not small enough to rule
+  out chance convincingly, so the data provide, at best, modest evidence
+  that ultra-processed foods raise glucagon levels.
+
+*Data:* `data/ch04/ProcessedFoods.csv`, from
+<https://www.lock5stat.com/datasets3e/ProcessedFoods.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the mean glucagon difference, ultra-processed minus unprocessed, when the null mean is zero
+gluc = pf["Glucagon"].dropna().to_numpy(float)
+boots = signflip_stats(gluc)
+tail_plot(boots, gluc.mean(), "right", "Mean glucagon difference")
+p_row("Mean difference", gluc.mean(), boots, "right").to_string()
+```
+
+## Exercise 4.95
+
+**Rolling Dice.** You roll a die 60 times and record the sample proportion
+of 5's; the randomization distribution simulates samples of 60 rolls of a
+fair die.
+
+- **(a)** $H_0\colon p = 1/6$ vs $H_a\colon p > 1/6$, where $p$ is the true
+  proportion of rolls giving a 5 (biased toward 5's).
+- **(b) Center: $1/6 \approx 0.167$** — the null value, since the simulated
+  samples all come from a fair die.
+- **(c)** A fair die gives 10 fives on average in 60 rolls; getting only
+  **7 fives**, say, is less than expected: $\hat p = 7/60 \approx 0.117$.
+- **(d)** To the **left** of the center — 0.117 is below 1/6.
+- **(e) The right tail.** The alternative is $H_a\colon p > 1/6$, so the
+  p-value is always the probability of a statistic at least as extreme in
+  the *direction of the alternative*: the proportion of simulated samples
+  with $\hat p \ge 0.117$.
+- **(f) Yes — it will be large.** More than half of the randomization
+  distribution lies at or above 0.117, so the p-value is **greater than
+  0.5**: seeing fewer 5's than expected provides no evidence at all that the
+  die is biased toward 5's.
+
+## Exercise 4.96
+
+**What Is Your Lucky Number?** 30 students each pick a digit 0–9; we record
+$X$ = the number of 7's, expected to be 3 when $H_0\colon p = 0.1$ is true.
+Figure 4.25 shows the randomization distribution of $X$ for 1000 simulated
+sets of 30 digits (entered here directly from the figure):
+
+```{python}
+#| echo: false
+sevens = pd.DataFrame({"Sevens": np.arange(10),
+                       "Frequency": [46, 137, 229, 227, 183, 106, 50, 18, 3, 1]})
+fig, ax = plt.subplots(figsize=(6, 3))
+colors = ["#c44e52" if s >= 8 else "#4c72b0" for s in sevens.Sevens]
+ax.bar(sevens.Sevens, sevens.Frequency, color=colors)
+ax.set_xlabel("Number of 7s in 30 digits")
+ax.set_ylabel("Frequency (1000 samples)")
+plt.tight_layout()
+plt.show()
+sevens.T.to_string(index=False)
+```
+
+- **(a)** $X = 8$ is $8 - 3 = 5$ above the expected count of 3. A value
+  equally far out on the *other* side would be $3 - 5 = -2$ — impossible,
+  since a count of 7's cannot be negative. The distribution is cut off on the
+  left, so there is no matching lower-tail value to add: **doubling the
+  one-tailed p-value is the better approach** here, because adding "exact
+  values on both sides" would badly understate the evidence.
+- **(b)** One-tailed: $(3 + 1)/1000 = 0.004$ (the counts at 8 and 9). Doubled
+  for the two-tailed test: **p-value ≈ 0.008** — eight 7's would occur by
+  chance in only about 8 of 1000 sets of 30 random digits.
+- **(c)** For $H_a\colon p < 0.1$ (students *avoid* a digit), the p-value is
+  a left-tail area $P(X \le x_{\text{obs}})$. The smallest left-tail
+  probability available in this distribution is the proportion at
+  $X = 0$: **$46/1000 = 0.046$**. It would occur if **none of the 30
+  students picked that digit** ($X = 0$) — even the most extreme possible
+  sample gives a p-value of only about 0.05 with 30 students, so a sample
+  this small can never provide strong evidence of digit avoidance using this
+  distribution.
+
+:::

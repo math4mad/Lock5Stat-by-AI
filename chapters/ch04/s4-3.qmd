@@ -1,0 +1,1271 @@
+---
+execute-dir: project
+title: "Chapter 4 · Section 4.3"
+subtitle: "Determining Statistical Significance — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 4.3 of Lock⁵ turns a p-value into a **decision**. The **significance
+level** $\alpha$ is chosen *before* the data are examined — usually 5% — as
+the tolerable chance of rejecting a true null (a Type I error). If
+$p \le \alpha$ we **reject $H_0$** and call the result **statistically
+significant**; if $p > \alpha$ we **do not reject $H_0$** (never "accept
+$H_0$"). The same p-value also supports a less formal reading as the
+**strength of evidence**: $p \approx 0.5$ gives no evidence, $p$ just under
+0.10 is suggestive, $p < 0.05$ significant, $p < 0.01$ strong, $p < 0.001$
+very strong — Figure 4.27 contrasts this ladder with the crisp formal rule,
+and both are worth keeping in mind. Significance answers *whether* an effect
+is hard to explain by chance, not whether it *matters*: with a huge sample
+even a trivial effect becomes "significant", so always pair a test with an
+effect size (**practical vs statistical significance**). The 50 exercises
+below (4.97–4.146, pp. 323–332) work through all of this: Skill Builders
+4.97–4.106 make decisions at several significance levels; 4.107–4.125 read
+published p-values in context; 4.126–4.146 run full randomization tests,
+verified below with 10000-replicate simulations (seed 2026) using the real
+Lock⁵ datasets wherever they are available.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+sns.set_theme(style="whitegrid")
+
+def rand_test(groups, stat_fn, alt="two", reps=10000, seed=2026):
+    """Randomization test: pool the group values, repeatedly re-shuffle them
+    into groups of the original sizes, and compare each statistic to the
+    observed one. alt = 'greater', 'less', or 'two'."""
+    rng = np.random.default_rng(seed)
+    groups = [np.asarray(g, float) for g in groups]
+    comb = np.concatenate(groups)
+    sizes = [len(g) for g in groups]
+    stat = float(stat_fn(groups))
+    out = np.empty(reps)
+    for i in range(reps):
+        perm = rng.permutation(comb)
+        res, pos = [], 0
+        for s in sizes:
+            res.append(perm[pos:pos + s])
+            pos += s
+        out[i] = stat_fn(res)
+    if alt == "greater":
+        p = float(np.mean(out >= stat - 1e-12))
+    elif alt == "less":
+        p = float(np.mean(out <= stat + 1e-12))
+    else:
+        p = float(np.mean(np.abs(out) >= abs(stat) - 1e-12))
+    return out, stat, p
+
+def signflip_test(diffs, alt="two", reps=10000, seed=2026):
+    """Randomization for matched pairs: randomly flip the sign of each
+    difference (the null hypothesis is that each difference is symmetric
+    about zero)."""
+    rng = np.random.default_rng(seed)
+    d = np.asarray(diffs, float)
+    stat = float(d.mean())
+    signs = rng.choice([-1.0, 1.0], size=(reps, len(d)))
+    out = (signs * d).mean(axis=1)
+    if alt == "greater":
+        p = float(np.mean(out >= stat - 1e-12))
+    elif alt == "less":
+        p = float(np.mean(out <= stat + 1e-12))
+    else:
+        p = float(np.mean(np.abs(out) >= abs(stat) - 1e-12))
+    return out, stat, p
+
+def prop_test(n, k, p0, alt="two", reps=10000, seed=2026):
+    """Randomization for a single proportion under H0: p = p0 — simulate
+    n coin flips with probability p0, repeat `reps` times."""
+    rng = np.random.default_rng(seed)
+    out = rng.binomial(n, p0, reps) / n
+    stat = k / n
+    if alt == "greater":
+        p = float(np.mean(out >= stat - 1e-12))
+    elif alt == "less":
+        p = float(np.mean(out <= stat + 1e-12))
+    else:
+        p = float(np.mean(np.abs(out - p0) >= abs(stat - p0) - 1e-12))
+    return out, stat, p
+
+def rand_plot(boots, stat, xlabel, bins=30, figsize=(6, 3)):
+    """Histogram of a randomization distribution with the observed statistic."""
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.histplot(x=boots, bins=bins, ax=ax, color="#4c72b0")
+    ax.axvline(stat, color="#c44e52", ls="--", lw=1.5)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Count")
+    plt.tight_layout()
+    plt.show()
+
+def p_row(label, stat, p, digits=3):
+    """One-row summary: sample statistic and randomization p-value."""
+    return pd.Series({label: round(float(stat), digits),
+                      "Randomization p-value": round(p, 4)})
+```
+
+::: {.panel-tabset}
+
+## Exercise 4.97
+
+*(Skill Builder 1: state the decision at the 5% level.)* p-value = 0.0007.
+
+**Reject $H_0$.** Since $0.0007 < 0.05 = \alpha$, the result is statistically
+significant — and with a p-value this tiny, the evidence against the null is
+very strong.
+
+## Exercise 4.98
+
+*(Skill Builder 1)* p-value = 0.0320.
+
+**Reject $H_0$.** Since $0.032 < 0.05$, the result is significant — but the
+evidence is only moderately strong (a p-value of 0.032 is not far below 0.05).
+
+## Exercise 4.99
+
+*(Skill Builder 1)* p-value = 0.2531.
+
+**Do not reject $H_0$.** Since $0.2531 > 0.05$, the data do not provide
+evidence against the null hypothesis.
+
+## Exercise 4.100
+
+*(Skill Builder 1)* p-value = 0.1145.
+
+**Do not reject $H_0$.** Since $0.1145 > 0.05$, the result is not
+statistically significant at the 5% level.
+
+## Exercise 4.101
+
+*(Skill Builder 2: significance at 10%? 5%? 1%?)* p-value = 0.0320.
+
+- **10% level: significant** ($0.032 \le 0.10$).
+- **5% level: significant** ($0.032 \le 0.05$).
+- **1% level: not significant** ($0.032 > 0.01$).
+
+## Exercise 4.102
+
+*(Skill Builder 2)* p-value = 0.2800.
+
+**Not significant at any of the three levels** — 0.28 exceeds 0.10, 0.05,
+and 0.01 alike. There is no evidence against the null hypothesis.
+
+## Exercise 4.103
+
+*(Skill Builder 2)* p-value = 0.008.
+
+**Significant at all three levels** — 0.008 is below 0.10, 0.05, and 0.01.
+The evidence against the null is strong.
+
+## Exercise 4.104
+
+*(Skill Builder 2)* p-value = 0.0621.
+
+- **10% level: significant** ($0.0621 \le 0.10$).
+- **5% level: not significant** ($0.0621 > 0.05$).
+- **1% level: not significant.**
+
+## Exercise 4.105
+
+*(Skill Builder 3: match p-values I. 0.0875, II. 0.5457, III. 0.0217,
+IV. 0.00003 to conclusions.)*
+
+- **(a) Significant, but only at the 10% level → I (0.0875).** It is below
+  0.10 but above 0.05.
+- **(b) Very strong evidence for the alternative → IV (0.00003).**
+- **(c) Not enough evidence even at the 10% level → II (0.5457).**
+- **(d) Significant at 5% but not at 1% → III (0.0217).** Below 0.05, above
+  0.01.
+
+## Exercise 4.106
+
+*(Skill Builder 3: match p-values I. 0.00008, II. 0.0571, III. 0.0368,
+IV. 0.1753 to conclusions.)*
+
+- **(a) Significant only at the 10% level → II (0.0571).**
+- **(b) Very strong evidence → I (0.00008).**
+- **(c) Not enough evidence even at the 10% level → IV (0.1753).**
+- **(d) Significant at 5% but not at 1% → III (0.0368).**
+
+## Exercise 4.107
+
+**Significance Levels.** Test A is reported as significant with "$P < .01$";
+Test B in the same article as "$P < .10$".
+
+**Test A** would be our suspicion for stronger evidence: its p-value is
+known to be below 0.01, while B's could be anywhere below 0.10. The caveat
+is that both reports give only *upper bounds* — B's actual p-value could in
+principle be smaller than A's — but with nothing else to go on, the tighter
+bound for A is the better bet.
+
+## Exercise 4.108
+
+**Can Rats Keep Quiet in Hide-and-Seek?** Researchers tested whether the
+mean amount of vocalizing is higher when rats are seeking than when hiding;
+the authors report "$p < 0.001$".
+
+**Reject $H_0$.** The p-value is below 0.001 — far below any common
+significance level — so the result is statistically significant: there is
+very strong evidence that rats vocalize more, on average, while seeking than
+while hiding in the hide-and-seek game.
+
+## Exercise 4.109
+
+**Honest Placebos.** In a randomized study of open-label placebos for
+chronic back pain (127 people), the placebo group reported a *significantly
+lower* mean level of pain, but there was *not* a significant difference in
+mean range of motion. The two p-values are 0.001 and 0.47.
+
+- **Pain: p = 0.001.** "Significantly lower" means $p \le 0.05$; 0.001
+  qualifies (and indicates strong evidence), 0.47 does not.
+- **Range of motion: p = 0.47.** Far from significant at any usual level.
+
+## Exercise 4.110
+
+**Are Fast-Food Diet and Depression Related?** Match the p-values 0.371,
+0.031, and 0.009 to the study results.
+
+- **(a) Strong evidence of an association between sodium levels and
+  depression symptoms → 0.009.**
+- **(b) No evidence of a relationship between potassium levels and
+  depression symptoms for males → 0.371.**
+- **(c) Significant at the 5% level but not the 1% level → 0.031** (below
+  0.05, above 0.01).
+
+## Exercise 4.111
+
+**Which Is Better for Understanding: Reading or Movies?** Brain-connectivity
+study of 27 four-year-olds. No evidence of a difference between audio and
+illustrated, some evidence of a difference between illustrated and animated,
+strong evidence of a difference between audio and animated. Match p-values
+(a) 0.031, (b) 0.258, (c) 0.006.
+
+- **Audio vs illustrated: (b) 0.258** — no evidence of a difference.
+- **Illustrated vs animated: (a) 0.031** — some (significant at 5%)
+  evidence.
+- **Audio vs animated: (c) 0.006** — strong evidence of a difference.
+  Animation was the worst format for understanding the stories.
+
+## Exercise 4.112
+
+**High Fat Diet Affects Young Memory?** Young rats randomly assigned to a
+high-fat diet or control; the article reports "spatial memory was
+significantly impaired" and "no significant differences in amount of time
+exploring objects." The two p-values are 0.0001 and 0.7.
+
+- **(a)** **Spatial memory: p = 0.0001** (significant — very strong
+  evidence of impairment). **Time exploring objects: p = 0.7** (not
+  significant).
+- **(b) Yes, the causal wording is justified for rats.** The rats were
+  *randomly assigned* to the diets in a double-blind experiment, so a
+  significant difference can reasonably be attributed to the diet itself.
+  The caution is about generalization: the study says nothing directly
+  about human children.
+
+## Exercise 4.113
+
+**Multiple Sclerosis and Sunlight.** Mice injected with an MS-like
+condition: UV-light mice suppressed the disease *significantly better* than
+controls; vitamin-D mice did *not* fare significantly better. The two
+p-values are 0.472 and 0.002.
+
+- **UV light vs control: p = 0.002** (significant).
+- **Vitamin D supplements vs control: p = 0.472** (not significant).
+
+## Exercise 4.114
+
+**Is Your Nose Getting Bigger? — males vs females.** Test whether males, on
+average, have bigger noses than females; the study indicates "$p < 0.01$".
+
+- **(a)** $H_0: \mu_M = \mu_F$ vs $H_a: \mu_M > \mu_F$, where $\mu_M$ and
+  $\mu_F$ are the mean nose sizes (total nasal volume) for all males and
+  females.
+- **(b)** Since $p < 0.01 < 0.05$, **reject $H_0$** at the 5% level: there
+  is strong evidence that males have a larger average nose size than
+  females.
+
+## Exercise 4.115
+
+**Is Your Nose Getting Bigger? — nasal tip angle.** Test whether there is a
+difference between males and females in average nasal tip angle; the study
+indicates "$p > 0.05$".
+
+- **(a)** $H_0: \mu_M = \mu_F$ vs $H_a: \mu_M \ne \mu_F$ for the mean nasal
+  tip angle of males and females.
+- **(b)** Since $p > 0.05$, **do not reject $H_0$**: there is no evidence of
+  a difference in mean nasal tip angle between males and females.
+
+## Exercise 4.116
+
+**Is Your Nose Getting Bigger? — age and nose size.** Test whether there is
+a positive linear relationship between age and nose size; the study
+indicates "$p < 0.001$".
+
+- **(a)** $H_0: \rho = 0$ vs $H_a: \rho > 0$, where $\rho$ is the
+  population correlation between age and nose size.
+- **(b)** Since $p < 0.001$, **reject $H_0$**: very strong evidence of a
+  positive linear relationship — noses do keep growing with age.
+
+## Exercise 4.117
+
+**Antibiotics in Infancy and Weight.** Prescription records for antibiotics
+in the first year of life; children classified as overweight or not at age
+12. The study concludes that infants receiving antibiotics were more likely
+to be overweight later (32.4% versus 18.2% at age 12, $P = 0.002$).
+
+- **(a)** Explanatory variable: whether the child received antibiotics in
+  the first year (categorical). Response variable: whether the child is
+  classified as overweight at age 12 (categorical).
+- **(b) Observational study** — exposure was recorded from prescription
+  records, not randomly assigned.
+- **(c)** $H_0: p_A = p_N$ vs $H_a: p_A > p_N$, where $p_A$ and $p_N$ are
+  the proportions overweight at age 12 among all children who do (A) and do
+  not (N) receive antibiotics in infancy.
+- **(d)** The sample statistic is $\hat p_A - \hat p_N = 0.324 - 0.182 =
+  0.142$.
+- **(e)** $p = 0.002 \le 0.05$, so **reject $H_0$**: the result is
+  statistically significant, and $p = 0.002$ indicates strong evidence that
+  infants who receive antibiotics are more likely to be overweight later.
+- **(f) No.** This is an observational study — children were not randomly
+  assigned to antibiotics. Confounding variables (for example, illness
+  patterns, diet, other early-life factors) could explain the difference,
+  so we cannot conclude that antibiotics *cause* the higher overweight
+  proportion.
+
+## Exercise 4.118
+
+**Sleep or Caffeine for Memory?** 35 adults randomly divided into three
+groups (nap, caffeine, placebo) and given 24 words to memorize; recall was
+measured after the break. Table 4.9 (hardcoded from the book):
+
+```{python}
+#| echo: false
+pd.DataFrame({"Group": ["Sleep", "Caffeine", "Placebo"],
+              "Sample Size": [12, 12, 11],
+              "Mean": [15.25, 12.25, 13.70],
+              "Standard Deviation": [3.3, 3.5, 3.0]}).to_string(index=False)
+```
+
+- **(a)** Sleep vs caffeine, $p = 0.003 \le 0.05$: **reject $H_0$** — there
+  is significant evidence of a difference. In the sample the **sleep group**
+  did better (15.25 vs 12.25 words). Since this was a randomized experiment
+  with a small p-value, yes — the results suggest sleep really is better
+  than caffeine for recall ability.
+- **(b)** Sleep vs placebo, $p = 0.06$. At the 5% level: **do not reject
+  $H_0$**. At the 10% level: **reject $H_0$**. The evidence of a difference
+  in mean recall between sleep and placebo is moderate — real, but not
+  strong.
+- **(c)** Caffeine vs placebo, $p = 0.22$: **do not reject $H_0$**. In the
+  sample the **placebo group** did better (13.70 vs 12.25). We would **not**
+  be justified in concluding that caffeine impairs recall ability — the
+  difference is not statistically significant, so it could easily be due to
+  random chance.
+- **(d)** Based on this study: **sleep (take a nap) before an exam** that
+  requires recall — it beat both caffeine and placebo, significantly so
+  against caffeine.
+
+## Exercise 4.119
+
+**Price and Marketing.** 204 undergraduates all drank the same energy drink
+and solved puzzles, having paid either the regular price (\$1.89) or a
+discount (\$0.89): "the number of puzzles solved was lower in the
+reduced-price condition ($M = 4.2$) than in the regular-price condition
+($M = 5.8$) … $p < .0001$."
+
+- **(a)** Since this was a randomized experiment and $p < 0.0001$, we
+  **reject $H_0$**: there is very strong evidence that students who paid the
+  discounted price solved fewer puzzles on average (4.2 vs 5.8). The drink
+  was identical — only the price differed — so the effect is a real
+  expectation (placebo) effect of pricing.
+- **(b)** The results suggest that expectations manufactured by price and
+  marketing change not just how products *feel* but how they *perform*: a
+  cheaper price tag made the identical drink less effective. For marketing
+  and pricing this means discounts can carry a hidden cost (lower perceived
+  and actual quality), brand names can outperform generics even when the
+  chemistry is the same, and consumers might do well to judge products
+  blind — as the Coke-vs-cheaper-cola and brand-name-vs-generic-aspirin
+  examples illustrate.
+
+## Exercise 4.120
+
+**Mercury Levels in Fish.** Scatterplot of pH vs average mercury (ppm) for
+$n = 53$ Florida lakes (`FloridaLakes` data); we test for a negative
+association between pH and mercury.
+
+- **(a)** $H_0: \rho = 0$ vs $H_a: \rho < 0$, where $\rho$ is the population
+  correlation between pH and mercury level.
+- **(b)** Software gives $r = -0.575$, p-value $= 0.000017$. Since
+  $0.000017 < 0.05$, **reject $H_0$**: there is very strong evidence of a
+  negative association between pH and mercury levels in Florida lakes —
+  more acidic lakes tend to have fish with higher mercury levels.
+- **(c) No.** This is an observational study of lakes, so association does
+  not establish causation — other variables (such as alkalinity, water
+  chemistry, or pollution sources) could confound the relationship.
+
+Our 10000-replicate randomization test (permuting mercury values against
+pH) reproduces the result — the observed $r = -0.575$ never comes close to
+appearing under random re-pairing:
+
+*Data:* `data/ch03/FloridaLakes.csv`, from
+<https://www.lock5stat.com/datasets3e/FloridaLakes.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the correlation between pH and mercury in Florida lakes
+lakes = pd.read_csv("data/ch03/FloridaLakes.csv")
+ph = lakes["pH"].to_numpy(float)
+hg = lakes["AvgMercury"].to_numpy(float)
+boots, stat, p = rand_test([ph, hg], lambda r: np.corrcoef(r[0], r[1])[0, 1],
+                           alt="less")
+rand_plot(boots, stat, "Randomization correlations (pH vs mercury)")
+```
+
+```{python}
+#| echo: false
+p_row("Sample correlation", stat, p).to_string()
+```
+
+## Exercise 4.121
+
+**Penalty Shots in Soccer.** For a given body movement ("tell") before a
+penalty kick, test whether the proportion of kicks going right differs from
+one-half.
+
+- **(a)** $H_0: p = 0.5$ vs $H_a: p \ne 0.5$, where $p$ is the proportion
+  of all kicks that go right after this type of body movement.
+- **(b)** $p = 0.3184 > 0.05$: **do not reject $H_0$** — no evidence that
+  this movement is informative. A goalie should **not** bother learning to
+  distinguish this movement.
+- **(c)** $p = 0.0006 \le 0.05$: **reject $H_0$** — very strong evidence
+  that the proportion of kicks going right differs from 50% for this
+  movement. A goalie **should** learn to distinguish this movement.
+
+## Exercise 4.122
+
+**ADHD and Pesticides.** Observational study of organophosphate pesticide
+metabolites (DAP) and ADHD. The authors state: "The threshold for
+statistical significance was set at $P < .05$"; "The odds of meeting the
+… criteria for ADHD increased with the urinary concentrations of total DAP
+metabolites"; "The association was statistically significant."
+
+- **(a)** We can conclude that the p-value was **less than 0.05**.
+- **(b) No.** Knowing only $p < 0.05$ cannot distinguish very strong from
+  moderately strong evidence — a p-value of 0.001 and one of 0.049 are both
+  "significant" but carry very different strength.
+- **(c) Yes** — the association is statistically significant, so the data
+  provide evidence that pesticide exposure is related to the likelihood of
+  an ADHD diagnosis.
+- **(d) No.** This is an observational study (exposure was not randomly
+  assigned), so we cannot conclude that pesticides **cause** ADHD;
+  confounding variables remain possible.
+
+## Exercise 4.123
+
+**Diabetes and Pollution.** 28 mice randomly selected: 14 got filtered air
+(FA) and 14 breathed particulate matter simulating air pollution (PM);
+insulin resistance after 24 weeks was the response.
+
+- **(a) Randomized experiment** — the mice were randomly assigned to the air
+  conditions.
+- **(b)** $H_0: \mu_{FA} = \mu_{PM}$ vs $H_a: \mu_{FA} \ne \mu_{PM}$, the
+  mean insulin resistance for mice under filtered air vs polluted air.
+- **(c)** The observed difference is $D = \bar x_{FA} - \bar x_{PM} = 1.8 -
+  6.2 = -4.4$. In Figure 4.29, the 1000 randomization differences all fall
+  roughly between −3 and +2, so a difference of −4.4 (or more extreme)
+  **never occurred** in 1000 shuffles — such a result would be essentially
+  impossible under $H_0$. **Yes, it is very likely we will reject the null
+  hypothesis.**
+- **(d)** The p-value is **approximately 0** — 0 of the 1000 randomization
+  differences were as extreme as the observed −4.4.
+- **(e)** **Reject $H_0$**: there is very strong evidence that mean insulin
+  resistance differs between the groups — breathing polluted air leads to
+  higher average insulin resistance in these mice (a plausible path from air
+  pollution toward diabetes).
+
+## Exercise 4.124
+
+**Beer and Mosquitoes.** 43 volunteers randomly assigned to drink a liter of
+beer or water; mosquito activation was measured. The report states that
+"Beer consumption, as opposed to water consumption, significantly increased
+the activation … of *An. gambiae* … ($P < 0.001$)."
+
+- **(a) Yes.** The result is statistically significant ($P < 0.001$), so the
+  data provide convincing evidence that consuming beer is *associated with*
+  higher mosquito attraction.
+- **(b) Very strong.** A p-value below 0.001 means a difference at least
+  this large would occur far less than 1 time in 1000 if beer had no effect.
+- **(c) Yes — here a causal conclusion is reasonable.** Volunteers were
+  *randomly assigned* to beer or water, so the significant difference can be
+  attributed to the beer itself (confounding is ruled out by randomization).
+  Beer drinkers really do attract more mosquitoes.
+
+## Exercise 4.125
+
+**Exercise and the Brain.** Separate groups of mice exposed to running
+wheels for 0, 2, 4, 7, or 10 days; the study tests effects on Y-maze
+performance, BMP levels, and noggin levels.
+
+- **(a)** $p < .01$: **strong evidence** that exercise improved Y-maze
+  performance by the 7th day of exposure (with further increases after 10
+  days).
+- **(b)** $p < .01$: **strong evidence** that exercise reduced BMP — and the
+  reduction persisted at all later time points.
+- **(c)** $p < .001$: **very strong evidence** that exercise increased
+  noggin levels (1.5-fold by 7–10 days), after no change through 4 days.
+- **(d)** The **noggin test** ($p < .001$) shows the strongest statistical
+  effect.
+- **(e)** These are randomized experiments, so we can conclude that exercise
+  **causally** improves brain-function measures (better cognition, lower
+  BMP, higher noggin) **in mice**. Whether the same benefits extend to
+  humans is a question these mouse studies cannot answer on their own.
+
+## Exercise 4.126
+
+**Cake or Broccoli?** Two-year-olds chose between two options (480 trials
+in each experiment); we test whether the second option is picked more than
+half the time. In both experiments: $H_0: p = 0.5$ vs $H_a: p > 0.5$, where
+$p$ is the proportion of trials in which the second option is chosen.
+
+- **(a) Experiment 1 (pictures):** $\hat p = 248/480 = 0.517$. The
+  randomization (binomial) distribution below gives **p ≈ 0.25** — far from
+  significant, so we **do not reject $H_0$**: with pictures, there is no
+  evidence of recency bias.
+- **(b) Experiment 2 (words):** $\hat p = 409/480 = 0.852$. **p < 0.0001**
+  (none of 10000 simulations comes close) — **reject $H_0$**: very strong
+  evidence that toddlers pick the second option more than half the time when
+  the question is verbal. Recency bias shows up in verbal choices, not
+  pointing ones.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distributions of the second-choice proportion under H0 p = 0.5, with the observed proportions marked
+b1, s1, p1 = prop_test(480, 248, 0.5, alt="greater")
+b2, s2, p2 = prop_test(480, 409, 0.5, alt="greater")
+fig, axes = plt.subplots(1, 2, figsize=(7, 3))
+for ax, b, s, name in [(axes[0], b1, s1, "Pictures (248 of 480)"),
+                       (axes[1], b2, s2, "Words (409 of 480)")]:
+    sns.histplot(x=b, bins=30, ax=ax, color="#4c72b0")
+    ax.axvline(s, color="#c44e52", ls="--", lw=1.5)
+    ax.set_title(name, fontsize=10)
+    ax.set_xlabel("Randomization proportions")
+plt.tight_layout()
+plt.show()
+```
+
+```{python}
+#| echo: false
+pd.concat([p_row("Pictures: proportion", s1, p1),
+           p_row("Words: proportion", s2, p2)], axis=1).to_string()
+```
+
+## Exercise 4.127
+
+**Can a Brief Diet Intervention Help Depression?** 75 college students with
+elevated depression symptoms were randomly assigned to a healthy diet group
+(37) or a control group (38); the response is the reduction in depression
+after three weeks on the DASS survey (`DietDepression` data, variable
+`DASSDiff`; larger = more improvement). We test $H_0: \mu_D = \mu_C$ vs
+$H_a: \mu_D > \mu_C$.
+
+The diet group improved by about 7.9 DASS points on average versus 0.8 for
+the control group, and a 10000-replicate randomization test (re-shuffling
+the 75 students between groups) gives **p ≈ 0.002** — **reject $H_0$**:
+strong evidence that, on average, depression symptoms improve more for
+students who eat a healthy diet for three weeks. Random assignment makes a
+causal conclusion reasonable.
+
+*Data:* `data/ch02/DietDepression.csv`, from
+<https://www.lock5stat.com/datasets3e/DietDepression.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in mean DASS depression reduction, diet minus control
+dd = pd.read_csv("data/ch02/DietDepression.csv")
+diet = dd.loc[dd.Group == "Diet", "DASSDiff"].to_numpy(float)
+ctrl = dd.loc[dd.Group == "Control", "DASSDiff"].to_numpy(float)
+boots, stat, p = rand_test([diet, ctrl], lambda r: r[0].mean() - r[1].mean(),
+                           alt="greater")
+rand_plot(boots, stat, "Randomization differences in mean DASS reduction")
+```
+
+```{python}
+#| echo: false
+pd.concat([p_row("Diet mean", diet.mean(), p, digits=2),
+           p_row("Control mean", ctrl.mean(), p, digits=2)], axis=1).to_string()
+```
+
+## Exercise 4.128
+
+**Can a Brief Diet Intervention Change BMI?** Same 75 students, same design;
+now the response is the reduction in BMI (`BMIDiff`, larger = greater
+reduction). Test $H_0: \mu_D = \mu_C$ vs $H_a: \mu_D > \mu_C$.
+
+The diet group's mean BMI reduction is 0.28 vs 0.12 for controls, but the
+10000-replicate randomization test gives **p ≈ 0.29** — **do not reject
+$H_0$**: there is no evidence that three weeks of healthy diet changes BMI
+on average. (A depression benefit without a detectable BMI change is
+plausible — three weeks may be too short, and weight change is slow.)
+
+*Data:* `data/ch02/DietDepression.csv`, from
+<https://www.lock5stat.com/datasets3e/DietDepression.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in mean BMI reduction, diet minus control
+dietb = dd.loc[dd.Group == "Diet", "BMIDiff"].dropna().to_numpy(float)
+ctrlb = dd.loc[dd.Group == "Control", "BMIDiff"].dropna().to_numpy(float)
+boots, stat, p = rand_test([dietb, ctrlb], lambda r: r[0].mean() - r[1].mean(),
+                           alt="greater")
+rand_plot(boots, stat, "Randomization differences in mean BMI reduction")
+```
+
+```{python}
+#| echo: false
+pd.concat([p_row("Diet mean", dietb.mean(), p, digits=3),
+           p_row("Control mean", ctrlb.mean(), p, digits=3)], axis=1).to_string()
+```
+
+## Exercise 4.129
+
+**Social Media Use and ADHD.** Teens rated as high- or low-frequency social
+media users and followed for two years (Table 4.10, hardcoded):
+
+```{python}
+#| echo: false
+pd.DataFrame({"Social Media Use": ["High frequency", "Low frequency", "Total"],
+              "ADHD": [16, 23, 39], "No ADHD": [149, 472, 621],
+              "Total": [165, 495, 660]}).to_string(index=False)
+```
+
+**Hypotheses:** $H_0: p_H = p_L$ vs $H_a: p_H > p_L$, where $p_H$ and $p_L$
+are the proportions diagnosed with ADHD among all teens with high- and
+low-frequency social media use.
+
+**Sample statistic:** $\hat p_H - \hat p_L = 16/165 - 23/495 = 0.097 -
+0.046 = 0.051$ — the high-use group's diagnosis rate is about 5 percentage
+points higher.
+
+**Randomization test:** re-shuffle the 660 teens between the two group
+sizes 10000 times. The p-value is **≈ 0.017** — only about 1.7% of
+re-shuffles give a difference this large.
+
+**Conclusion:** **Reject $H_0$** at the 5% level: the data provide
+evidence that teens with high-frequency social media use are more likely to
+be diagnosed with ADHD. (An observational study — association, not a proven
+causal effect.)
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in ADHD diagnosis proportions, high minus low social media use
+boots, stat, p = rand_test([np.repeat([1, 0], [16, 149]),
+                            np.repeat([1, 0], [23, 472])],
+                           lambda r: r[0].mean() - r[1].mean(), alt="greater")
+rand_plot(boots, stat, "Randomization differences in proportions")
+```
+
+```{python}
+#| echo: false
+p_row("Difference (high - low)", stat, p).to_string()
+```
+
+## Exercise 4.130
+
+**Want to Live Longer? Walk More!** Over 16,000 older women divided into
+quartiles by steps per day (Table 4.11, hardcoded):
+
+```{python}
+#| echo: false
+pd.DataFrame({"Quartile": [1, 2, 3, 4],
+              "Median Steps": [2718, 4363, 5905, 8442],
+              "Deaths": [275, 103, 77, 49],
+              "Women": [4185, 4185, 4186, 4185]}).to_string(index=False)
+```
+
+- **(a) Quartile 1 vs Quartile 2:** $\hat p_1 - \hat p_2 = 275/4185 -
+  103/4185 = 0.066 - 0.025 = 0.041$. The randomization test gives
+  **p < 0.0001** (0 of 10000 shuffles) — **reject $H_0$**: the proportion
+  dying is significantly higher among women walking at the Quartile 1 level
+  than at the Quartile 2 level.
+- **(b) Quartile 3 vs Quartile 4 (5% level):** $\hat p_3 - \hat p_4 =
+  77/4186 - 49/4185 = 0.018 - 0.012 = 0.007$. The p-value is **≈ 0.007** —
+  **reject $H_0$** at the 5% level: even this small step increase is
+  associated with a significant drop in mortality.
+- **(c) The causal title is not appropriate.** This is an observational
+  study — women were not randomly assigned to walk more. Healthier women
+  both walk more *and* live longer, so the walking itself may not be the
+  cause of the lower death rates.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distributions of the difference in mortality proportions, Quartile 1 minus 2 and Quartile 3 minus 4
+b12, s12, p12 = rand_test([np.repeat([1, 0], [275, 4185 - 275]),
+                           np.repeat([1, 0], [103, 4185 - 103])],
+                          lambda r: r[0].mean() - r[1].mean(), alt="greater")
+b34, s34, p34 = rand_test([np.repeat([1, 0], [77, 4186 - 77]),
+                           np.repeat([1, 0], [49, 4185 - 49])],
+                          lambda r: r[0].mean() - r[1].mean(), alt="greater")
+fig, axes = plt.subplots(1, 2, figsize=(7, 3))
+for ax, b, s, name in [(axes[0], b12, s12, "Q1 vs Q2 (275/4185 vs 103/4185)"),
+                       (axes[1], b34, s34, "Q3 vs Q4 (77/4186 vs 49/4185)")]:
+    sns.histplot(x=b, bins=30, ax=ax, color="#4c72b0")
+    ax.axvline(s, color="#c44e52", ls="--", lw=1.5)
+    ax.set_title(name, fontsize=9)
+    ax.set_xlabel("Randomization differences in proportions")
+plt.tight_layout()
+plt.show()
+```
+
+```{python}
+#| echo: false
+pd.concat([p_row("Q1 - Q2", s12, p12), p_row("Q3 - Q4", s34, p34)],
+          axis=1).to_string()
+```
+
+## Exercise 4.131
+
+**Are Female or Male Homing Pigeons Faster?** Race results for 1412 pigeons
+(`HomingPigeons` data): 649 hens (H) and 763 cocks (C), speeds in YPM. Test
+$H_0: \mu_C = \mu_H$ vs $H_a: \mu_C \ne \mu_H$.
+
+The sample means are almost identical — hens 632.2 YPM, cocks 631.6 YPM, a
+difference of only −0.6 YPM — and the 10000-replicate randomization test
+gives **p ≈ 0.96**: **do not reject $H_0$**. This dataset provides no
+evidence of a difference in mean race speed between male and female
+pigeons.
+
+*Data:* `data/ch02/HomingPigeons.csv`, from
+<https://www.lock5stat.com/datasets3e/HomingPigeons.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in mean pigeon race speed, cocks minus hens
+pig = pd.read_csv("data/ch02/HomingPigeons.csv")
+hens = pig.loc[pig.Sex == "H", "Speed"].to_numpy(float)
+cocks = pig.loc[pig.Sex == "C", "Speed"].to_numpy(float)
+boots, stat, p = rand_test([cocks, hens], lambda r: r[0].mean() - r[1].mean())
+rand_plot(boots, stat, "Randomization differences in mean speed (C - H)")
+```
+
+```{python}
+#| echo: false
+pd.concat([p_row("Cocks mean (YPM)", cocks.mean(), p, digits=1),
+           p_row("Hens mean (YPM)", hens.mean(), p, digits=1)], axis=1).to_string()
+```
+
+## Exercise 4.132
+
+**Does Heat Affect Math Reaction Time?** 46 students during a heat wave,
+some in air-conditioned dorms (`HeatCognition` data, `MathZRT` = z-scored
+math reaction time). With Group 1 = air-conditioned, we test
+$H_0: \mu_1 = \mu_2$ vs $H_a: \mu_1 < \mu_2$ (left-tail: AC students
+faster).
+
+**Sample statistic:** $\bar x_1 - \bar x_2 = -0.031 - 0.072 = -0.103$.
+The 10000-replicate randomization test gives **p ≈ 0.22** — **do not reject
+$H_0$**: there is no evidence that students with air-conditioning are
+faster, on average, at the two-digit arithmetic task. (The math task may be
+too easy, or too noisy, for the heat effect to show.)
+
+*Data:* `data/ch04/HeatCognition.csv`, from
+<https://www.lock5stat.com/datasets3e/HeatCognition.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in mean math reaction time z-scores, air-conditioned minus not
+heat = pd.read_csv("data/ch04/HeatCognition.csv")
+mAC = heat.loc[heat.AC == "Yes", "MathZRT"].to_numpy(float)
+mNo = heat.loc[heat.AC == "No", "MathZRT"].to_numpy(float)
+boots, stat, p = rand_test([mAC, mNo], lambda r: r[0].mean() - r[1].mean(),
+                           alt="less")
+rand_plot(boots, stat, "Randomization differences in mean MathZRT (AC - No)")
+```
+
+```{python}
+#| echo: false
+pd.concat([p_row("AC mean MathZRT", mAC.mean(), p),
+           p_row("No AC mean MathZRT", mNo.mean(), p)], axis=1).to_string()
+```
+
+## Exercise 4.133
+
+**Does Heat Affect Color Dissonance Reaction Time?** Same study, now the
+STROOP color test (`ColorsZRT`, z-scored reaction time). Again
+$H_0: \mu_1 = \mu_2$ vs $H_a: \mu_1 < \mu_2$ with Group 1 = air-conditioned.
+
+**Sample statistic:** $\bar x_1 - \bar x_2 = -0.157 - 0.623 = -0.780$. The
+randomization p-value is **≈ 0.004** — **reject $H_0$**: there is evidence
+that students with air-conditioning are faster (lower mean reaction time) on
+the color-dissonance task. Together with 4.132, heat hurts some kinds of
+thinking more than others.
+
+*Data:* `data/ch04/HeatCognition.csv`, from
+<https://www.lock5stat.com/datasets3e/HeatCognition.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in mean STROOP reaction time z-scores, air-conditioned minus not
+cAC = heat.loc[heat.AC == "Yes", "ColorsZRT"].to_numpy(float)
+cNo = heat.loc[heat.AC == "No", "ColorsZRT"].to_numpy(float)
+boots, stat, p = rand_test([cAC, cNo], lambda r: r[0].mean() - r[1].mean(),
+                           alt="less")
+rand_plot(boots, stat, "Randomization differences in mean ColorsZRT (AC - No)")
+```
+
+```{python}
+#| echo: false
+pd.concat([p_row("AC mean ColorsZRT", cAC.mean(), p),
+           p_row("No AC mean ColorsZRT", cNo.mean(), p)], axis=1).to_string()
+```
+
+## Exercise 4.134
+
+**Do Tears Subconsciously Affect Sadness Ratings?** Double-blind matched
+pairs: each of 25 men sniffed both tears and a salt placebo, and the
+difference in sadness ratings for female faces (placebo − tears) is in
+`HumanTears25` (`SadDiff`). Test $H_0: \mu_D = 0$ vs $H_a: \mu_D \ne 0$.
+
+**Sample statistic:** $\bar x_D = 18.5$ — faces rate sadder after the
+placebo, i.e., tears make faces look sadder. But the 10000-replicate
+sign-flip randomization test gives **p ≈ 0.26** — **do not reject $H_0$**
+at the 5% level: with these (very lumpy, heavily skewed) data we do not have
+significant evidence that tears contain a chemical signal affecting
+sadness ratings. The direction is consistent with such a signal, but the
+evidence is not conclusive.
+
+*Data:* `data/ch04/HumanTears25.csv`, from
+<https://www.lock5stat.com/datasets3e/HumanTears25.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the mean sadness-rating difference under sign-flipping
+tears = pd.read_csv("data/ch04/HumanTears25.csv")
+sad = tears["SadDiff"].to_numpy(float)
+boots, stat, p = signflip_test(sad, alt="two")
+rand_plot(boots, stat, "Randomization mean differences in sadness ratings")
+```
+
+```{python}
+#| echo: false
+p_row("Mean difference (placebo - tears)", stat, p, digits=2).to_string()
+```
+
+## Exercise 4.135
+
+**Do Tears Subconsciously Affect Sexual Arousal Ratings?** Same design; the
+difference in sexual arousal ratings (placebo − tears) is `SexDiff` in
+`HumanTears25`. Test $H_0: \mu_D = 0$ vs $H_a: \mu_D \ne 0$ at the 5%
+level.
+
+**Sample statistic:** $\bar x_D = 21.6$. The 10000-replicate sign-flip test
+gives **p ≈ 0.037** — **reject $H_0$** at the 5% level: significant evidence
+that tears contain a chemical signal that lowers sexual arousal ratings of
+female faces.
+
+*Data:* `data/ch04/HumanTears25.csv`, from
+<https://www.lock5stat.com/datasets3e/HumanTears25.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the mean sexual-arousal-rating difference under sign-flipping
+sex = tears["SexDiff"].to_numpy(float)
+boots, stat, p = signflip_test(sex, alt="two")
+rand_plot(boots, stat, "Randomization mean differences in arousal ratings")
+```
+
+```{python}
+#| echo: false
+p_row("Mean difference (placebo - tears)", stat, p, digits=2).to_string()
+```
+
+## Exercise 4.136
+
+**Do Tears Affect Testosterone Levels?** Testosterone levels (pg/mL) after
+exposure to tears or placebo for 50 men; the difference (placebo − tears) is
+in `HumanTears50`. Tears are claimed to reduce testosterone, so we test
+$H_0: \mu_D = 0$ vs $H_a: \mu_D > 0$ (right-tail).
+
+**Sample statistic:** $\bar x_D = 15.3$ pg/mL — testosterone is higher after
+the placebo, i.e., lower after tears. The 10000-replicate sign-flip test
+gives **p ≈ 0.001** — **reject $H_0$**: strong evidence that tears contain a
+chemical signal that reduces testosterone levels in men.
+
+*Data:* `data/ch04/HumanTears50.csv`, from
+<https://www.lock5stat.com/datasets3e/HumanTears50.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the mean testosterone difference under sign-flipping
+t50 = pd.read_csv("data/ch04/HumanTears50.csv")
+tdiff = t50["Difference"].to_numpy(float)
+boots, stat, p = signflip_test(tdiff, alt="greater")
+rand_plot(boots, stat, "Randomization mean testosterone differences (placebo - tears)")
+```
+
+```{python}
+#| echo: false
+p_row("Mean difference (placebo - tears)", stat, p, digits=2).to_string()
+```
+
+## Exercise 4.137
+
+**Watch Out for Lions after a Full Moon.** Of 95 lion attacks between 6 pm
+and 10 pm within five days before or after a full moon, 71 happened in the
+five days *after* the full moon and 24 in the five days *before*. This is a
+test for a single proportion: $H_0: p = 0.5$ vs $H_a: p \ne 0.5$, where $p$
+is the proportion of such attacks that fall in the five days after a full
+moon.
+
+**Sample statistic:** $\hat p = 71/95 = 0.747$. Simulating 95 fair-coin
+attacks 10000 times, **none** comes as close to 0.5-or-beyond as the
+observed split — **p < 0.0001** (the exact two-tailed binomial p-value is
+about 0.000002).
+
+**Conclusion:** **Reject $H_0$**: very strong evidence that attacks are not
+equally split between the two five-day periods — lions are significantly
+more likely to attack people in the five days after a full moon.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the proportion of attacks after a full moon under H0 p = 0.5
+boots, stat, p = prop_test(95, 71, 0.5, alt="two")
+rand_plot(boots, stat, "Randomization proportions of attacks after full moon")
+```
+
+```{python}
+#| echo: false
+p_row("Proportion after full moon", stat, p).to_string()
+```
+
+## Exercise 4.138
+
+**Electrical Stimulation for Fresh Insight?** 40 participants trained on a
+certain way of solving problems, then given an unfamiliar problem; half were
+randomly assigned to electrical stimulation, half to sham (Table 4.12,
+hardcoded):
+
+```{python}
+#| echo: false
+pd.DataFrame({"Treatment": ["Sham", "Electrical"],
+              "Solved": [4, 12], "Not Solved": [16, 8],
+              "Proportion solved": ["0.20", "0.60"]}).to_string(index=False)
+```
+
+**Hypotheses:** $H_0: p_E = p_S$ vs $H_a: p_E > p_S$, the proportions who
+solve the problem with electrical vs sham stimulation.
+
+**Sample statistic:** $\hat p_E - \hat p_S = 0.60 - 0.20 = 0.40$. The
+10000-replicate randomization test (re-shuffling the 40 people between
+groups) gives **p ≈ 0.012** — **reject $H_0$** at the 5% level: the
+proportion solving the problem was significantly higher with electrical
+stimulation.
+
+- **(b) Yes** — this was a randomized experiment, so we can conclude that
+  electrical stimulation of the brain *causes* better performance on
+  problems requiring fresh insight (at least in settings like this one).
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in proportions solved, electrical minus sham
+boots, stat, p = rand_test([np.repeat([1, 0], [12, 8]),
+                            np.repeat([1, 0], [4, 16])],
+                           lambda r: r[0].mean() - r[1].mean(), alt="greater")
+rand_plot(boots, stat, "Randomization differences in proportions solved")
+```
+
+```{python}
+#| echo: false
+p_row("Difference (electrical - sham)", stat, p).to_string()
+```
+
+## Exercise 4.139
+
+**Does Massage Help Heal Muscles Strained by Exercise?** 11 men who had just
+strenuously exercised got 10 minutes of massage on one randomly chosen
+quadricep and no treatment on the other; the differences in interleukin-6
+production (control minus massage, Table 4.13) are hardcoded below.
+
+- **(a)** This is an **experiment** — the treatment (massage vs none) was
+  randomly assigned to the two legs. It is **not double-blind** because the
+  participants (and the person giving the massage) know which leg was
+  massaged — a subject can feel which leg received treatment.
+- **(b)** The sample mean difference is $\bar x_D = 1.3$ (computed below):
+  untreated muscle averages 1.3 units more inflammation than massaged
+  muscle.
+- **(c)** $H_0: \mu_D = 0$ vs $H_a: \mu_D > 0$, where $\mu_D$ is the mean
+  difference in inflammation (control minus massage) for all similar
+  exercised muscles.
+- **(d)** Randomizing by flipping the sign of each difference 10000 times
+  gives **p ≈ 0.047**.
+- **(e)** Significant at the 5% level ($0.047 \le 0.05$) but **not** at the
+  1% level. At the 5% level: **reject $H_0$** — there is evidence that
+  massage reduces inflammation in strained muscles (the authors' conclusion
+  stands, though just barely).
+
+```{python}
+#| echo: false
+massage = np.array([0.6, 4.7, 3.8, 0.4, 1.5, -1.2, 2.8, -0.4, 1.4, 3.5, -2.8])
+boots, stat, p = signflip_test(massage, alt="greater")
+rand_plot(boots, stat, "Randomization mean differences (control - massage)")
+```
+
+```{python}
+#| echo: false
+p_row("Mean difference", stat, p, digits=2).to_string()
+```
+
+## Exercise 4.140
+
+**The Ignorance Survey: United States.** Of 1005 US respondents, 5% picked
+the correct answer ("almost halved") to the extreme-poverty question; with
+three choices, random guessing would give 1/3 correct. Test
+$H_0: p = 1/3$ vs $H_a: p \ne 1/3$, where $p$ is the proportion of all US
+respondents who would answer correctly.
+
+- **(a)** As stated above.
+- **(b)** Taking 5% of 1005, about 50 people answered correctly:
+  $\hat p = 50/1005 = 0.050$. In 10000 simulations of guessing among 1005
+  people, **none** comes anywhere near 0.05 — **p < 0.0001** (0 of 10000).
+- **(c)** **Reject $H_0$**: the percent correct is significantly *different
+  from* (in fact far below) random guessing. US respondents are not merely
+  uninformed — their preconceptions actively lead them to wrong answers far
+  more often than chance.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the proportion correct under random guessing, p = 1/3
+boots, stat, p = prop_test(1005, 50, 1 / 3, alt="two")
+rand_plot(boots, stat, "Randomization proportions correct (guessing)")
+```
+
+```{python}
+#| echo: false
+p_row("US proportion correct", stat, p).to_string()
+```
+
+## Exercise 4.141
+
+**The Ignorance Survey: United Kingdom.** Of 373 UK university degree
+holders, 45 answered the extreme-poverty question correctly; of 639
+non-degree holders, 57 did. Test $H_0: p_D = p_N$ vs $H_a: p_D \ne p_N$.
+
+**Sample statistic:** $\hat p_D - \hat p_N = 45/373 - 57/639 = 0.121 -
+0.089 = 0.031$. The 10000-replicate randomization test gives **p ≈ 0.13**
+— **do not reject $H_0$**: there is no significant difference in the
+percent of correct answers between UK degree holders and non-degree
+holders. (Unlike the US result in 4.140, both groups here answered far
+below the guessing rate of 1/3, but not significantly differently from each
+other.)
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in proportions correct, degree holders minus non-degree
+boots, stat, p = rand_test([np.repeat([1, 0], [45, 373 - 45]),
+                            np.repeat([1, 0], [57, 639 - 57])],
+                           lambda r: r[0].mean() - r[1].mean())
+rand_plot(boots, stat, "Randomization differences in proportions correct")
+```
+
+```{python}
+#| echo: false
+p_row("Difference (degree - non-degree)", stat, p).to_string()
+```
+
+## Exercise 4.142
+
+**Flying Home for the Holidays.** `DecemberFlights` contains the difference
+between actual and scheduled arrival time (negative = early) for 1000
+December flights each of Delta and United. Test whether the mean difference
+differs between the airlines: $H_0: \mu_D = \mu_U$ vs
+$H_a: \mu_D \ne \mu_U$.
+
+- **(a)** Parameters and hypotheses as above; $\mu_D$ and $\mu_U$ are the
+  mean actual-minus-scheduled arrival differences for all December Delta
+  and United flights.
+- **(b)** Sample means (computed below): Delta −5.65 minutes, United
+  +4.21 minutes, so $\bar x_D - \bar x_U = -9.86$ minutes — Delta averages
+  almost 10 minutes earlier than United.
+- **(c)** The 10000-replicate randomization test gives **p < 0.0001**
+  (0 of 10000 shuffles).
+- **(d)** At $\alpha = 0.01$: **reject $H_0$** — even at this strict level
+  there is strong evidence that the mean arrival difference differs between
+  the two airlines, with Delta flights averaging about 10 minutes earlier
+  than United flights in December.
+
+*Data:* `data/ch04/DecemberFlights.csv`, from
+<https://www.lock5stat.com/datasets3e/DecemberFlights.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in mean arrival delay, Delta minus United
+flights = pd.read_csv("data/ch04/DecemberFlights.csv")
+delta = flights.loc[flights.Airline == "Delta", "Difference"].to_numpy(float)
+united = flights.loc[flights.Airline == "United", "Difference"].to_numpy(float)
+boots, stat, p = rand_test([delta, united], lambda r: r[0].mean() - r[1].mean())
+rand_plot(boots, stat, "Randomization differences in mean arrival time (Delta - United)")
+```
+
+```{python}
+#| echo: false
+pd.concat([p_row("Delta mean (min)", delta.mean(), p, digits=2),
+           p_row("United mean (min)", united.mean(), p, digits=2)],
+          axis=1).to_string()
+```
+
+## Exercise 4.143
+
+**Lizards and Invasive Fire Ants — fleeing.** Lizards from uninvaded
+(Arkansas) and invaded (Alabama, 70+ years of fire ants) habitats exposed to
+fire ants; `Flee` = time to flee in seconds (capped at 61). If lizards
+adapt, invaded-habitat lizards should flee faster: $H_0: \mu_I = \mu_U$ vs
+$H_a: \mu_I < \mu_U$.
+
+- **(a)** Hypotheses as above.
+- **(b)** Sample means: invaded 26.7 s vs uninvaded 46.9 s, difference
+  −20.2 s. The 10000-replicate randomization test gives **p < 0.0001**
+  (0 of 10000 shuffles).
+- **(c)** The p-value tells us the observed difference is essentially
+  impossible by random chance: **lizards from the invaded habitat flee fire
+  ants much faster** — strong evidence of behavior consistent with
+  adaptation.
+- **(d) No.** The habitat each lizard comes from was not randomly assigned —
+  this is an observational comparison of two populations. Other differences
+  between the habitats (predators, climate, ant density) could explain the
+  faster fleeing, so we cannot conclude the invasion *causes* the behavior
+  change.
+
+*Data:* `data/ch04/FireAnts.csv`, from
+<https://www.lock5stat.com/datasets3e/FireAnts.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in mean flee time, invaded minus uninvaded habitat
+ants = pd.read_csv("data/ch04/FireAnts.csv")
+fleeI = ants.loc[ants.Habitat == "Invaded", "Flee"].to_numpy(float)
+fleeU = ants.loc[ants.Habitat == "Uninvaded", "Flee"].to_numpy(float)
+boots, stat, p = rand_test([fleeI, fleeU], lambda r: r[0].mean() - r[1].mean(),
+                           alt="less")
+rand_plot(boots, stat, "Randomization differences in mean flee time (I - U)")
+```
+
+```{python}
+#| echo: false
+pd.concat([p_row("Invaded mean (s)", fleeI.mean(), p, digits=1),
+           p_row("Uninvaded mean (s)", fleeU.mean(), p, digits=1)],
+          axis=1).to_string()
+```
+
+## Exercise 4.144
+
+**Lizards and Invasive Fire Ants — twitching.** `Twitches` = number of body
+twitches in the first minute after exposure; if lizards adapt, invaded-
+habitat lizards should twitch more: $H_0: \mu_I = \mu_U$ vs
+$H_a: \mu_I > \mu_U$.
+
+- **(a)** Hypotheses as above.
+- **(b)** Sample means: invaded 2.75 twitches vs uninvaded 1.10, difference
+  +1.65. The 10000-replicate randomization test gives **p ≈ 0.0002**.
+- **(c)** The p-value is far below any usual significance level: **reject
+  $H_0$** — strong evidence that lizards from invaded habitats twitch more
+  when exposed to fire ants, exactly the behavior that helps repel the
+  ants. As in 4.143, this is evidence of an association with habitat, not a
+  proven causal effect of the invasion.
+
+*Data:* `data/ch04/FireAnts.csv`, from
+<https://www.lock5stat.com/datasets3e/FireAnts.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in mean twitches, invaded minus uninvaded habitat
+twI = ants.loc[ants.Habitat == "Invaded", "Twitches"].to_numpy(float)
+twU = ants.loc[ants.Habitat == "Uninvaded", "Twitches"].to_numpy(float)
+boots, stat, p = rand_test([twI, twU], lambda r: r[0].mean() - r[1].mean(),
+                           alt="greater")
+rand_plot(boots, stat, "Randomization differences in mean twitches (I - U)")
+```
+
+```{python}
+#| echo: false
+pd.concat([p_row("Invaded mean twitches", twI.mean(), p, digits=2),
+           p_row("Uninvaded mean twitches", twU.mean(), p, digits=2)],
+          axis=1).to_string()
+```
+
+## Exercise 4.145
+
+**Split the Bill?** 48 subjects in eight groups of six diners, randomly told
+to pay individually or to split the bill equally (`SplitBill` data, cost in
+Israeli shekels). Test whether the mean cost is *lower* when paying
+individually: $H_0: \mu_I = \mu_S$ vs $H_a: \mu_I < \mu_S$.
+
+The sample means are 37.29 shekels (individual, $n = 24$) vs 50.92 shekels
+(split, $n = 24$), a difference of −13.62 shekels. The 10000-replicate
+randomization test gives **p ≈ 0.0001** — **reject $H_0$**: strong evidence
+that diners order less, on average, when they pay individually than when the
+bill is split equally (a free-rider effect when sharing the cost).
+
+*Data:* `data/ch01/SplitBill.csv`, from
+<https://www.lock5stat.com/datasets3e/SplitBill.csv>:
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in mean meal cost, individual minus split
+bills = pd.read_csv("data/ch01/SplitBill.csv")
+ind = bills.loc[bills.Payment == "Individual", "Cost"].to_numpy(float)
+spl = bills.loc[bills.Payment == "Split", "Cost"].to_numpy(float)
+boots, stat, p = rand_test([ind, spl], lambda r: r[0].mean() - r[1].mean(),
+                           alt="less")
+rand_plot(boots, stat, "Randomization differences in mean cost (I - S)")
+```
+
+```{python}
+#| echo: false
+pd.concat([p_row("Individual mean", ind.mean(), p, digits=2),
+           p_row("Split mean", spl.mean(), p, digits=2)], axis=1).to_string()
+```
+
+## Exercise 4.146
+
+**Cat Ownership and Schizophrenia.** Case-control study: 262 people with
+mental illness (cases, mostly schizophrenia) and 522 matched controls;
+childhood cat ownership: 136/262 = 0.519 (cases) vs 220/522 = 0.421
+(controls).
+
+- **(a)** Case-control studies can establish an **association** but not a
+  **causal** relationship: the "exposure" (cat ownership) happened in the
+  past and was not randomly assigned, cases and controls are selected
+  retrospectively, and recall of past pet ownership may differ between
+  groups (people with mental illness may remember or report pets
+  differently).
+- **(b)** Matching controls to cases on age, sex, and socioeconomic status
+  reduces **confounding** — those traits are held as similar as possible, so
+  differences in cat ownership are less likely to be explained by them.
+- **(c)** $\hat p_C - \hat p_N = 136/262 - 220/522 = 0.519 - 0.421 = 0.098$.
+- **(d)** Testing $H_0: p_C = p_N$ vs $H_a: p_C > p_N$, the 10000-replicate
+  randomization test gives **p ≈ 0.005**.
+- **(e) Yes** — the p-value is well below 0.05, so the data provide
+  significant evidence of an association between owning a cat as a child and
+  later mental illness. But association is not causation (see (a)): the
+  study design cannot rule out confounding or selection/recall issues, so
+  this is far from proof that cats cause schizophrenia.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in proportions of childhood cat ownership, cases minus controls
+boots, stat, p = rand_test([np.repeat([1, 0], [136, 262 - 136]),
+                            np.repeat([1, 0], [220, 522 - 220])],
+                           lambda r: r[0].mean() - r[1].mean(), alt="greater")
+rand_plot(boots, stat, "Randomization differences in cat-ownership proportions")
+```
+
+```{python}
+#| echo: false
+p_row("Difference (cases - controls)", stat, p).to_string()
+```
+
+:::

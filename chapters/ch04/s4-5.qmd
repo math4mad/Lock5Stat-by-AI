@@ -1,0 +1,984 @@
+---
+execute-dir: project
+title: "Chapter 4 · Section 4.5"
+subtitle: "Making Connections — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 4.5 closes Chapter 4 by connecting everything in Unit B so far: how the
+data were collected (randomized experiment or observational study), what kind of
+variables are involved (categorical or quantitative), and which simulation tool
+fits the question — a **bootstrap distribution** to build a *confidence
+interval*, or a **randomization distribution** to run a *hypothesis test*. The
+central bridge of the section: a two-tailed test at significance level $\alpha$
+and a $(1-\alpha)$ confidence interval for the same parameter give matching
+verdicts — a null value *outside* the interval is rejected, a value *inside* it
+is not. The two tools still tell different stories: the interval describes the
+plausible *size* of the effect, the p-value describes the *strength* of the
+evidence against "nothing going on," and neither is a substitute for the other.
+And both are only as good as the data collection behind the sample — random
+assignment licenses causal conclusions, random sampling licenses generalization,
+and without either we weigh evidence cautiously no matter how small the p-value.
+
+The exercises below are from *Statistics: Unlocking the Power of Data* (Lock⁵,
+3rd ed., pp. 363–369). Skill Builders 4.184–4.185 decide whether a question
+calls for a confidence interval, a hypothesis test, or no inference at all;
+4.186–4.189 read test conclusions (and significance levels) off confidence
+intervals; 4.190–4.192 run the logic in reverse. The applied exercises
+4.193–4.216 then work the full connection — design, data type, statistic,
+randomization or bootstrap, decision — on real Lock⁵ datasets loaded below (the
+numbered list ends at 4.216; the Unit B synthesis that follows uses its own
+B-numbering). All simulations use 10,000 replicates with seed 2026, so every
+p-value and interval here is reproducible; the book's StatKey runs agree up to
+Monte Carlo wobble.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+sns.set_theme(style="whitegrid")
+
+def boot_stats(samples, stat_fn, reps=10000, seed=2026):
+    """Bootstrap: resample each array in `samples` with replacement, apply stat_fn."""
+    rng = np.random.default_rng(seed)
+    out = np.empty(reps)
+    for i in range(reps):
+        res = [s[rng.integers(0, len(s), len(s))] for s in samples]
+        out[i] = stat_fn(res)
+    return out
+
+def rand_label(values, n1, stat_fn, reps=10000, seed=2026):
+    """Randomization by re-assigning labels: shuffle `values`, split n1 / rest."""
+    rng = np.random.default_rng(seed)
+    out = np.empty(reps)
+    for i in range(reps):
+        p = rng.permutation(values)
+        out[i] = stat_fn(p[:n1], p[n1:])
+    return out
+
+def rand_sign(diffs, reps=10000, seed=2026):
+    """Randomization for paired data: random sign flips of the differences."""
+    rng = np.random.default_rng(seed)
+    return (rng.choice([-1.0, 1.0], size=(reps, len(diffs))) * diffs).mean(axis=1)
+
+def rand_corr(x, y, reps=10000, seed=2026):
+    """Randomization for correlation: permute y against fixed x."""
+    rng = np.random.default_rng(seed)
+    out = np.empty(reps)
+    for i in range(reps):
+        out[i] = np.corrcoef(x, rng.permutation(y))[0, 1]
+    return out
+
+def shift_null(vals, null):
+    """Translate data so the null value is true (center and size unchanged)."""
+    return vals - vals.mean() + null
+
+def two_tail_p(boots, obs, center=0):
+    return float((np.abs(boots - center) >= abs(obs - center) - 1e-9).mean())
+
+def dist_plot(boots, xlabel, obs=None, tail="two", bins=30, figsize=(6, 3)):
+    """Histogram of simulated statistics, optionally marking the observed statistic."""
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.histplot(x=boots, bins=bins, ax=ax, color="#4c72b0")
+    if obs is not None:
+        lines = (-abs(obs), abs(obs)) if tail == "two" else ((obs,) if tail == "right" else (-abs(obs),))
+        for v in lines:
+            ax.axvline(v, color="#c44e52", ls="--", lw=1)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Simulated statistics")
+    plt.tight_layout()
+    plt.show()
+```
+
+::: {.panel-tabset}
+
+## Exercise 4.184
+
+*(Skill Builder 1: confidence interval, hypothesis test, or is inference not
+relevant?)*
+
+- **(a) Confidence interval.** "What percent of US voters support …" asks us to
+  *estimate* a population proportion — no claim to test.
+- **(b) Hypothesis test.** "Do players hit a *higher* proportion at home than
+  away?" is a claim that two proportions differ: $H_0: p_H = p_A$ vs
+  $H_a: p_H > p_A$.
+- **(c) Hypothesis test.** "A majority" is a specific claim:
+  $H_0: p = 0.5$ vs $H_a: p > 0.5$. (A confidence interval would also settle it
+  by checking whether the whole interval sits above 0.5, but the question is
+  posed as a claim, so a test is the natural tool.)
+- **(d) Inference is not relevant.** The 23 Canadian and 23 US players *are*
+  the entire groups of interest — not samples from larger populations. Just
+  compute the two average ages and compare them.
+
+## Exercise 4.185
+
+*(Skill Builder 1)*
+
+- **(a) Confidence interval.** Estimate the proportion of all public-restroom
+  users who wash their hands.
+- **(b) Confidence interval.** "How much more … ?" asks for the *size* of the
+  difference in mean exercise — estimate $\mu_1 - \mu_2$.
+- **(c) Inference is not relevant.** Every vote in the 2018 Senate is on
+  record — the 100 senators are the whole population, so the percent is
+  computed exactly.
+- **(d) Confidence interval.** Estimate the average daily calorie intake of
+  20-year-old males.
+
+## Exercise 4.186
+
+*(Skill Builder 2: $H_0: \mu = 15$ vs $H_a: \mu \ne 15$ — conclude from each
+confidence interval.)*
+
+- **(a) 95% CI 13.9 to 16.2 — do not reject $H_0$** at the 5% level: 15 is
+  inside the interval.
+- **(b) 95% CI 12.7 to 14.8 — reject $H_0$** at the 5% level: the whole
+  interval is below 15, with evidence $\mu < 15$.
+- **(c) 90% CI 13.5 to 16.5 — do not reject $H_0$** at the 10% level: 15 is
+  inside the interval.
+
+## Exercise 4.187
+
+*(Skill Builder 2: $H_0: p = 0.5$ vs $H_a: p \ne 0.5$.)*
+
+- **(a) 95% CI 0.53 to 0.57 — reject $H_0$** at the 5% level: 0.5 is below the
+  interval, with evidence $p > 0.5$.
+- **(b) 95% CI 0.41 to 0.52 — do not reject $H_0$** at the 5% level: 0.5 is
+  inside the interval.
+- **(c) 99% CI 0.35 to 0.55 — do not reject $H_0$** at the 1% level: 0.5 is
+  inside the interval.
+
+## Exercise 4.188
+
+*(Skill Builder 2: $H_0: \rho = 0$ vs $H_a: \rho \ne 0$; give the sign of any
+significant correlation.)*
+
+- **(a) 95% CI 0.07 to 0.15 — reject $H_0$** at the 5% level: the correlation
+  is significant and **positive**.
+- **(b) 90% CI $-0.78$ to $-0.39$ — reject $H_0$** at the 10% level: the
+  correlation is significant and **negative** (the interval is entirely below
+  zero).
+- **(c) 99% CI $-0.06$ to 0.03 — do not reject $H_0$** at the 1% level: 0 is
+  inside the interval.
+
+## Exercise 4.189
+
+*(Skill Builder 2: $H_0: \mu_1 = \mu_2$ vs $H_a: \mu_1 \ne \mu_2$; name the
+group with the larger mean when significant.)*
+
+- **(a) 95% CI 0.12 to 0.54 — reject $H_0$** at the 5% level: 0 is outside and
+  the interval is entirely positive, so **group 1 has the larger mean**.
+- **(b) 99% CI $-2.1$ to 5.4 — do not reject $H_0$** at the 1% level: 0 is
+  inside the interval.
+- **(c) 90% CI $-10.8$ to $-3.7$ — reject $H_0$** at the 10% level: the
+  interval is entirely negative, so **group 2 has the larger mean**.
+
+## Exercise 4.190
+
+*(Skill Builder 3: a 95% CI for $p$ runs from 0.48 to 0.57 — conclude each
+test.)*
+
+- **(a) $H_0: p = 0.5$ vs $H_a: p \ne 0.5$ — do not reject $H_0$** at the 5%
+  level: 0.5 is inside the interval.
+- **(b) $H_0: p = 0.75$ vs $H_a: p \ne 0.75$ — reject $H_0$** at the 5% level:
+  0.75 is outside (above) the interval.
+- **(c) $H_0: p = 0.4$ vs $H_a: p \ne 0.4$ — reject $H_0$** at the 5% level:
+  0.4 is outside (below) the interval.
+
+## Exercise 4.191
+
+*(Skill Builder 3: a 99% CI for $\mu$ runs from 134 to 161.)*
+
+- **(a) $\mu = 100$: reject $H_0$** at the 1% level — 100 is outside (below)
+  the interval.
+- **(b) $\mu = 150$: do not reject $H_0$** at the 1% level — 150 is inside the
+  interval.
+- **(c) $\mu = 200$: reject $H_0$** at the 1% level — 200 is outside (above)
+  the interval.
+
+## Exercise 4.192
+
+*(Skill Builder 3: a 90% CI for $p_1 - p_2$ runs from 0.07 to 0.18.)*
+
+- **(a) Two-tailed $p_1 \ne p_2$ — reject $H_0$** at the 10% level: 0 is
+  outside the interval.
+- **(b) One-tailed $p_1 > p_2$ — reject $H_0$** at the 5% level: the entire
+  interval is above 0, so even a one-tailed test at half the significance
+  level rejects.
+- **(c) One-tailed $p_1 < p_2$ — do not reject $H_0$.** The sample difference
+  is *positive*, the opposite direction from the alternative, so the p-value
+  exceeds 0.5 — no evidence at any usual level.
+
+## Exercise 4.193
+
+**Approval Rating for Congress.** Gallup, May 2019: $n = 1009$,
+$\hat p = 0.20$, 95% CI (0.175, 0.225); significance level 5%.
+
+- **(a) Testing $p \ne 0.21$:** 0.21 lies *inside* the interval → **do not
+  reject $H_0: p = 0.21$** — no evidence that approval differs from the 21%
+  of the previous six months.
+- **(b) Testing $p \ne 0.17$:** 0.17 lies *below* the interval → **reject
+  $H_0: p = 0.17$** at the 5% level — evidence that approval was different
+  from (in fact higher than) its May 2018 level of 17%.
+
+## Exercise 4.194
+
+**Car Window Skin Cancer?** Records of all 1050 skin-cancer patients at one
+cancer center in 2004; of the 42 melanoma patients, 31 had cancer on the left
+side and 11 on the right.
+
+- **(a) Observational study** — existing records were reviewed; nothing was
+  manipulated or assigned.
+- **(b)** $31/42 \approx 0.738$ of the melanomas occurred on the left side.
+- **(c)** We are 95% sure that the proportion of all such melanomas that occur
+  on the left side of the body is between 0.579 and 0.861.
+- **(d)** $H_0: p = 0.5$ vs $H_a: p > 0.5$, where $p$ is the proportion of
+  melanomas occurring on the left side (no side preference).
+- **(e) One-tailed** — the alternative specifies a direction.
+- **(f)** 0.5 lies below the *entire* confidence interval, so we predict
+  **reject $H_0$** at the 5% level: melanomas are more likely to occur on the
+  left.
+- **(g)** With $p = 0.003 < 0.05$: **reject $H_0$** — there is strong evidence
+  that melanomas are more likely to occur on the left side of the body.
+- **(h) No.** Observational data can establish the left-side preponderance but
+  not *why*. Sunlight through windows is one plausible explanation, but
+  without randomization other differences in left-vs-right exposure cannot be
+  ruled out, so a causal claim is not supported.
+
+The randomization test in (g) is a coin-flip test for one proportion
+($H_0: p = 0.5$, $n = 42$). We can compute it exactly and check the book's
+$p = 0.003$ by simulation:
+
+```{python}
+#| echo: false
+from math import comb
+exact = sum(comb(42, i) for i in range(31, 43)) / 2**42
+rng = np.random.default_rng(2026)
+sims = rng.binomial(42, 0.5, 10000)
+pd.Series({"Exact p-value: P(X >= 31) when p = 0.5": round(exact, 4),
+           "Simulated p-value (10000 reps)": round(float((sims >= 31).mean()), 4)}).to_string()
+```
+
+Our run gives $p \approx 0.0015$ — even a bit smaller than the book's
+simulated 0.003; either way the conclusion is the same.
+
+## Exercise 4.195
+
+**Print vs E-books.**
+
+- **(a)** An experiment: recruit volunteers, have everyone read the *same*
+  passages under the same conditions, and **randomly assign** half to read
+  from a print book and half from an e-reader (or a matched-pairs version
+  where each person reads comparable passages in both media with the order
+  randomized). Measure reading speed, ideally with a comprehension check, and
+  compare the mean speeds.
+- **(b)** Descriptive statistics show a sample difference, but any two samples
+  differ by chance. A hypothesis test tells us whether an observed difference
+  is *beyond what random-chance variation would produce* — the p-value
+  measures the strength of evidence against "no real difference."
+- **(c)** A confidence interval adds the *size* of the effect: a set of
+  plausible values for how much slower (or faster) one medium really is —
+  information a yes/no significance verdict does not give.
+- **(d) We need the second quotation.** "Significant" speaks to chance, not
+  direction: from the first quotation alone we cannot tell *which* device was
+  slower. The second quotation supplies the sample percentages — both devices
+  were slower than print (Kindle 10.7%, iPad 6.2%). The Kindle difference is
+  both larger and more significant ($p < .01$ vs $p = .06$), and the
+  iPad–Kindle gap fails to reach significance because the high variability
+  swamps a 4.5-percentage-point difference — a nice reminder that a bigger
+  effect is easier to detect.
+
+## Exercise 4.196
+
+**Are You "In a Relationship"?** 58 college-age heterosexual couples, together
+for about 19 months.
+
+- **(a)** For both partners reporting "in a relationship" on Facebook, the 95%
+  CI (0.66, 0.88) lies entirely above 0.5 → **reject $H_0: p = 0.5$** at the
+  5% level: evidence that the proportion exceeds 0.5.
+- **(b)** For couples displaying their partner in the profile picture, the 95%
+  CI (0.40, 0.66) *contains* 0.5 → **do not reject $H_0: p = 0.5$** at the 5%
+  level: the data are consistent with an even split.
+
+## Exercise 4.197
+
+**Testing for a Sex Difference in Compassionate Rats.** From Exercise 3.98:
+6 of 6 female rats freed the trapped rat vs 17 of 24 males, and the 95%
+bootstrap CI for $p_F - p_M$ runs from 0.104 to 0.480.
+
+- **(a)** $H_0: p_F = p_M$ vs $H_a: p_F \ne p_M$.
+- **(b)** 0 is *not* in the interval (0.104, 0.480) → **reject $H_0$** at the
+  5% level (two-tailed).
+- **(c)** The entire interval is positive, so **female rats** appear more
+  likely to show compassion.
+
+*Reality check with the data:* `data/ch03/CompassionateRats.csv` — a
+label-reassignment randomization test on the 30 rats:
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in proportions of compassion, females minus males
+rats = pd.read_csv("data/ch03/CompassionateRats.csv")
+fem = (rats.loc[rats.Sex == "F", "Empathy"] == "yes").to_numpy(float)
+male = (rats.loc[rats.Sex == "M", "Empathy"] == "yes").to_numpy(float)
+pool = np.concatenate([fem, male])
+obs = fem.mean() - male.mean()
+boots = rand_label(pool, len(fem), lambda a, b: a.mean() - b.mean())
+dist_plot(boots, "Randomization differences in proportions (F - M)", obs=obs)
+```
+
+```{python}
+#| echo: false
+pd.Series({"Observed difference": round(obs, 3),
+           "Two-tail p-value (label reassignment)": round(two_tail_p(boots, obs), 3)}).to_string()
+```
+
+A caution worth connecting: the exact label-reassignment p-value is about
+0.29, not below 0.05 — with only six females, chance alone assigns all six
+helpers to the "female" group about 17% of the time. The bootstrap interval of
+Exercise 3.98 understates the uncertainty because every female bootstrap
+sample is degenerate (all six values are "yes"). The CI–test correspondence is
+an approximation, and it is least trustworthy with tiny, lopsided groups.
+
+## Exercise 4.198
+
+**Testing for a Home Field Advantage in Soccer.** The home team won 70 of 120
+FA Premier League games ($\hat p = 0.583$).
+
+- **(a)** Bootstrapping the 120 game results gives a 90% CI of about
+  (0.51, 0.66): we are 90% sure that the proportion of all such games won by
+  the home team is between about 0.51 and 0.66.
+- **(b)** $H_0: p = 0.5$ vs $H_a: p \ne 0.5$.
+- **(c)** 0.5 lies (just) below the interval → **reject $H_0$** at the 10%
+  level.
+- **(d)** Randomizing under $H_0$ (120 fair coin flips per simulated sample,
+  recording the proportion) gives a two-tailed **p-value of about 0.06–0.07**.
+- **(e)** At the 10% level: $p < 0.10$ → **reject $H_0$** — evidence of a home
+  field advantage. **Yes, this matches part (c)** — the two routes agree.
+- **(f)** The confidence interval tells us the *size* of the advantage (the
+  home team plausibly wins 51% to 66% of games); the p-value tells us the
+  *strength of the evidence* against $p = 0.5$ (how surprising 70 wins would
+  be under a fair coin).
+- **(g)** Both distributions use the same data and statistic, but the
+  **bootstrap distribution is centered at the observed $\hat p = 0.583$**
+  while the **randomization distribution is centered at the null value 0.5**.
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap and randomization distributions for the home-win proportion
+soccer = np.repeat([1.0, 0.0], [70, 50])
+p_hat = soccer.mean()
+boot = boot_stats([soccer], lambda r: r[0].mean())
+rng = np.random.default_rng(2026)
+randp = rng.binomial(120, 0.5, 10000) / 120
+fig, axes = plt.subplots(1, 2, figsize=(7, 3), sharex=True)
+lo, hi = np.percentile(boot, [5, 95])
+sns.histplot(x=boot, bins=24, ax=axes[0], color="#4c72b0")
+for v in (lo, hi):
+    axes[0].axvline(v, color="#c44e52", ls="--", lw=1)
+axes[0].set_title("Bootstrap - centered at observed", fontsize=10)
+axes[0].set_xlabel("Bootstrap proportions")
+sns.histplot(x=randp, bins=24, ax=axes[1], color="#55a868")
+for v in (0.5 - (p_hat - 0.5), 0.5 + (p_hat - 0.5)):
+    axes[1].axvline(v, color="#c44e52", ls="--", lw=1)
+axes[1].set_title("Randomization - centered at null 0.5", fontsize=10)
+axes[1].set_xlabel("Randomization proportions")
+plt.tight_layout()
+plt.show()
+```
+
+```{python}
+#| echo: false
+ci90 = np.percentile(boot, [5, 95])
+p_two = float((np.abs(randp - 0.5) >= p_hat - 0.5).mean())
+pd.Series({"Observed proportion": round(p_hat, 3),
+           "90% bootstrap CI": f"({ci90[0]:.3f}, {ci90[1]:.3f})",
+           "Two-tail randomization p-value": round(p_two, 3)}).to_string()
+```
+
+## Exercise 4.199
+
+**Change in Stock Prices.** A random sample of 50 S&P 500 companies; the
+change in share price (in dollars) over August 2–6, 2010
+(`StockChanges` data).
+
+- **(a) Observational study** — price changes were recorded, no treatment was
+  imposed. Randomization entered only through the **random sample** of 50 of
+  the 500 stocks (random sampling, not random assignment). With a genuinely
+  random sample we expect little bias, though all conclusions are specific to
+  this five-day window.
+- **(b)** Write the names (or numbers) of all 500 companies on slips, mix
+  thoroughly, and draw 50 — or use a random number generator to pick 50
+  distinct companies from the list.
+- **(c)** The boxplot below (left) is roughly symmetric around a median of
+  about \$0.11: the middle 50% of stocks changed between about −\$0.03 and
+  \$0.32, the whiskers reach about −\$0.50 and \$0.70, and five outlying
+  stocks range from −\$3.27 up to \$4.86 — most stocks moved little, a few
+  moved several dollars.
+- **(d)** Computed below: $\bar x = \$0.12$, $s = \$0.99$, five-number summary
+  (−3.27, −0.03, 0.11, 0.32, 4.86).
+- **(e)** The bootstrap 95% CI for the mean is about (−\$0.14, \$0.41): we are
+  95% sure that the mean five-day price change for all 500 S&P stocks over
+  this period is between about −\$0.14 and \$0.41.
+- **(f)** $H_0: \mu = 0$ vs $H_a: \mu \ne 0$ at the 5% level: 0 is inside the
+  interval → **do not reject $H_0$** — no evidence of a nonzero average
+  change.
+- **(g)** $H_0: \mu = 0$ vs $H_a: \mu > 0$. Shifting the data to a mean of 0
+  and bootstrapping gives a one-tailed **p-value of about 0.48** → **do not
+  reject** — no evidence that the average change was positive.
+- **(h) Type II error.** The decision in (g) was "do not reject $H_0$," so a
+  mistake would be failing to detect a real positive mean change. Unusually,
+  we *could* find out: the population is a small, finite, identifiable set of
+  500 stocks, so we can look up the price change of every one and compute the
+  population mean — if it is above 0, the Type II error occurred.
+
+```{python}
+#| echo: false
+#| fig-cap: Changes in S&P 500 stock prices over five days and the bootstrap distribution of the sample mean
+st = pd.read_csv("data/ch04/StockChanges.csv")["SPChange"].dropna().to_numpy(float)
+boots = boot_stats([st], lambda r: r[0].mean())
+boots95 = np.percentile(boots, [2.5, 97.5])
+fig, axes = plt.subplots(1, 2, figsize=(7, 3))
+sns.boxplot(x=st, ax=axes[0], color="#c8d4e3")
+axes[0].set_xlabel("Price change ($)")
+sns.histplot(x=boots, bins=24, ax=axes[1], color="#4c72b0")
+for v in boots95:
+    axes[1].axvline(v, color="#c44e52", ls="--", lw=1)
+axes[1].set_xlabel("Bootstrap sample means ($)")
+plt.tight_layout()
+plt.show()
+```
+
+```{python}
+#| echo: false
+rng = np.random.default_rng(2026)
+shifted = st - st.mean()
+pos = np.array([shifted[rng.integers(0, 50, 50)].mean() for _ in range(10000)]) + st.mean()
+pd.Series({"n": len(st), "Mean ($)": round(st.mean(), 2),
+           "StDev ($)": round(st.std(ddof=1), 2),
+           "Median ($)": round(float(np.median(st)), 2),
+           "Five-number summary": str(np.percentile(st, [0, 25, 50, 75, 100]).round(2)),
+           "95% bootstrap CI for the mean": f"({boots95[0]:.2f}, {boots95[1]:.2f})",
+           "One-tail p-value (mu > 0)": round(float((pos >= st.mean()).mean()), 3)}).to_string()
+```
+
+## Exercise 4.200
+
+**How Long Do Mammals Live?** Longevity (typical lifespan, years) for 40
+mammal species (`MammalLongevity`).
+
+- **(a)** $H_0: \mu = 10$ vs $H_a: \mu \ne 10$. Randomization: shift the 40
+  longevities to a mean of 10, resample 40 values with replacement, record the
+  sample mean; two-tailed p-value below. The sample mean is $\bar x = 13.15$
+  years and the two-tailed **p-value ≈ 0.007** → **reject $H_0$**: strong
+  evidence that the average lifespan of mammal species is different from (in
+  fact above) 10 years.
+- **(b) No.** A value rejected at the 5% level would not sit inside a 95%
+  confidence interval — $\mu = 10$ is not plausible.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the mean mammal lifespan when mu equals 10 years
+mam = pd.read_csv("data/ch04/MammalLongevity.csv")
+lon = mam["Longevity"].dropna().to_numpy(float)
+null10 = shift_null(lon, 10)
+boots = boot_stats([null10], lambda r: r[0].mean())
+dist_plot(boots, "Randomization sample means (years)", obs=lon.mean())
+```
+
+```{python}
+#| echo: false
+pd.Series({"Sample mean (years)": round(lon.mean(), 2),
+           "Two-tail p-value for mu = 10": round(two_tail_p(boots, lon.mean(), center=10), 4)}).to_string()
+```
+
+## Exercise 4.201
+
+**How Long Are Mammals Pregnant?** Gestation length (days) for the same 40
+species.
+
+- **(a)** $H_0: \mu = 200$ vs $H_a: \mu \ne 200$. Same shifted-randomization
+  method: $\bar x = 194.3$ days and the two-tailed **p-value ≈ 0.80** → **do
+  not reject $H_0$**: no evidence that average gestation differs from 200
+  days.
+- **(b) Yes.** Since the test at the 5% level fails to reject $\mu = 200$,
+  the value 200 *would* be inside a 95% confidence interval for mean
+  gestation.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the mean gestation length when mu equals 200 days
+gest = mam["Gestation"].dropna().to_numpy(float)
+null200 = shift_null(gest, 200)
+boots = boot_stats([null200], lambda r: r[0].mean())
+dist_plot(boots, "Randomization sample means (days)", obs=gest.mean())
+```
+
+```{python}
+#| echo: false
+pd.Series({"Sample mean (days)": round(gest.mean(), 2),
+           "Two-tail p-value for mu = 200": round(two_tail_p(boots, gest.mean(), center=200), 4)}).to_string()
+```
+
+## Exercise 4.202
+
+**Finger Tapping and Caffeine.** Ten subjects got caffeine (mean 248.3 taps)
+and ten did not (mean 244.8); the observed difference in means is
+$\bar x_c - \bar x_n = 3.5$. Under $H_0: \mu_c = \mu_n$ the caffeine/no-caffeine
+labels are arbitrary, so:
+
+- **(a) One randomization sample:** write the 20 tap rates on index cards,
+  shuffle, and deal them into two piles of 10 — the first pile stands in for
+  "caffeine," the second for "no caffeine."
+- **(b)** Compute each group's mean and their difference
+  $\bar x_c - \bar x_n$ for the simulated sample.
+- **(c)** Repeating this many times builds a randomization distribution
+  centered at 0 and roughly bell-shaped, with the observed 3.5 marked in its
+  right tail (see the sketch of Figure 4.21).
+
+One simulated deal from the actual Table 4.18 values:
+
+```{python}
+#| echo: false
+caf = np.array([246, 248, 250, 252, 248, 250, 246, 248, 245, 250], float)
+noc = np.array([242, 245, 244, 248, 247, 248, 242, 244, 246, 242], float)
+allv = np.concatenate([caf, noc])
+rng = np.random.default_rng(2026)
+pm = rng.permutation(allv)
+pd.Series({"Randomization group 1": ", ".join(str(int(v)) for v in sorted(pm[:10])),
+           "Randomization group 2": ", ".join(str(int(v)) for v in sorted(pm[10:])),
+           "Difference of means": round(pm[:10].mean() - pm[10:].mean(), 2),
+           "Observed difference": round(caf.mean() - noc.mean(), 2)}).to_string()
+```
+
+## Exercise 4.203
+
+**Arsenic in Chicken.** $n = 6$ chickens: 68, 75, 81, 93, 95, 134 ppb;
+testing $H_0: \mu = 80$ vs $H_a: \mu > 80$.
+
+- **(a)** The sample mean is $\bar x = 91$ ppb.
+- **(b)** Subtract 11 from every value to move the mean to 80:
+  57, 64, 70, 82, 84, 123. The new dataset has the **same sample size (6) and
+  the same standard deviation** — a shift changes only the center.
+- **(c)** Write those six new values on six cards. Draw one card at random,
+  record the value, *put it back*, and repeat until six values are recorded —
+  that is one randomization sample of size 6; its sample mean is one point in
+  the randomization distribution.
+- **(d)** Ten such simulated samples are generated below (dotplot), with an
+  arrow marking the original mean of 91. In the full randomization distribution
+  of Exercise 4.204, only about 12% of simulated means reach 91 or beyond.
+
+```{python}
+#| echo: false
+#| fig-cap: Ten randomization sample means for the shifted arsenic data, with the observed mean of 91 ppb marked
+ar = np.array([68, 75, 81, 93, 95, 134], float)
+ash = ar - ar.mean() + 80
+rng = np.random.default_rng(2026)
+means = np.array([ash[rng.integers(0, 6, 6)].mean() for _ in range(10)])
+print("Ten randomization sample means:", np.round(means, 1))
+fig, ax = plt.subplots(figsize=(6, 2))
+ys = np.random.default_rng(1).uniform(0.03, 0.07, 10)
+ax.scatter(means, ys, s=45, color="#4c72b0")
+ax.annotate("observed mean = 91", xy=(91, 0.05), xytext=(96, 0.05),
+            arrowprops=dict(arrowstyle="->", color="#c44e52"),
+            color="#c44e52", fontsize=9)
+ax.set_xlabel("Randomization sample means (ppb)")
+ax.set_yticks([])
+ax.set_ylim(0, 0.1)
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 4.204
+
+**A Randomization Distribution for Arsenic in Chicken.** Generating the full
+distribution (shift to mean 80, resample $n = 6$ with replacement, 10,000
+repeats) gives a one-tailed **p-value ≈ 0.12**:
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the mean arsenic level when mu equals 80 ppb
+ar = np.array([68, 75, 81, 93, 95, 134], float)
+ash = ar - ar.mean() + 80
+boots = boot_stats([ash], lambda r: r[0].mean())
+dist_plot(boots, "Randomization sample means (ppb)", obs=ar.mean(), tail="right")
+pd.Series({"Observed mean (ppb)": ar.mean(),
+           "One-tail p-value (mu > 80)": round(float((boots >= ar.mean()).mean()), 4)}).to_string()
+```
+
+- **Conclusion:** $p \approx 0.12$ is not small — **do not reject
+  $H_0: \mu = 80$** at any usual significance level. Despite the sample mean
+  of 91 ppb sitting above 80, a difference this size is unremarkable when
+  $n = 6$ and the data are this spread out (the 134 helps push the mean up
+  but also inflates the variability). On this evidence alone the chain should
+  **not** stop ordering from the supplier — a larger sample would give a much
+  sharper answer.
+
+## Exercise 4.205
+
+**Effect of Sleep and Caffeine on Memory.** 24 adults randomly split: 12 nap,
+12 get caffeine; response = words recalled (`SleepCaffeine`).
+
+- **(a)** Parameters $\mu_s$ and $\mu_c$, the mean words recalled for all
+  people like these after sleep and after caffeine:
+  $H_0: \mu_s = \mu_c$ vs $H_a: \mu_s \ne \mu_c$.
+- **(b)** Assumption: the null is true, so the Sleep/Caffeine labels are
+  arbitrary — because of the random assignment, the 24 recall scores would
+  have come out the same no matter how the labels had been dealt.
+- **(c)** Statistic: the difference in sample means
+  $\bar x_s - \bar x_c = 15.25 - 12.25 = 3.0$ words.
+- **(d)** The randomization distribution is **centered at 0** — under the
+  null there is no difference, so simulated differences scatter around zero.
+- **(e)** One randomization sample (printed below): shuffle the 24 values,
+  deal 12 to "sleep" and 12 to "caffeine," and record the difference in
+  means.
+- **(f)** From 10,000 randomizations, the two-tailed **p-value ≈ 0.05**.
+- **(g)** At $\alpha = 0.01$: $p > 0.01$ → **do not reject $H_0$** — not
+  convincing evidence at the 1% level that mean recall differs between sleep
+  and caffeine. (A nice connection: the same data are — just barely —
+  significant at the 5% level, a reminder that "significant" depends on the
+  pre-chosen $\alpha$.)
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in mean words recalled, sleep minus caffeine
+sc = pd.read_csv("data/ch04/SleepCaffeine.csv")
+sw = sc.loc[sc.Group == "Sleep", "Words"].to_numpy(float)
+cw = sc.loc[sc.Group == "Caffeine", "Words"].to_numpy(float)
+allw = np.concatenate([sw, cw])
+obs = sw.mean() - cw.mean()
+boots = rand_label(allw, len(sw), lambda a, b: a.mean() - b.mean())
+dist_plot(boots, "Randomization differences in means (sleep - caffeine)", obs=obs)
+```
+
+```{python}
+#| echo: false
+rng = np.random.default_rng(2026)
+pm = allw[rng.permutation(24)]
+pd.Series({"Observed difference (part c)": round(obs, 2),
+           "One randomization difference of means (part e)": round(pm[:12].mean() - pm[12:].mean(), 2),
+           "Two-tail p-value, 10000 randomizations (part f)": round(two_tail_p(boots, obs), 4)}).to_string()
+```
+
+## Exercise 4.206
+
+**Hurricane Rate.** 105 years of North Atlantic hurricane counts,
+1914–2018 (`Hurricanes2018`); testing whether hurricanes are increasing via
+the correlation between year and count.
+
+- **(a)** $H_0: \rho = 0$ vs $H_a: \rho > 0$, where $\rho$ is the correlation
+  between year and number of hurricanes (positive correlation ⟺ increasing).
+- **(b)** Under $H_0$ the *pairing* of years with counts is arbitrary. By
+  hand: write the 105 years on 105 cards and lay them out in order; write the
+  105 hurricane counts on 105 other cards, shuffle that pile thoroughly, and
+  deal one count next to each year. Compute the correlation $r$ of the
+  re-paired data — that is one randomization statistic. Shuffling and dealing
+  again gives the next point, and many repeats build the randomization
+  distribution, which should be centered near 0.
+
+## Exercise 4.207
+
+**Finding the Hurricane Rate P-value.** Simulating the shuffle above 10,000
+times (permute the counts against the fixed years):
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the correlation between year and hurricane count when rho equals 0
+hu = pd.read_csv("data/ch04/Hurricanes2018.csv")
+yr = hu["Year"].to_numpy(float)
+hc = hu["Hurricanes"].to_numpy(float)
+r_obs = np.corrcoef(yr, hc)[0, 1]
+boots = rand_corr(yr, hc)
+dist_plot(boots, "Randomization correlations", obs=r_obs, tail="right")
+pd.Series({"Sample correlation": round(r_obs, 3),
+           "One-tail p-value": round(float((boots >= r_obs).mean()), 4)}).to_string()
+```
+
+The observed correlation is $r = 0.321$ and the one-tailed **p-value ≈
+0.0006** — far below 0.001. This **is** convincing evidence that the number of
+North Atlantic hurricanes is increasing over time.
+
+## Exercise 4.208
+
+**Hockey Malevolence.** Same test as Example 4.36 (NFL) but with the NHL
+(`MalevolentUniformsNHL`): uniform malevolence rating vs standardized penalty
+minutes ($z$-scores) for the 21 teams with complete data.
+
+- Hypotheses: $H_0: \rho = 0$ vs $H_a: \rho > 0$.
+- Statistic: the sample correlation, $r = 0.521$.
+- Randomization: permute the $z$-scores against the fixed malevolence ratings,
+  10,000 times; the distribution is centered at 0.
+- The observed $r$ sits far in the upper tail: one-tailed **p-value ≈ 0.013**.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the correlation between uniform malevolence and penalty minutes for NHL teams
+nhl = pd.read_csv("data/ch04/MalevolentUniformsNHL.csv").dropna(subset=["NHL_Malevolence", "ZPenMin"])
+mv = nhl["NHL_Malevolence"].to_numpy(float)
+zp = nhl["ZPenMin"].to_numpy(float)
+r_obs = np.corrcoef(mv, zp)[0, 1]
+boots = rand_corr(mv, zp)
+dist_plot(boots, "Randomization correlations", obs=r_obs, tail="right")
+pd.Series({"Sample correlation (21 teams)": round(r_obs, 3),
+           "One-tail p-value": round(float((boots >= r_obs).mean()), 4)}).to_string()
+```
+
+- **Conclusion at the 5% level:** since $p < 0.05$, **reject $H_0$** — there
+  is evidence of a positive correlation between perceived uniform malevolence
+  and penalty minutes in the NHL as well, matching the direction (and roughly
+  the strength) of the NFL finding in Example 4.36. Association only — the
+  study is observational, so we cannot conclude that malevolent uniforms
+  *cause* more penalties.
+
+## Exercise 4.209
+
+**Desipramine vs Placebo in Cocaine Addiction (design).** Testing whether
+desipramine lowers relapse: of 24 placebo patients 20 relapsed, of 24
+desipramine patients 10 relapsed, so the observed difference in relapse
+*counts* is $D = 10 - 20 = -10$.
+
+- **(a)** $H_0: p_d = p_c$ vs $H_a: p_d < p_c$ (desipramine relapse rate
+  lower than placebo).
+- **(b)** The randomization distribution of $D$ is **centered at 0**: under
+  $H_0$ the group labels are arbitrary, so each simulated assignment deals the
+  relapses out evenly on average (about 15 relapses in each group of 24) and
+  simulated differences scatter symmetrically around zero.
+- **(c)** Index cards: **48 cards** — write "relapse" on 30 of them and "no
+  relapse" on 18. Shuffle and deal 24 cards to the "desipramine" pile and 24
+  to the "placebo" pile. Record
+  $D = (\#$ desipramine relapses$) - (\#$ placebo relapses$)$ for that deal.
+
+## Exercise 4.210
+
+**Testing Desipramine vs Placebo in Cocaine Addiction.** Simulating 10,000
+deals of the 48 cards:
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in relapse counts, desipramine minus placebo
+cards = np.repeat([1.0, 0.0], [30, 18])
+boots = rand_label(cards, 24, lambda a, b: a.sum() - b.sum())
+obs = 10 - 20
+dist_plot(boots, "Randomization differences in relapse counts", obs=obs, tail="left")
+pd.Series({"Observed difference in relapse counts": obs,
+           "One-tail p-value (desipramine < placebo)": round(float((boots <= obs).mean()), 4)}).to_string()
+```
+
+- **(a)** The one-tailed **p-value ≈ 0.003** — a difference of $-10$ relapses
+  or fewer is very rare under $H_0$. **Reject $H_0$**: strong evidence that
+  desipramine reduces relapse compared with a placebo. (Using counts rather
+  than proportions gives exactly the same test — the statistic is just
+  rescaled by the constant group size 24.)
+- **(b) Desipramine, by a wide margin.** Its p-value (≈ 0.003) is far smaller
+  than the p-value for lithium vs placebo (0.36, Example 4.34): the
+  desipramine data would be very surprising by chance alone, while the
+  lithium data look entirely ordinary under $H_0$.
+
+## Exercise 4.211
+
+**The Lady Tasting Tea.** 8 cups; $\hat p$ = proportion Muriel guesses
+correctly; $H_0$: she has no ability. The right way to simulate depends on
+what Muriel knows:
+
+- **(a) She does not know the 4/4 split.** Model each guess as an independent
+  fair coin flip. A randomization sample is 8 coin flips and the statistic is
+  the number (or proportion) correct. A perfect 8-for-8 then has probability
+  $(1/2)^8 \approx 0.0039$.
+- **(b) She knows 4 cups are milk-first and 4 tea-first.** Chance alone is now
+  constrained: a randomization sample is any choice of *which 4 of the 8 cups*
+  she labels "milk first," and all $\binom{8}{4} = 70$ choices are equally
+  likely under $H_0$. A perfect 8-for-8 means choosing the one correct set:
+  $p = 1/70 \approx 0.014$.
+
+```{python}
+#| echo: false
+from math import comb
+pd.Series({"Scenario (a): P(all 8 correct) with free guessing": round(0.5**8, 4),
+           "Scenario (b): equally likely 4-of-8 guesses": comb(8, 4),
+           "Scenario (b): P(all 8 correct)": round(1 / comb(8, 4), 4)}).to_string()
+```
+
+Both p-values are below 0.05 — 8-for-8 would be remarkable either way — but
+the null distribution (and hence the p-value) depends on what the guesser
+knows about the design. Ignoring known constraints misstates the chance
+explanation.
+
+## Exercise 4.212
+
+**Quiz vs Lecture Pulse Rates (design).** Paired data — quiz and lecture pulse
+for each of 10 students (`QuizPulse10`, Table 4.20).
+
+- **(a)** Parameter: $\mu_d$, the mean of (quiz − lecture) pulse differences
+  for all students like these. $H_0: \mu_d = 0$ vs $H_a: \mu_d > 0$.
+- **(b)** Statistic: the mean difference $\bar d$. From Table 4.20 the ten
+  differences (quiz − lecture) are 2, −1, 5, −8, 1, 20, 15, −4, 9, −12, so
+  $\bar d = 2.7$ beats per minute.
+- **(c)** Method that respects the pairing: for **each student**, flip a coin
+  — heads leaves their (quiz, lecture) pair as is, tails swaps the two values.
+  Equivalently, randomly flip the sign of each difference and recompute the
+  mean. This matches $H_0$ (within a pair, which reading is "quiz" is
+  arbitrary) while keeping each student's two pulses linked.
+- **(d)** One simulated sign-flip sample is printed below, with its mean
+  difference.
+- **(e)** Unless the simulated statistic lands above 2.7 — which happens in
+  only about 21% of randomization samples (Exercise 4.213) — the answer is
+  **no**, it is not more extreme than the original sample.
+
+```{python}
+#| echo: false
+diffs = np.array([2, -1, 5, -8, 1, 20, 15, -4, 9, -12], float)
+rng = np.random.default_rng(2026)
+sgn = rng.choice([-1, 1], 10)
+pd.Series({"Observed mean difference (part b)": round(diffs.mean(), 2),
+           "One randomization sample (sign flips)": round(float((sgn * diffs).mean()), 2),
+           "Simulated statistic more extreme?": bool((sgn * diffs).mean() > diffs.mean())}).to_string()
+```
+
+## Exercise 4.213
+
+**Testing Quiz vs Lecture Pulse Rates.** Sign-flip randomization on the ten
+differences. With 10 differences there are exactly $2^{10} = 1024$ equally
+likely sign patterns, so the one-tailed p-value can be computed *exactly*:
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the mean sign-flipped quiz-minus-lecture pulse difference
+from itertools import product
+diffs = np.array([2, -1, 5, -8, 1, 20, 15, -4, 9, -12], float)
+sums = np.array([np.dot(diffs, s) for s in product([1.0, -1.0], repeat=10)]) / 10
+p_exact = float((sums >= diffs.mean() - 1e-9).mean())
+boots = rand_sign(diffs)
+dist_plot(boots, "Randomization mean differences (bpm)", obs=diffs.mean())
+pd.Series({"Observed mean difference (bpm)": round(diffs.mean(), 2),
+           "Exact one-tail p over all 1024 sign patterns": round(p_exact, 4),
+           "Simulated p-value (10000 flips)": round(float((boots >= diffs.mean() - 1e-9).mean()), 4)}).to_string()
+```
+
+The exact one-tailed **p-value is 0.214** (the 10,000-flip simulation agrees).
+Since $0.214 > 0.05$, **do not reject $H_0$**: there is **not** sufficient
+evidence to conclude that mean pulse rate during a quiz exceeds the mean
+during lecture. The observed 2.7 bpm sits well inside the chance spread of
+the sign-flipped differences — students' pulses vary too much between people
+for a 2.7 bpm average shift to stand out with only $n = 10$ pairs.
+
+## Exercise 4.214
+
+**Clicker Questions.** 76 correct of 100 responses; $H_0: p = 0.80$ vs
+$H_a: p \ne 0.80$. Are the two proposed simulation schemes appropriate?
+
+- **(a) Not appropriate.** Resampling the original 100 responses with
+  replacement is a *bootstrap*: the simulated counts center at the observed
+  0.76, not at the null value 0.80. The resulting distribution describes how
+  $\hat p$ varies from sample to sample (useful for a confidence interval),
+  but it does not describe the world where $H_0$ is true — so it gives the
+  wrong p-value for this test.
+- **(b) Appropriate.** The pool of 8 correct and 2 incorrect responses has
+  exactly $p = 0.80$, so simulated samples satisfy $H_0$, and the count of
+  correct answers in each simulated sample forms a valid randomization
+  distribution centered at 80. (For the record, that test gives a two-tailed
+  p-value of about 0.38 — no evidence the true rate differs from 80%.)
+
+```{python}
+#| echo: false
+#| fig-cap: Two ways to simulate 100-answer samples when testing p equals 0.80
+from math import comb
+rng = np.random.default_rng(2026)
+orig = np.repeat([1.0, 0.0], [76, 24])
+scheme_a = orig[rng.integers(0, 100, (10000, 100))].mean(axis=1)
+pool = np.repeat([1.0, 0.0], [8, 2])
+scheme_b = pool[rng.integers(0, 10, (10000, 100))].mean(axis=1)
+fig, axes = plt.subplots(1, 2, figsize=(7, 3), sharex=True)
+for ax, b, t in [(axes[0], scheme_a, "(a) resample original responses"),
+                 (axes[1], scheme_b, "(b) resample 8 correct / 2 incorrect")]:
+    sns.histplot(x=b, bins=24, ax=ax, color="#4c72b0")
+    ax.axvline(0.80, color="#c44e52", ls="--", lw=1)
+    ax.set_title(t, fontsize=9)
+    ax.set_xlabel("Simulated proportion correct")
+plt.tight_layout()
+plt.show()
+p_low = sum(comb(100, i) * 0.8**i * 0.2**(100 - i) for i in range(0, 77))
+pd.Series({"Center of scheme (a)": round(scheme_a.mean(), 3),
+           "Center of scheme (b)": round(scheme_b.mean(), 3),
+           "Exact two-tail p via scheme (b)": round(2 * p_low, 3)}).to_string()
+```
+
+The red dashed line marks the null value 0.80: scheme (a)'s distribution is
+centered away from it, scheme (b)'s is centered on it.
+
+## Exercise 4.215
+
+**Exercise Hours (three proposed randomization methods).** 50 students: 30
+women ($\bar x_F = 9.40$, $s = 7.41$) and 20 men ($\bar x_M = 12.40$,
+$s = 8.80$); testing $H_0: \mu_F = \mu_M$ vs $H_a: \mu_F \ne \mu_M$.
+
+- **(a) Appropriate — this is the standard randomization.** Under $H_0$ the
+  F/M labels carry no information, so randomly assigning 30 of the actual 50
+  exercise values to "F" and the remaining 20 to "M" simulates the null world
+  while using the real data. The simulated $\bar x_F - \bar x_M$ values center
+  at 0.
+- **(b) Reasonable.** Shifting each group to the common mean 10.6 creates
+  data in which $H_0$ is true while preserving each group's spread and shape;
+  resampling within groups then simulates samples under the null. It is less
+  direct than (a) — it alters the data values and resamples *with*
+  replacement, adding simulation noise — but it targets the same null.
+- **(c) Reasonable.** Pooling all 50 values (mean 10.6) and drawing both
+  groups from the same pool makes group membership irrelevant — exactly the
+  null claim. As in (b), drawing *with* replacement adds a little extra
+  variability compared with splitting the real data without replacement.
+
+Exercise 4.216 checks empirically that all three routes agree.
+
+## Exercise 4.216
+
+**Different Randomization Distributions for Exercise Hours.** The book asks
+for any two of the three procedures; we run all three, 10,000 replicates each,
+on `ExerciseHours`:
+
+```{python}
+#| echo: false
+#| fig-cap: Three randomization distributions for the difference in mean exercise hours, females minus males
+eh = pd.read_csv("data/ch04/ExerciseHours.csv")
+fv = eh.loc[eh.Sex == "F", "Exercise"].to_numpy(float)
+mv2 = eh.loc[eh.Sex == "M", "Exercise"].to_numpy(float)
+allv = np.concatenate([fv, mv2])
+obs = fv.mean() - mv2.mean()
+ra = rand_label(allv, len(fv), lambda a, b: a.mean() - b.mean())
+fs = fv - fv.mean() + 10.6
+ms = mv2 - mv2.mean() + 10.6
+rb = boot_stats([fs, ms], lambda r: r[0].mean() - r[1].mean())
+rng = np.random.default_rng(2026)
+rc = np.array([allv[rng.integers(0, 50, 30)].mean() - allv[rng.integers(0, 50, 20)].mean()
+               for _ in range(10000)])
+fig, ax = plt.subplots(figsize=(7, 3.5))
+for b, lab, c in [(ra, "(a) re-label the 50 values", "#4c72b0"),
+                  (rb, "(b) shift to common mean, resample in groups", "#55a868"),
+                  (rc, "(c) pool, draw both groups with replacement", "#c44e52")]:
+    sns.histplot(x=b, bins=40, element="step", fill=False, ax=ax, color=c, label=lab)
+ax.axvline(obs, color="black", ls="--", lw=1)
+ax.legend(fontsize=8)
+ax.set_xlabel("Randomization differences in means (F - M)")
+plt.tight_layout()
+plt.show()
+rows = []
+for lab, b in [("(a) re-label", ra), ("(b) shift", rb), ("(c) pool", rc)]:
+    rows.append({"Method": lab, "Simulated SE": round(b.std(ddof=1), 2),
+                 "Two-tail p": round(two_tail_p(b, obs), 3)})
+pd.DataFrame(rows).set_index("Method").to_string()
+```
+
+The three distributions are **relatively consistent**: each has SE ≈ 2.3
+hours and each gives a two-tailed p-value of about 0.20 for the observed
+difference of $\bar x_F - \bar x_M = 9.4 - 12.4 = -3.0$ hours (dashed line).
+Every method says the same thing: a 3-hour gap is unremarkable when group
+labels are randomized. **Conclusion: no evidence of a relationship between sex
+and weekly exercise hours** in these data — the difference in the sample is
+within the range that chance alone produces.
+
+:::
