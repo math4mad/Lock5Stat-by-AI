@@ -1,0 +1,679 @@
+---
+execute-dir: project
+title: "Chapter 8 · Section 8.2"
+subtitle: "Pairwise Comparisons and Inference after ANOVA — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Once an ANOVA signals that means differ, Section 8.2 of Lock⁵ asks *which*
+groups differ. Because one of the ANOVA conditions is a **common within-group
+standard deviation**, every post-ANOVA procedure pools information:
+estimate any standard deviation with the **pooled standard deviation**
+$\sqrt{MSE}$ and use the **error degrees of freedom** $n-k$ for every
+$t$-distribution:
+$$\bar{x}_i \pm t^*\sqrt{\frac{MSE}{n_i}}, \qquad
+(\bar{x}_i-\bar{x}_j) \pm t^*\sqrt{MSE\left(\tfrac{1}{n_i}+\tfrac{1}{n_j}\right)}, \qquad
+t=\frac{\bar{x}_i-\bar{x}_j}{\sqrt{MSE\left(\tfrac{1}{n_i}+\tfrac{1}{n_j}\right)}}.$$
+A 95% interval for $\mu_i-\mu_j$ excludes zero exactly when the 5% pairwise
+test rejects, and with many groups the **multiplicity** problem — many 5%
+tests compound into a much larger overall error rate — motivates doing
+pairwise comparisons only after the overall ANOVA is significant (with
+formal adjustments such as Fisher's LSD, Exercise 8.66). Below every
+interval, test, and LSD threshold is computed exactly from the published
+ANOVA tables with `scipy.stats`, and the data-based exercises
+(`PASeniors`, `DrugResistance`, `SynchronizedMovement`, `TextbookCosts`,
+`FishGills3`) are worked from the raw data.
+The exercises are from *Statistics: Unlocking the Power of Data* (Lock⁵,
+3rd ed., pp. 610–613): Skill Builders 8.45–8.49 and 8.50–8.56 read two
+ANOVA outputs, followed by pairwise inference for sandwich ants, pulse
+rates, light-at-night mice, PASeniors surveys, drug-resistance dosing,
+synchronized movement, Fisher's LSD, and fish gill rates.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+from scipy import stats
+sns.set_theme(style="whitegrid")
+
+def ci_mean(mean, mse, n, df, conf=0.95):
+    """Confidence interval for a single group mean after ANOVA."""
+    t = stats.t.ppf(0.5 + conf / 2, df)
+    me = t * np.sqrt(mse / n)
+    return round(mean - me, 2), round(mean + me, 2), round(me, 2)
+
+def ci_diff(m1, n1, m2, n2, mse, df, conf=0.95):
+    """Confidence interval for mu1 - mu2 after ANOVA (pooled MSE)."""
+    t = stats.t.ppf(0.5 + conf / 2, df)
+    se = np.sqrt(mse * (1 / n1 + 1 / n2))
+    d = m1 - m2
+    return round(d - t * se, 2), round(d + t * se, 2), round(t * se, 2)
+
+def pair_test(m1, n1, m2, n2, mse, df):
+    """Two-sided pairwise test of mu1 = mu2 after ANOVA."""
+    se = np.sqrt(mse * (1 / n1 + 1 / n2))
+    t = (m1 - m2) / se
+    p = 2 * stats.t.sf(abs(t), df)
+    return round(t, 3), round(float(p), 4) if p >= 1e-4 else float(f"{p:.3g}"), round(se, 3)
+
+def anova_table(groups):
+    """One-way ANOVA from a dict of sample arrays (used for data-based items)."""
+    names = list(groups)
+    samples = [np.asarray(v, float) for v in groups.values()]
+    k = len(samples); allv = np.concatenate(samples); n = len(allv)
+    grand = allv.mean()
+    ssG = sum(len(x) * (x.mean() - grand) ** 2 for x in samples)
+    ssE = sum(((x - x.mean()) ** 2).sum() for x in samples)
+    dfG, dfE = k - 1, n - k
+    F = (ssG / dfG) / (ssE / dfE)
+    p = stats.f.sf(F, dfG, dfE)
+    tab = pd.DataFrame(
+        {"df": [dfG, dfE, n - 1],
+         "SS": [round(ssG, 2), round(ssE, 2), round(ssG + ssE, 2)],
+         "MS": [round(ssG / dfG, 3), round(ssE / dfE, 3), np.nan],
+         "F": [round(F, 3), np.nan, np.nan],
+         "p-value": [float(f"{p:.3g}") if p < 1e-4 else round(float(p), 4), np.nan, np.nan]},
+        index=["Groups", "Error", "Total"])
+    return tab, F
+
+def lsd(mse, df, ni, nj, conf=0.95):
+    """Fisher's Least Significant Difference."""
+    t = stats.t.ppf(0.5 + conf / 2, df)
+    return round(t * np.sqrt(mse * (1 / ni + 1 / nj)), 2)
+
+def pair_table(means, ns, mse, df, conf=0.95):
+    """All pairwise CIs and tests after ANOVA, sorted as in Minitab output."""
+    names = list(means)
+    rows = []
+    for i in range(len(names)):
+        for j in range(i + 1, len(names)):
+            lo, hi, me = ci_diff(means[names[j]], ns[names[j]], means[names[i]], ns[names[i]],
+                                 mse, df, conf)
+            t, p, se = pair_test(means[names[j]], ns[names[j]], means[names[i]], ns[names[i]], mse, df)
+            rows.append({f"{names[j]} - {names[i]}": round(means[names[j]] - means[names[i]], 2),
+                         "Lower": lo, "Upper": hi,
+                         "t": t, "p-value": p,
+                         "Significant at 5%": hi < 0 or lo > 0})
+    out = pd.DataFrame(rows)
+    return out.set_index(out.columns[0])
+
+def summary_table(groups):
+    """N / Mean / StDev per group."""
+    items = groups.items() if isinstance(groups, dict) else \
+        [(f"Group {i+1}", v) for i, v in enumerate(groups)]
+    return pd.DataFrame({"N": [len(v) for _, v in items],
+                         "Mean": [np.mean(v) for _, v in items],
+                         "StDev": [np.std(v, ddof=1) for _, v in items]},
+                        index=[k for k, _ in items]).round(3)
+```
+
+::: {.panel-tabset}
+
+## Exercise 8.45
+
+*(Skill Builder 1)* Three groups ($n = 5$ each); ANOVA gives
+$F = 10.74$, p = 0.002. Is there sufficient evidence of a difference in
+the population means?
+
+**Yes.** The p-value (0.002) is far below any reasonable significance
+level: if the three population means were equal, an F-statistic of 10.74
+(upper tail of $F_{2,12}$) would occur only about 2 times in 1000. We
+reject $H_0\colon \mu_A=\mu_B=\mu_C$ and conclude that at least one
+population mean differs — the sample means (A: 10.2, B: 16.8, C: 10.8)
+suggest B is the different one.
+
+## Exercise 8.46
+
+*(Skill Builder 1)* What is the pooled standard deviation, and what
+degrees of freedom are used for inference about these means?
+
+```{python}
+#| echo: false
+pd.Series({"Pooled StDev = sqrt(MSE)": round(np.sqrt(6.20), 3),
+           "df for all t-inference": 12}).to_string()
+```
+
+Pooled standard deviation = $\sqrt{MSE} = \sqrt{6.20} = 2.49$; all
+post-ANOVA intervals and tests use **12 error degrees of freedom**
+($n - k = 15 - 3$).
+
+## Exercise 8.47
+
+*(Skill Builder 1)* 95% confidence interval for the mean of population A
+($\bar{x}_A = 10.200$, $n_A = 5$).
+
+```{python}
+#| echo: false
+lo, hi, me = ci_mean(10.200, 6.20, 5, 12)
+pd.Series({"Margin of error": me, "95% CI": f"({lo}, {hi})"}).to_string()
+```
+
+$$10.2 \pm 2.179\sqrt{6.20/5} = 10.2 \pm 2.43 = \mathbf{(7.78,\ 12.62)}$$
+using $t^* = 2.179$ from the $t_{12}$ distribution.
+
+## Exercise 8.48
+
+*(Skill Builder 1)* 90% confidence interval for the difference in means of
+populations B and C ($\bar{x}_B = 16.800$, $\bar{x}_C = 10.800$, both
+$n = 5$).
+
+```{python}
+#| echo: false
+lo, hi, me = ci_diff(16.800, 5, 10.800, 5, 6.20, 12, conf=0.90)
+pd.Series({"Margin of error": me, "90% CI": f"({lo}, {hi})"}).to_string()
+```
+
+$$(16.8 - 10.8) \pm 1.782\sqrt{6.20(1/5 + 1/5)} = 6.0 \pm 2.81
+= \mathbf{(3.19,\ 8.81)}$$
+using $t^* = 1.782$ from $t_{12}$. Since the interval contains only
+positive values, B's mean exceeds C's.
+
+## Exercise 8.49
+
+*(Skill Builder 1)* Test for a difference in population means between
+groups A and C.
+
+```{python}
+#| echo: false
+t, p, se = pair_test(10.200, 5, 10.800, 5, 6.20, 12)
+pd.Series({"H0": "mu_A = mu_C", "Difference": 10.200 - 10.800,
+           "SE": se, "t-statistic": t, "p-value": p,
+           "Conclusion (5%)": "Do not reject H0" if p > 0.05 else "Reject H0"}).to_string()
+```
+
+$H_0\colon \mu_A = \mu_C$ vs $H_a\colon \mu_A \ne \mu_C$.
+$t = (10.2 - 10.8)/1.575 = -0.38$ with 12 df, giving **p-value ≈ 0.71**.
+We **do not reject $H_0$** — no evidence of a difference between groups A
+and C (consistent with their nearly equal sample means, 10.2 vs 10.8).
+
+## Exercise 8.50
+
+*(Skill Builder 2)* Four groups ($n = 6$ each); ANOVA gives $F = 6.64$,
+p = 0.003. Is there evidence of a difference in the population means?
+
+**Yes.** The p-value (0.003) is well below 0.05: only about 3 in 1000
+random samples would give an F-statistic of 6.64 if all four population
+means were equal. We reject $H_0$ and conclude at least one mean differs —
+the sample means (A: 86.8, B: 76.2, C: 80.0, D: 69.3) point to group A
+being higher and group D lower.
+
+## Exercise 8.51
+
+*(Skill Builder 2)* What is the pooled standard deviation, and what
+degrees of freedom are used for inference?
+
+```{python}
+#| echo: false
+pd.Series({"Pooled StDev = sqrt(MSE)": round(np.sqrt(48.3), 3),
+           "df for all t-inference": 20}).to_string()
+```
+
+Pooled standard deviation = $\sqrt{48.3} = 6.95$; all inference uses
+**20 error degrees of freedom** ($n - k = 24 - 4$).
+
+## Exercise 8.52
+
+*(Skill Builder 2)* 99% confidence interval for the mean of population A
+($\bar{x}_A = 86.833$). Is 90 a plausible value?
+
+```{python}
+#| echo: false
+lo, hi, me = ci_mean(86.833, 48.3, 6, 20, conf=0.99)
+pd.Series({"Margin of error": me, "99% CI": f"({lo}, {hi})",
+           "90 inside the interval?": lo <= 90 <= hi}).to_string()
+```
+
+$$86.833 \pm 2.845\sqrt{48.3/6} = 86.833 \pm 8.07 = \mathbf{(78.76,\ 94.90)}$$
+using $t^* = 2.845$ from $t_{20}$. **Yes — 90 is a plausible value** for
+the population mean of group A since it lies within the interval.
+
+## Exercise 8.53
+
+*(Skill Builder 2)* 95% confidence interval for the difference in means of
+populations C and D ($\bar{x}_C = 80.000$, $\bar{x}_D = 69.333$).
+
+```{python}
+#| echo: false
+lo, hi, me = ci_diff(80.000, 6, 69.333, 6, 48.3, 20)
+pd.Series({"Margin of error": me, "95% CI": f"({lo}, {hi})"}).to_string()
+```
+
+$$(80.0 - 69.333) \pm 2.086\sqrt{48.3(1/6 + 1/6)} = 10.667 \pm 8.37
+= \mathbf{(2.30,\ 14.70)}$$
+using $t^* = 2.086$ from $t_{20}$.
+
+## Exercise 8.54
+
+*(Skill Builder 2)* Test for a difference in population means between
+groups A and D.
+
+```{python}
+#| echo: false
+t, p, se = pair_test(86.833, 6, 69.333, 6, 48.3, 20)
+pd.Series({"H0": "mu_A = mu_D", "Difference": round(86.833 - 69.333, 3),
+           "SE": se, "t-statistic": t, "p-value": float(f"{p:.3g}"),
+           "Conclusion (5%)": "Reject H0" if p < 0.05 else "Do not reject H0"}).to_string()
+```
+
+$H_0\colon \mu_A = \mu_D$ vs $H_a\colon \mu_A \ne \mu_D$.
+$t = 17.5/4.013 = 4.36$ with 20 df, **p-value ≈ 0.0003**. We **reject
+$H_0$**: strong evidence that group A's mean exceeds group D's.
+
+## Exercise 8.55
+
+*(Skill Builder 2)* Test for a difference in population means between
+groups A and B.
+
+```{python}
+#| echo: false
+t, p, se = pair_test(86.833, 6, 76.167, 6, 48.3, 20)
+pd.Series({"H0": "mu_A = mu_B", "Difference": round(86.833 - 76.167, 3),
+           "SE": se, "t-statistic": t, "p-value": round(float(p), 4),
+           "Conclusion (5%)": "Reject H0" if p < 0.05 else "Do not reject H0"}).to_string()
+```
+
+$H_0\colon \mu_A = \mu_B$ vs $H_a\colon \mu_A \ne \mu_B$.
+$t = 10.667/4.013 = 2.66$ with 20 df, **p-value ≈ 0.015**. We **reject
+$H_0$** at the 5% level: evidence that group A's mean exceeds group B's.
+
+## Exercise 8.56
+
+*(Skill Builder 2)* Test for a difference in population means between
+groups B and D.
+
+```{python}
+#| echo: false
+t, p, se = pair_test(76.167, 6, 69.333, 6, 48.3, 20)
+pd.Series({"H0": "mu_B = mu_D", "Difference": round(76.167 - 69.333, 3),
+           "SE": se, "t-statistic": t, "p-value": round(float(p), 4),
+           "Conclusion (5%)": "Reject H0" if p < 0.05 else "Do not reject H0"}).to_string()
+```
+
+$H_0\colon \mu_B = \mu_D$ vs $H_a\colon \mu_B \ne \mu_D$.
+$t = 6.834/4.013 = 1.70$ with 20 df, **p-value ≈ 0.10**. We **do not
+reject $H_0$**: no evidence of a difference between groups B and D.
+
+## Exercise 8.57 Peanut Butter vs Ham & Pickles
+
+SandwichAnts ANOVA ($MSE = 138.7$, $df = 21$); sample means: peanut
+butter 34.0, ham & pickles 49.25 ($n = 8$ each). Is the difference
+significant at 5%?
+
+```{python}
+#| echo: false
+t, p, se = pair_test(34.0, 8, 49.25, 8, 138.7, 21)
+lo, hi, me = ci_diff(34.0, 8, 49.25, 8, 138.7, 21)
+pd.Series({"t-statistic": t, "p-value": round(float(p), 4),
+           "95% CI for mu_PB - mu_HP": f"({lo}, {hi})"}).to_string()
+```
+
+$H_0\colon \mu_{PB} = \mu_{HP}$ vs $H_a\colon \mu_{PB} \ne \mu_{HP}$.
+$t = (34.0 - 49.25)/5.89 = -2.59$ with 21 df, **p-value ≈ 0.017** (the 95%
+interval $-18.5 \pm 12.25 = (-30.75, -6.25)$ excludes zero). We **reject
+$H_0$**: mean ant counts differ significantly between peanut butter and
+ham & pickles — ants prefer ham & pickles by about 15 ants on average.
+
+## Exercise 8.58 Pulse Rate and Award Preference
+
+StudentSurvey pulse rates by award preference; ANOVA: $MSE = 144$,
+$df = 359$. Means: Academy 70.52 ($n=31$), Nobel 72.21 ($n=149$), Olympic
+67.25 ($n=182$). Compare each pair.
+
+```{python}
+#| echo: false
+means = {"Academy": 70.52, "Nobel": 72.21, "Olympic": 67.25}
+ns = {"Academy": 31, "Nobel": 149, "Olympic": 182}
+rows = {}
+for lab, (a, b) in {"(a)": ("Academy", "Nobel"), "(b)": ("Academy", "Olympic"),
+                    "(c)": ("Nobel", "Olympic")}.items():
+    t, p, se = pair_test(means[a], ns[a], means[b], ns[b], 144, 359)
+    rows[f"{lab} {a} - {b}"] = \
+        pd.Series({"Diff": round(means[a] - means[b], 2), "SE": se,
+                   "t": t, "p-value": round(float(p), 4),
+                   "Significant at 5%": p < 0.05})
+pd.DataFrame(rows).T.to_string()
+```
+
+**(a) Academy vs Nobel:** $t = -0.71$, p ≈ 0.48 — no evidence of a
+difference.
+**(b) Academy vs Olympic:** $t = 1.40$, p ≈ 0.16 — no evidence of a
+difference.
+**(c) Nobel vs Olympic:** $t = 3.74$, p ≈ 0.0002 — **significant**: the
+only detectable pairwise difference is between the Nobel Prize and Olympic
+gold medal groups (Nobel students average about 5 bpm higher than Olympic
+students). Note the Academy group's interval is wide because of its small
+sample size, so its comparisons with either group lack power.
+
+## Exercise 8.59 Body Mass Gain (Light at Night)
+
+Body-mass gain by light condition: DM ($n=10$, 7.859), LD ($n=9$, 5.987),
+LL ($n=9$, 11.010); ANOVA: $MSE = 6.48$, $df = 25$, F = 8.96, p = 0.001.
+
+```{python}
+#| echo: false
+means = {"DM": 7.859, "LD": 5.987, "LL": 11.010}
+ns = {"DM": 10, "LD": 9, "LL": 9}
+pair_table(means, ns, 6.48, 25).to_string()
+```
+
+Which conditions differ? Using the pooled $MSE = 6.48$ with 25 df:
+
+- **LL vs LD**: difference 5.02, 95% CI (2.55, 7.49) — **significant**.
+- **LL vs DM**: difference 3.15, 95% CI (0.74, 5.56) — **significant**.
+- **DM vs LD**: difference 1.87, 95% CI (−4.28, 0.54) — **not significant**.
+
+So the bright-light (LL) group gains significantly more mass than **both**
+other groups, while DM and LD are statistically indistinguishable —
+consistent with exercise 8.31's finding that light at night (even dim)
+increases weight gain, with the effect most pronounced under bright light.
+
+## Exercise 8.60 When Calories Are Consumed (Light at Night)
+
+Percent of food eaten during the day: DM ($n=10$, 55.516), LD ($n=9$,
+36.485), LL ($n=9$, 76.573); ANOVA: $MSE = 92.8$, $df = 25$, F = 39.01,
+p < 0.001.
+
+```{python}
+#| echo: false
+means = {"DM": 55.516, "LD": 36.485, "LL": 76.573}
+ns = {"DM": 10, "LD": 9, "LL": 9}
+pair_table(means, ns, 92.8, 25).to_string()
+```
+
+All three pairwise comparisons are significant at 5% (every interval
+excludes zero): **LD differs from both DM and LL, and DM differs from LL**.
+Mice on the standard cycle eat ≈ 36% of calories by day, dim-light-at-night
+mice ≈ 56%, and bright-light-at-night mice ≈ 77% — each increase in night
+lighting shifts eating further into the normal sleeping period.
+
+## Exercise 8.61 More on Exercise and Stress
+
+Time (s) in darkness, six groups ($n=8$ each): IE:HC 192, SE:HC 196,
+EE:HC 205, IE:SD 392, SE:SD 438, EE:SD 231; ANOVA: $MSE = 2469.9$,
+$df = 42$, F = 39.0, p < 0.001.
+
+**(a)** Yes — the ANOVA leaves no doubt that the six group means differ.
+The two means farthest apart are **SE:SD (438) and IE:HC (192)**, so that
+pair is the most likely to show a difference; the closest pair,
+**IE:HC (192) and SE:HC (196)**, is the least likely.
+**(b)** The three HC (control) means cluster tightly (192–205) and EE:SD
+(231) sits near them; the large differences are between the two
+non-exercising stressed groups (IE:SD 392, SE:SD 438) and the rest — i.e.,
+stress raises hiding time unless the mice had an enriched (exercise)
+environment.
+
+```{python}
+#| echo: false
+t, p, se = pair_test(192, 8, 231, 8, 2469.9, 42)
+lo, hi, me = ci_diff(192, 8, 231, 8, 2469.9, 42)
+pd.Series({"H0": "mu_IE:HC = mu_EE:SD", "Difference": 192 - 231,
+           "SE": se, "t": t, "p-value": round(float(p), 4),
+           "95% CI": f"({lo}, {hi})",
+           "Conclusion (5%)": "Reject H0" if p < 0.05 else "Do not reject H0"}).to_string()
+```
+
+**(c)** Testing IE:HC (192) vs EE:SD (231): $t = -39/24.85 = -1.57$ with
+42 df, **p-value ≈ 0.124** — we **do not reject $H_0$**: the impoverished-
+but-unstressed mice do not differ significantly from the enriched-but-
+stressed mice, underscoring how strongly exercise buffers the effect of
+stress.
+
+## Exercise 8.62 More on School Pressure and Time with Friends
+
+PASeniors: `HangHours` by `SchoolPressure` (F-test p = 0.003). Which
+groups differ?
+
+```{python}
+#| echo: false
+pa = pd.read_csv("data/ch08/PASeniors.csv")
+hw = pa[["SchoolPressure", "HangHours"]].dropna()
+grp = {g: d["HangHours"].values for g, d in hw.groupby("SchoolPressure")}
+summary_table(grp).to_string()
+```
+
+```{python}
+#| echo: false
+tab, F = anova_table(grp)
+mse = tab.loc["Error", "MS"]; dfe = int(tab.loc["Error", "df"])
+means = {k: float(np.mean(v)) for k, v in grp.items()}
+ns = {k: len(v) for k, v in grp.items()}
+pair_table(means, ns, mse, dfe).to_string()
+```
+
+With pooled $MSE \approx 110.9$ (428 df), the pairwise intervals show:
+
+- **"Very little" differs significantly from both "Some" and "A lot"**
+  (students feeling very little pressure spend ≈ 5–6 more hrs/week with
+  friends).
+- **"Some" vs "A lot"** is not significant (difference ≈ 1.1 hrs).
+
+Overall: the significant ANOVA is driven by students who feel very little
+school pressure spending more time with friends than those feeling some or
+a lot of pressure.
+
+## Exercise 8.63 More on Number of Texts and Communication Method
+
+PASeniors: `TextsSent` by `Communicate` (F-test p < 0.0001). Which groups
+differ?
+
+```{python}
+#| echo: false
+tx = pa[["Communicate", "TextsSent"]].dropna()
+tx = tx[tx["Communicate"].str.strip() != ""]  # one record with a blank category
+grpt = {g: d["TextsSent"].values for g, d in tx.groupby("Communicate")}
+summary_table(grpt).to_string()
+```
+
+```{python}
+#| echo: false
+tab, F = anova_table(grpt)
+mse = tab.loc["Error", "MS"]; dfe = int(tab.loc["Error", "df"])
+means = {k: float(np.mean(v)) for k, v in grpt.items()}
+ns = {k: len(v) for k, v in grpt.items()}
+pair_table(means, ns, mse, dfe).to_string()
+```
+
+With pooled $MSE \approx 14224$ (441 df), the picture is clear:
+
+- **"Phone" and "Text" differ significantly from both "App" and
+  "In person"** — heavy messengers send roughly 50–70 more texts per day.
+- **"Phone" vs "Text"** and **"App" vs "In person"** are not significant.
+
+The significant ANOVA is driven by the heavy-messaging groups (Phone ≈ 110
+and Text ≈ 100 texts/day) versus the light-messaging groups (App ≈ 41,
+In person ≈ 47).
+
+## Exercise 8.64 Drug Resistance and Dosing
+
+DrugResistance (untreated group excluded): compare **Moderate vs
+Aggressive** (same daily dose 8 mg/kg, different duration: 1 day vs 5–7
+days) and **Light vs Moderate** (same 1-day duration, different daily dose:
+4 vs 8 mg/kg) for ResistantDensity and DaysInfectious.
+
+```{python}
+#| echo: false
+dr = pd.read_csv("data/ch08/DrugResistance.csv")
+dose = dr[dr["Treatment"] != "Untreated"]
+groups = {t: d for t, d in dose.groupby("Treatment")}
+rows = {}
+for resp in ["ResistantDensity", "DaysInfectious"]:
+    g = {t: d[resp].dropna().values for t, d in groups.items()}
+    t3, _ = anova_table(g)
+    m = {k: float(np.mean(v)) for k, v in g.items()}
+    n = {k: len(v) for k, v in g.items()}
+    mse, dfe = t3.loc["Error", "MS"], int(t3.loc["Error", "df"])
+    for label, a, b in [("duration: Aggressive - Moderate", "Aggressive", "Moderate"),
+                        ("amount/day: Moderate - Light", "Moderate", "Light")]:
+        t, p, se = pair_test(m[a], n[a], m[b], n[b], mse, dfe)
+        rows[f"{resp} · {label}"] = pd.Series(
+            {"Diff": round(m[a] - m[b], 2), "SE": round(se, 2), "t": t,
+             "p-value": round(float(p), 4) if p >= 1e-4 else float(f"{p:.3g}"),
+             "Significant at 5%": p < 0.05,
+             "Higher mean": a if m[a] > m[b] else b})
+pd.DataFrame(rows).T.to_string()
+```
+
+**(a) Duration (Moderate vs Aggressive, same 8 mg/kg daily dose):** both
+resistance measures differ significantly (p < 0.001 for ResistantDensity,
+p ≈ 0.023 for DaysInfectious) — the **Aggressive** (longer) treatment has
+the higher mean resistance.
+**(b) Amount per day (Light vs Moderate, same 1-day duration):**
+DaysInfectious differs significantly (Moderate higher, p ≈ 0.033), while
+ResistantDensity shows no significant difference (p ≈ 0.74).
+**(c) Duration appears more influential.** Moving from 1 day to 5–7 days
+of the same daily dose significantly increases *both* resistance measures
+(the ResistantDensity difference alone is enormous, ≈ 70000 parasites/μL),
+whereas doubling the daily dose for one day significantly moves only one
+measure. Consistent with the evolutionary model: a longer treatment window
+keeps drug pressure on the parasites for more generations, giving resistant
+strains more opportunity to dominate — again contradicting the "aggressive
+treatment prevents resistance" conventional wisdom.
+
+## Exercise 8.65 Effects of Synchronization and Exertion on Closeness
+
+SynchronizedMovement closeness change: HS+HE ($n=72$, mean 0.319) vs
+LS+LE ($n=58$, mean −0.431); ANOVA: $MSE = 3.248$, $df = 256$.
+
+```{python}
+#| echo: false
+t, p, se = pair_test(0.319, 72, -0.431, 58, 3.248, 256)
+lo, hi, me = ci_diff(0.319, 72, -0.431, 58, 3.248, 256)
+pd.Series({"Difference (HS+HE - LS+LE)": round(0.319 - (-0.431), 3),
+           "SE": round(se, 3), "t": t, "p-value": round(float(p), 4),
+           "95% CI": f"({lo}, {hi})",
+           "Conclusion (5%)": "Reject H0" if p < 0.05 else "Do not reject H0"}).to_string()
+```
+
+$H_0\colon \mu_{HS+HE} = \mu_{LS+LE}$ vs $H_a\colon \mu_{HS+HE} \ne
+\mu_{LS+LE}$. $t = 0.75/0.317 = 2.36$ with 256 df, **p-value ≈ 0.019**
+(95% interval (0.12, 1.38) excludes zero). We **reject $H_0$**: the
+high-synchronization, high-exertion group shows a significantly larger
+increase in closeness than the low-synchronization, low-exertion group —
+doing vigorous, synchronized movement together brings people closer.
+
+## Exercise 8.66 Fisher's LSD
+
+Compute Fisher's LSD at 5% for the TextbookCosts ANOVA (Example 8.10:
+$MSE = 2536$, $df = 36$, $n_i = 10$ per field) and identify which fields
+differ.
+
+```{python}
+#| echo: false
+tb = pd.read_csv("data/ch08/TextbookCosts.csv")
+grp = {g: d["Cost"].values for g, d in tb.groupby("Field")}
+tab, F = anova_table(grp)
+mse, dfe = tab.loc["Error", "MS"], int(tab.loc["Error", "df"])
+L = lsd(mse, dfe, 10, 10)
+means = {k: float(np.mean(v)) for k, v in grp.items()}
+ns = {k: len(v) for k, v in grp.items()}
+pd.Series({"MSE": mse, "df Error": dfe,
+           "LSD (t* = 2.028)": L,
+           "Grand mean": round(float(tb["Cost"].mean()), 2)}).to_string()
+```
+
+```{python}
+#| echo: false
+rows = {}
+names = list(means)
+for i in range(len(names)):
+    for j in range(i + 1, len(names)):
+        d = abs(means[names[i]] - means[names[j]])
+        rows[f"{names[i]} - {names[j]}"] = pd.Series(
+            {"|Difference|": round(d, 2), "LSD": L,
+             "Significant": d > L})
+pd.DataFrame(rows).T.to_string()
+```
+
+$$LSD = t^*\sqrt{MSE\left(\tfrac{1}{10}+\tfrac{1}{10}\right)}
+= 2.028\sqrt{2536(0.2)} \approx \mathbf{45.7}$$
+using $t^* = 2.028$ from $t_{36}$. Comparing each pair of sample means to
+45.7: **Natural Science** differs from all three other fields
+(differences of 76.2 vs Arts, 50.5 vs Humanities, 52.5 vs Social Science —
+all exceed the LSD), while Arts, Humanities, and Social Science do not
+differ from one another (differences of 2.0–25.7). This exactly reproduces
+the Minitab grouping in Example 8.10: Natural Science = group A, the rest
+= group B.
+
+## Exercise 8.67 LSD for Exercise and Stress
+
+Fisher's LSD at 5% for the six exercise-and-stress groups of Exercise
+8.61 ($MSE = 2469.9$, $df = 42$, $n = 8$ per group; means IE:HC 192,
+SE:HC 196, EE:HC 205, IE:SD 392, SE:SD 438, EE:SD 231).
+
+```{python}
+#| echo: false
+L = lsd(2469.9, 42, 8, 8)
+means = {"IE:HC": 192, "SE:HC": 196, "EE:HC": 205, "IE:SD": 392,
+         "SE:SD": 438, "EE:SD": 231}
+names = list(means)
+pd.Series({"LSD (t* = 2.018)": L}).to_string()
+```
+
+```{python}
+#| echo: false
+rows = {}
+for i in range(len(names)):
+    for j in range(i + 1, len(names)):
+        d = abs(means[names[i]] - means[names[j]])
+        if d > L:
+            rows[f"{names[i]} vs {names[j]}"] = pd.Series(
+                {"|Difference|": d, "Significant": True})
+pd.DataFrame(rows).T.to_string()
+```
+
+$$LSD = 2.018\sqrt{2469.9(1/8 + 1/8)} \approx \mathbf{50.2}$$
+The pairs whose mean difference exceeds 50.2 are: **IE:SD and SE:SD each
+differ significantly from all three HC control groups and from EE:SD**
+(differences of 161–246), while no other pair is significant — the three
+HC means differ from each other by only 4–13, EE:SD sits 26–39 above the
+HC groups, and IE:SD vs SE:SD differ by only 36.
+
+In words: the LSD analysis splits the mice into the non-exercising
+stressed groups (IE:SD, SE:SD — hiding longest) versus everyone else
+(EE:SD together with the three control groups), confirming that only
+enriched-environment mice were resilient to the social-defeat stress.
+
+## Exercise 8.68 Fish Ventilation
+
+FishGills3: gill beat rates by calcium level. If the ANOVA shows a
+difference, determine which levels differ; otherwise give a CI for each
+mean.
+
+```{python}
+#| echo: false
+fg = pd.read_csv("data/ch08/FishGills3.csv")
+grp = {g: d["GillRate"].values for g, d in fg.groupby("Calcium")}
+tab, F = anova_table(grp)
+tab.to_string()
+```
+
+```{python}
+#| echo: false
+mse, dfe = tab.loc["Error", "MS"], int(tab.loc["Error", "df"])
+means = {k: float(np.mean(v)) for k, v in grp.items()}
+ns = {k: len(v) for k, v in grp.items()}
+pair_table(means, ns, mse, dfe).to_string()
+```
+
+The ANOVA (F ≈ 4.65, p ≈ 0.012) indicates the mean gill rates **do**
+differ by calcium level, so we proceed to pairwise comparisons using the
+pooled $MSE \approx 219$ (87 df):
+
+- **Low vs High**: difference ≈ 10.3, 95% CI (2.7, 17.9) — **significant**.
+- **Low vs Medium**: difference ≈ 9.8, 95% CI (2.2, 17.4) — **significant**.
+- **Medium vs High**: difference ≈ 0.5, 95% CI (−7.1, 8.1) — **not
+  significant**.
+
+Fish in the **low-calcium** water beat their gills significantly faster
+than fish in either the high- or medium-calcium water, which are
+statistically indistinguishable from each other.
+
+:::

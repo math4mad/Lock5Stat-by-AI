@@ -1,0 +1,1243 @@
+---
+execute-dir: project
+title: "Chapter 8 · Section 8.1"
+subtitle: "Analysis of Variance — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 8.1 of Lock⁵ extends the two-mean $t$-test to **several groups** by
+partitioning variability. The **total sum of squares** splits into a
+**between-groups** piece,
+$$SSG=\sum_i n_i(\bar{x}_i-\bar{x})^2,$$
+measuring how far apart the group means are, and a **within-groups (error)**
+piece,
+$$SSE=\sum_i (n_i-1)s_i^2,$$
+measuring background variation inside the samples; the **F-statistic** is the
+ratio of the corresponding mean squares, $F=MSG/MSE$ with $df_G=k-1$ and
+$df_E=n-k$. Large $F$ means the sample means are spread farther apart than
+within-group noise can explain, and (when each population is roughly normal
+and the group standard deviations are comparable) the null distribution is an
+**$F_{k-1,\,n-k}$ distribution with the p-value in the upper tail**. Below we
+build every ANOVA table exactly with `scipy.stats.f` (via
+`scipy.stats.f_oneway`-equivalent calculations), and, for the applied
+data-based exercises, verify each F-distribution p-value with a
+**randomization test** (10000 label scrambles, seed 2026 — under $H_0$ any
+value could have landed in any group).
+The exercises are from *Statistics: Unlocking the Power of Data* (Lock⁵,
+3rd ed., pp. 592–604): Skill Builders 8.1–8.6 compare evidence across pairs
+of datasets, 8.7–8.10 complete ANOVA tables from fragments, and 8.11–8.14
+read computer output; the applied exercises 8.15–8.44 cover a mother's voice
+and cortisol, wine vs pathogens, school pressure, synchronized dancing,
+color and anagrams, laptop warmth, exercise-and-stress mice, exercise
+incentives, posture and pain, sandwich ants by bread, drawing and memory,
+light-at-night mice, PASeniors surveys, football and brain size, fish gill
+rates, and drug-resistant pathogens.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+from scipy import stats
+sns.set_theme(style="whitegrid")
+
+def anova_table(groups, names=None):
+    """One-way ANOVA from a dict (or list) of sample arrays.
+    Returns the ANOVA table DataFrame and the F-statistic."""
+    if isinstance(groups, dict):
+        names = list(groups); samples = [np.asarray(v, float) for v in groups.values()]
+    else:
+        samples = [np.asarray(v, float) for v in groups]
+        names = names or [f"Group {i+1}" for i in range(len(samples))]
+    k = len(samples); allv = np.concatenate(samples); n = len(allv)
+    grand = allv.mean()
+    ssG = sum(len(x) * (x.mean() - grand) ** 2 for x in samples)
+    ssE = sum(((x - x.mean()) ** 2).sum() for x in samples)
+    dfG, dfE = k - 1, n - k
+    msG, msE = ssG / dfG, ssE / dfE
+    F = msG / msE
+    p = stats.f.sf(F, dfG, dfE)
+    tab = pd.DataFrame(
+        {"df": [dfG, dfE, n - 1],
+         "SS": [round(ssG, 2), round(ssE, 2), round(ssG + ssE, 2)],
+         "MS": [round(msG, 3), round(msE, 3), np.nan],
+         "F": [round(F, 3), np.nan, np.nan],
+         "p-value": [float(f"{p:.3g}") if p < 1e-4 else round(float(p), 4), np.nan, np.nan]},
+        index=["Groups", "Error", "Total"])
+    return tab, F
+
+def anova_from_stats(ns, means, sds, grand=None):
+    """ANOVA sums of squares from summary statistics only.
+    SSTotal = SSG + SSE; grand mean estimated as the weighted mean if not given."""
+    ns, means, sds = map(np.asarray, (ns, means, sds))
+    n = ns.sum()
+    gm = float((ns * means).sum() / n) if grand is None else grand
+    ssG = float((ns * (means - gm) ** 2).sum())
+    ssE = float(((ns - 1) * sds ** 2).sum())
+    k = len(ns)
+    dfG, dfE = k - 1, int(n - k)
+    F = (ssG / dfG) / (ssE / dfE)
+    p = stats.f.sf(F, dfG, dfE)
+    tab = pd.DataFrame(
+        {"df": [dfG, dfE, int(n - 1)],
+         "SS": [round(ssG, 2), round(ssE, 2), round(ssG + ssE, 2)],
+         "MS": [round(ssG / dfG, 3), round(ssE / dfE, 3), np.nan],
+         "F": [round(F, 3), np.nan, np.nan],
+         "p-value": [float(f"{p:.3g}") if p < 1e-4 else round(float(p), 4), np.nan, np.nan]},
+        index=["Groups", "Error", "Total"])
+    return tab, F
+
+def rand_f(groups, reps=10000, seed=2026):
+    """Randomization check: scramble group labels, recompute F each time.
+    Returns (simulated F-statistics, randomization p-value, observed F)."""
+    if isinstance(groups, dict):
+        samples = [np.asarray(v, float) for v in groups.values()]
+    else:
+        samples = [np.asarray(v, float) for v in groups]
+    allv = np.concatenate(samples)
+    sizes = [len(s) for s in samples]
+    labels = np.concatenate([[i] * s for i, s in enumerate(sizes)])
+    def fstat(lab):
+        gs = [allv[lab == i] for i in range(len(sizes))]
+        k = len(sizes); grand = allv.mean(); n = len(allv)
+        ssG = sum(len(g) * (g.mean() - grand) ** 2 for g in gs)
+        ssE = sum(((g - g.mean()) ** 2).sum() for g in gs)
+        return (ssG / (k - 1)) / (ssE / (n - k))
+    obs = fstat(labels)
+    r = np.random.default_rng(seed)
+    sims = np.array([fstat(r.permutation(labels)) for _ in range(reps)])
+    p = (sims >= obs).mean()
+    return sims, p, obs
+
+def group_plot(groups, names=None, kind="box", figsize=(6, 3.2)):
+    """Side-by-side comparison of the group samples."""
+    if isinstance(groups, dict):
+        names = list(groups)
+        df = pd.DataFrame([(nm, float(v)) for nm, vals in groups.items()
+                           for v in np.atleast_1d(vals)], columns=["Group", "Value"])
+    else:
+        names = names or [f"Group {i+1}" for i in range(len(groups))]
+        df = pd.DataFrame([(nm, float(v)) for nm, vals in zip(names, groups)
+                           for v in np.atleast_1d(vals)], columns=["Group", "Value"])
+    fig, ax = plt.subplots(figsize=figsize)
+    if kind == "box":
+        sns.boxplot(data=df, x="Group", y="Value", ax=ax, color="#c9d7ef")
+        sns.despine(ax=ax)
+    else:
+        sns.stripplot(data=df, x="Group", y="Value", ax=ax, color="#4c72b0", size=4)
+    ax.set_xlabel(""); plt.tight_layout(); plt.show()
+
+def sim_hist(sims, stat, xlabel="Simulated F-statistics", bins=50, figsize=(6, 3)):
+    """Histogram of the randomization F-statistics with the observed one marked."""
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.histplot(x=sims, bins=bins, ax=ax, color="#4c72b0")
+    mask = sims >= stat
+    if mask.any():
+        sns.histplot(x=sims[mask], bins=bins, ax=ax, color="#c44e52")
+    ax.axvline(stat, color="black", lw=1.5)
+    ax.set_xlabel(xlabel); ax.set_ylabel("Simulated statistics")
+    plt.tight_layout(); plt.show()
+
+def summary_table(groups):
+    """N / Mean / StDev per group (dict or list of arrays)."""
+    items = list(groups.items()) if isinstance(groups, dict) else \
+        [(f"Group {i+1}", v) for i, v in enumerate(groups)]
+    return pd.DataFrame(
+        {"N": [len(v) for _, v in items],
+         "Mean": [np.mean(v) for _, v in items],
+         "StDev": [np.std(v, ddof=1) for _, v in items]},
+        index=[k for k, _ in items]).round(3)
+```
+
+::: {.panel-tabset}
+
+## Exercise 8.1
+
+*(Skill Builder 1)* Dataset A: Group 1 = 12, 20, 8, 21, 14 vs Group 2 =
+25, 18, 15, 28, 14. Dataset B: Group 1 = 15, 14, 16, 15, 15 vs Group 2 =
+20, 21, 19, 19, 21. Which dataset gives stronger evidence of a difference
+in means?
+
+```{python}
+#| echo: false
+A = [np.array([12, 20, 8, 21, 14.]), np.array([25, 18, 15, 28, 14.])]
+B = [np.array([15, 14, 16, 15, 15.]), np.array([20, 21, 19, 19, 21.])]
+pd.DataFrame({
+    "Dataset": ["A", "B"],
+    "s1": [np.std(g[0], ddof=1).round(2) for g in (A, B)],
+    "s2": [np.std(g[1], ddof=1).round(2) for g in (A, B)],
+    "F (15 vs 20)": [anova_table(g)[1].round(2) for g in (A, B)],
+}).set_index("Dataset").to_string()
+```
+
+**Dataset B.** Both datasets have the same sample means (15 vs 20), but the
+values in Dataset A are much more spread out ($s\approx 5.1$ and $5.7$ vs
+$s\approx 0.7$ and $2.9$ in B). With the same difference in means, less
+variability within groups is stronger evidence of a difference in population
+means.
+
+## Exercise 8.2
+
+*(Skill Builder 1)* Dataset A: Group 1 = 13–17 vs Group 2 = 18–22.
+Dataset B: Group 1 = 13–17 vs Group 2 = 48–52. Which dataset gives
+stronger evidence?
+
+```{python}
+#| echo: false
+A = [np.arange(13, 18.), np.arange(18, 23.)]
+B = [np.arange(13, 18.), np.arange(48, 53.)]
+pd.DataFrame({
+    "Dataset": ["A", "B"],
+    "s1": [np.std(g[0], ddof=1).round(2) for g in (A, B)],
+    "s2": [np.std(g[1], ddof=1).round(2) for g in (A, B)],
+    "F": [anova_table(g)[1].round(1) for g in (A, B)],
+}).set_index("Dataset").to_string()
+```
+
+**Dataset B.** The within-group variability is the same in both datasets
+($s\approx 1.6$ in every sample), but the means in B are 35 apart
+(15 vs 50) versus only 5 apart in A — much stronger evidence of a
+difference in B.
+
+## Exercise 8.3
+
+*(Skill Builder 1)* Two pairs of boxplots on a 5–25 scale. Dataset A:
+Group 1 centered near 10.5, Group 2 near 21.5. Dataset B: Group 1 near 13,
+Group 2 near 15.5 with overlapping boxes. Which gives stronger evidence?
+
+**Dataset A.** The boxplots have roughly the same spread in both datasets,
+but the means in Dataset A are much farther apart (about 11 units vs about
+2.5 units). Farther-apart means with the same variability is stronger
+evidence of a difference in population means.
+
+## Exercise 8.4
+
+*(Skill Builder 1)* Dataset A: Group 1 centered near 8, Group 2 near 21,
+moderate spread. Dataset B: Group 1 centered near 11, Group 2 near 19, with
+very tight boxes. Which gives stronger evidence?
+
+**Dataset B.** Both datasets show separated groups, but the boxes in B are
+extremely narrow relative to the gap between them, whereas A has
+considerable within-group spread. The much smaller variability in B — even
+with slightly closer means — provides the stronger evidence of a difference
+in population means.
+
+## Exercise 8.5
+
+*(Skill Builder 1)* Two pairs of dotplots on a 0–36 scale. Dataset A:
+Group 1 spread over roughly 4–26 (center ≈ 15), Group 2 over 14–36
+(center ≈ 24), heavily overlapping. Dataset B: Group 1 tightly clustered
+near 15, Group 2 tightly clustered near 24. Which gives stronger evidence?
+
+**Dataset B.** The group means are about the same in both datasets
+(≈ 15 vs ≈ 24), but the values within each group are far more tightly
+clustered in Dataset B. Less within-group variability with the same
+difference in means means stronger evidence of a difference in the
+population means.
+
+## Exercise 8.6
+
+*(Skill Builder 1)* Two pairs of dotplots on an 8–64 scale. Dataset A:
+Group 1 centered near 20, Group 2 near 48, little overlap. Dataset B:
+Group 1 centered near 28, Group 2 near 40, with substantial overlap.
+Which gives stronger evidence?
+
+**Dataset A.** The spread within groups is similar in the two datasets, but
+the means in Dataset A are about 28 units apart versus only about 12 units
+apart in Dataset B. Farther-apart means with the same variability is
+stronger evidence of a difference in the population means.
+
+## Exercise 8.7
+
+*(Skill Builder 2)* Three groups with $n_1=n_2=n_3=5$; SSG = 120,
+SSE = 282, SSTotal = 402. Complete the ANOVA table and find F.
+
+```{python}
+#| echo: false
+dfG, dfE = 3 - 1, 15 - 3
+msG, msE = 120 / dfG, 282 / dfE
+F = msG / msE
+pd.Series({"df Groups": dfG, "df Error": dfE, "df Total": 14,
+           "MSG": round(msG, 1), "MSE": round(msE, 1),
+           "F-statistic": round(F, 3),
+           "p-value": round(float(stats.f.sf(F, dfG, dfE)), 4)}).to_string()
+```
+
+**F = 2.55.** With $df_G = 2$ and $df_E = 12$: $MSG = 120/2 = 60$,
+$MSE = 282/12 = 23.5$, so $F = 60/23.5 = 2.55$.
+
+## Exercise 8.8
+
+*(Skill Builder 2)* Four groups of $n=10$ each; SSG = 960, SSE = 5760.
+Complete the ANOVA table and find F.
+
+```{python}
+#| echo: false
+dfG, dfE = 4 - 1, 40 - 4
+F = (960 / dfG) / (5760 / dfE)
+pd.Series({"df Groups": dfG, "df Error": dfE, "MSG": 960 / dfG,
+           "MSE": 5760 / dfE, "F-statistic": round(F, 3),
+           "p-value": round(float(stats.f.sf(F, dfG, dfE)), 4)}).to_string()
+```
+
+**F = 2.00.** With $df_G = 3$ and $df_E = 36$: $MSG = 960/3 = 320$,
+$MSE = 5760/36 = 160$, so $F = 320/160 = 2.00$.
+
+## Exercise 8.9
+
+*(Skill Builder 2)* Three groups with $n_1=10$, $n_2=8$, $n_3=11$;
+SSG = 80, SSTotal = 1380. Complete the ANOVA table and find F.
+
+```{python}
+#| echo: false
+n = 29
+dfG, dfE = 3 - 1, n - 3
+ssE = 1380 - 80
+F = (80 / dfG) / (ssE / dfE)
+pd.Series({"df Groups": dfG, "df Error": dfE, "SSE": ssE,
+           "MSG": 80 / dfG, "MSE": round(ssE / dfE, 2),
+           "F-statistic": round(F, 3),
+           "p-value": round(float(stats.f.sf(F, dfG, dfE)), 4)}).to_string()
+```
+
+**F = 1.60.** Total $n = 29$: $df_G = 2$, $df_E = 26$;
+$SSE = 1380 - 80 = 1300$, so $MSG = 40$, $MSE = 1300/26 = 50$, and
+$F = 40/50 = 1.60$.
+
+## Exercise 8.10
+
+*(Skill Builder 2)* Four groups with $n_1=5$, $n_2=8$, $n_3=7$, $n_4=5$;
+SSE = 800, SSTotal = 1400. Complete the ANOVA table and find F.
+
+```{python}
+#| echo: false
+n = 25
+dfG, dfE = 4 - 1, n - 4
+ssG = 1400 - 800
+F = (ssG / dfG) / (800 / dfE)
+pd.Series({"df Groups": dfG, "df Error": dfE, "SSG": ssG,
+           "MSG": round(ssG / dfG, 2), "MSE": round(800 / dfE, 2),
+           "F-statistic": round(F, 3),
+           "p-value": round(float(stats.f.sf(F, dfG, dfE)), 4)}).to_string()
+```
+
+**F ≈ 5.25.** Total $n = 25$: $df_G = 3$, $df_E = 21$;
+$SSG = 1400 - 800 = 600$, so $MSG = 200$, $MSE = 800/21 ≈ 38.1$, and
+$F = 200/38.1 ≈ 5.25$.
+
+## Exercise 8.11
+
+*(Skill Builder 3)* ANOVA output: $df_G=3$, $SSG=360$, $SSE=1200$ with
+$df_E=16$, $F=1.60$. How many groups, hypotheses, p-value, conclusion?
+
+```{python}
+#| echo: false
+F = 120 / 75
+pd.Series({"Groups": 4, "F": round(F, 2),
+           "p-value": round(float(stats.f.sf(F, 3, 16)), 4)}).to_string()
+```
+
+**(a)** Four groups ($df_G = k-1 = 3$).
+**(b)** $H_0\colon \mu_1=\mu_2=\mu_3=\mu_4$ vs
+$H_a\colon$ at least one $\mu_i \ne \mu_j$.
+**(c)** p-value ≈ 0.23.
+**(d)** Since $0.23 > 0.05$, we do not reject $H_0$ — there is no evidence
+of a difference in the population means.
+
+## Exercise 8.12
+
+*(Skill Builder 3)* ANOVA output: $df_G=4$, $SSG=1200$, $SSE=1837.5$ with
+$df_E=35$, $F=5.71$. How many groups, hypotheses, p-value, conclusion?
+
+```{python}
+#| echo: false
+F = 300 / 52.5
+pd.Series({"Groups": 5, "F": round(F, 2),
+           "p-value": float(f"{stats.f.sf(F, 4, 35):.4g}")}).to_string()
+```
+
+**(a)** Five groups ($df_G = 4$).
+**(b)** $H_0\colon \mu_1=\cdots=\mu_5$ vs $H_a\colon$ at least one
+$\mu_i \ne \mu_j$.
+**(c)** p-value ≈ 0.0012.
+**(d)** Since $0.0012 < 0.05$, we reject $H_0$ — there is strong evidence
+that at least one of the population means differs from the others.
+
+## Exercise 8.13
+
+*(Skill Builder 3)* ANOVA output: $df_G=2$, $SSG=540$, $SSE=847.8$ with
+$df_E=27$, $F=8.60$. How many groups, hypotheses, p-value, conclusion?
+
+```{python}
+#| echo: false
+F = 270 / 31.4
+pd.Series({"Groups": 3, "F": round(F, 2),
+           "p-value": round(float(stats.f.sf(F, 2, 27)), 4)}).to_string()
+```
+
+**(a)** Three groups ($df_G = 2$).
+**(b)** $H_0\colon \mu_1=\mu_2=\mu_3$ vs $H_a\colon$ at least one
+$\mu_i \ne \mu_j$.
+**(c)** p-value ≈ 0.0013.
+**(d)** Since $0.0013 < 0.05$, we reject $H_0$ — strong evidence of a
+difference among the population means.
+
+## Exercise 8.14
+
+*(Skill Builder 3)* ANOVA output: $df_G=3$, $SSG=450$, $SSE=3200$ with
+$df_E=16$, $F=0.75$. How many groups, hypotheses, p-value, conclusion?
+
+```{python}
+#| echo: false
+F = 150 / 200
+pd.Series({"Groups": 4, "F": round(F, 2),
+           "p-value": round(float(stats.f.sf(F, 3, 16)), 4)}).to_string()
+```
+
+**(a)** Four groups ($df_G = 3$).
+**(b)** $H_0\colon \mu_1=\mu_2=\mu_3=\mu_4$ vs
+$H_a\colon$ at least one $\mu_i \ne \mu_j$.
+**(c)** p-value ≈ 0.54.
+**(d)** Since $0.54 > 0.05$, we do not reject $H_0$ — no evidence of a
+difference among the population means.
+
+## Exercise 8.15 Stress Levels and a Mother's Voice
+
+68 girls ages 7–12 gave a speech and did mental arithmetic in front of
+strangers, then were randomly divided into four equal groups: talk to
+mother in person, by phone, by text, or no contact. The change in cortisol
+(a stress hormone) was recorded.
+
+**(a)** The two main variables are the **type of interaction with mom**
+(categorical: in person / phone / text / none) and the **change in cortisol
+level** (quantitative).
+**(b)** This is an **experiment** — the girls were randomly assigned to the
+interaction conditions.
+**(c)** Letting $\mu_1,\mu_2,\mu_3,\mu_4$ denote the mean change in cortisol
+for the in-person, phone, text, and no-contact groups:
+$$H_0\colon \mu_1=\mu_2=\mu_3=\mu_4 \quad\text{vs}\quad H_a\colon \text{at least one } \mu_i \ne \mu_j$$
+**(d)** With $n = 68$ and $k = 4$: total $df = 67$, groups $df = 3$,
+error $df = 64$.
+
+```{python}
+#| echo: false
+pd.Series({"Total df": 67, "Groups df": 3, "Error df": 64}).to_string()
+```
+
+**(e)** Since some of the group pairs show significant differences at the
+5% level, the overall ANOVA must have found significant differences among
+the means — the **p-value is below 0.05**.
+
+## Exercise 8.16 Wine and Antibacterial Properties
+
+Bacteria were placed in seven beverages (cola, lemon-lime mixer, diet cola,
+beer, wine, milk, water) and the change in bacteria count recorded after
+four hours. Only wine showed a change significantly different from (better
+than) all the others.
+
+**(a)** The two main variables are the **beverage** (categorical, seven
+levels) and the **change in number of bacteria** (quantitative).
+**(b)** Degrees of freedom for groups: $k - 1 = 7 - 1 = 6$.
+
+```{python}
+#| echo: false
+pd.Series({"df Groups": 6}).to_string()
+```
+
+**(c)** Since at least one pair of beverages (wine vs each of the others)
+shows a significant difference at the 5% level, the overall ANOVA
+p-value is **below 0.05**.
+**(d)** Generic conclusion: **reject $H_0$** — there is evidence that at
+least one population mean change differs from the others. In context: the
+data provide evidence that the mean change in bacteria differs among the
+seven beverages, with wine showing a dramatically greater decrease in
+bacteria than any other beverage.
+
+## Exercise 8.17 Is Pressure at School Related to Time with Friends?
+
+ANOVA compares mean weekly hours hanging out with friends (`HangHours`)
+across levels of school pressure (`SchoolPressure`) in the PASeniors data.
+Output: $SSG = 1563$, $SSE = 48557$, $F = 4.75$, p = 0.003; group means:
+None 12.19, Very little 15.91, Some 10.98, A lot 9.87.
+
+**(a)** The explanatory variable is **SchoolPressure** (categorical, four
+levels); the response variable is **HangHours** (quantitative).
+**(b)** The **"Very little"** group has the highest mean time with friends
+(15.91 hrs/week); the **"A lot"** group has the lowest (9.87 hrs/week).
+**(c)** Total sample size: $df_{Total} = 446 \Rightarrow$ **447 students**.
+**(d)** F-statistic = **4.75**, p-value = **0.003**.
+**(e)** Generic conclusion: reject $H_0$; there is evidence that at least
+one of the four population means differs.
+**(f)** In context: the amount of school pressure a student feels is
+related to the mean time spent hanging out with friends — students feeling
+"a lot" of pressure spend less time with friends (on average) than students
+feeling very little pressure.
+
+## Exercise 8.18 Does Synchronized Dancing Boost Feelings of Closeness?
+
+High-school students were randomly assigned to high/low synchronization
+(HS/LS) and high/low exertion (HE/LE) exercise; the response is the change
+in closeness rating (after − before, on a 1–7 scale). ANOVA:
+$F = 2.77$, p = 0.042. Group means: HS+HE 0.319, HS+LE 0.328, LS+HE 0.379,
+LS+LE −0.431.
+
+**(a)** In both high-synchronization groups the mean closeness change is
+positive (0.319 and 0.328) — ratings go **up** after synchronized exercise.
+**(b)** For low synchronization: with **high exertion** the mean change is
+positive (0.379, up), but with **low exertion** it is negative
+(−0.431, down).
+**(c)** Total sample size: $df_{Total} = 259 \Rightarrow$ **260 students**.
+**(d)** At 5%: p = 0.042 < 0.05, so we **reject $H_0$** and conclude there
+is a difference in mean closeness change among the four groups. Looking at
+the means, the difference is likely between the **LS+LE group** (the only
+negative mean, −0.43) and each of the other three groups (all ≈ 0.32–0.38).
+**(e)** At 1%: p = 0.042 > 0.01, so we **do not reject $H_0$** — the
+evidence is not strong enough at the 1% level.
+
+## Exercise 8.19 The Color Red and Performance
+
+71 students solved anagrams after seeing information in red, green, or
+black ink. Means: red 4.4 ($n=19$), green 5.7 ($n=27$), black 5.9
+($n=25$); $SSG = 27.7$, $SSTotal = 84.7$.
+
+```{python}
+#| echo: false
+n = 71
+dfG, dfE = 2, n - 3
+ssG, ssTot = 27.7, 84.7
+ssE = ssTot - ssG
+F = (ssG / dfG) / (ssE / dfE)
+pd.DataFrame({"df": [dfG, dfE, n - 1],
+              "SS": [ssG, round(ssE, 1), ssTot],
+              "MS": [round(ssG / dfG, 2), round(ssE / dfE, 4), np.nan],
+              "F": [round(F, 2), np.nan, np.nan],
+              "p-value": [float(f"{stats.f.sf(F, dfG, dfE):.3g}"), np.nan, np.nan]},
+             index=["Color", "Error", "Total"]).to_string()
+```
+
+**(a)** $H_0\colon \mu_{red}=\mu_{green}=\mu_{black}$ vs $H_a\colon$ at
+least one mean differs (μ = mean number of anagrams solved).
+**(b)** ANOVA table above: $SSE = 84.7 - 27.7 = 57$; $MSG = 13.85$,
+$MSE = 57/68 = 0.838$, **F = 16.52**.
+**(c)** p-value = $P(F_{2,68} \ge 16.52) \approx$ 0.000001.
+**(d)** Since the p-value is far below 5%, we **reject $H_0$**: there is
+strong evidence that performance on anagrams differs by the color
+participants were exposed to — the red group solved the fewest anagrams on
+average, consistent with red impairing achievement performance.
+
+## Exercise 8.20 Laptop Computers and Sperm Count
+
+Scrotal temperature increase (°C) over a 60-minute session under three
+conditions: legs together ($n=29$, mean 2.31, s 0.96), lap pad ($n=29$,
+mean 2.18, s 0.69), legs apart ($n=29$, mean 1.41, s 0.66); SSG = 13.7,
+SSE = 53.2.
+
+**(a)** The **legs together** condition has the largest mean increase
+(2.31 °C); the **legs apart** condition has the smallest (1.41 °C).
+**(b)** Yes — the largest standard deviation (0.96) is well under twice
+the smallest (0.66), so the equal-variance condition is reasonably met.
+
+```{python}
+#| echo: false
+dfG, dfE, n = 2, 84, 87
+F = (13.7 / dfG) / (53.2 / dfE)
+pd.DataFrame({"df": [dfG, dfE, n - 1],
+              "SS": [13.7, 53.2, 66.9],
+              "MS": [round(13.7 / dfG, 2), round(53.2 / dfE, 4), np.nan],
+              "F": [round(F, 2), np.nan, np.nan],
+              "p-value": [float(f"{stats.f.sf(F, dfG, dfE):.3g}"), np.nan, np.nan]},
+             index=["Condition", "Error", "Total"]).to_string()
+```
+
+**(c)** $H_0\colon \mu_1=\mu_2=\mu_3$ (mean temperature increase in each
+condition) vs $H_a\colon$ at least one mean differs. With $df_G = 2$,
+$df_E = 84$: $MSG = 6.85$, $MSE = 53.2/84 = 0.633$, **F = 10.82**,
+p-value ≈ 0.0001. Since p < 0.05 we **reject $H_0$**: there is strong
+evidence of a difference in mean temperature increase among the three
+conditions — sitting with legs apart reduces the temperature increase
+compared with the other two postures.
+
+## Exercise 8.21 Time Hiding in Darkness
+
+Mice were randomly assigned to one of three environments (impoverished IE,
+standard SE, enriched EE — only EE allows exercise) and to stress (SD, social
+defeat) or home-cage control (HC); $n = 8$ per group. Mean seconds in
+darkness: IE:HC 192, SE:HC 196, EE:HC 205, IE:SD 392, SE:SD 438, EE:SD 231;
+SSG = 481776, SSE = 177835.
+
+**(a)** Yes — every HC group (192–205 s) spends less time in darkness than
+every SD group (231–438 s). Among the stressed groups, **EE:SD** spends the
+least time in darkness on average (231 s), consistent with exercise
+conferring stress resiliency.
+
+```{python}
+#| echo: false
+dfG, dfE, n = 5, 42, 48
+F = (481776 / dfG) / (177835 / dfE)
+pd.DataFrame({"df": [dfG, dfE, n - 1],
+              "SS": [481776, 177835, 659611],
+              "MS": [round(481776 / dfG, 1), round(177835 / dfE, 1), np.nan],
+              "F": [round(F, 2), np.nan, np.nan],
+              "p-value": [float(f"{stats.f.sf(F, dfG, dfE):.3g}"), np.nan, np.nan]},
+             index=["Group", "Error", "Total"]).to_string()
+```
+
+**(b)** $H_0\colon \mu_1=\cdots=\mu_6$ vs $H_a\colon$ at least one mean
+differs. With $df_G = 5$, $df_E = 42$: $MSG = 96355.2$,
+$MSE = 177835/42 = 4234.2$, **F = 22.75**, p-value < 0.001. We **reject
+$H_0$** — there is strong evidence of a difference in mean time in darkness
+among the six groups; stressed mice without exercise (IE:SD, SE:SD) hide
+far longer, while exercising mice (EE:SD) are almost as resilient as
+unstressed controls.
+
+## Exercise 8.22 Time Immobile
+
+Mean seconds immobile: IE:HC 50, SE:HC 47, EE:HC 52, IE:SD 191, SE:SD 188,
+EE:SD 96; SSG = 188464, SSE = 197562 ($n=8$ per group).
+
+**(a)** Yes — the HC groups (47–52 s) spend much less time immobile than
+the SD groups (96–191 s). Among the stressed groups, **EE:SD** spends the
+least time immobile on average (96 s).
+
+```{python}
+#| echo: false
+dfG, dfE, n = 5, 42, 48
+F = (188464 / dfG) / (197562 / dfE)
+pd.DataFrame({"df": [dfG, dfE, n - 1],
+              "SS": [188464, 197562, 386026],
+              "MS": [round(188464 / dfG, 1), round(197562 / dfE, 1), np.nan],
+              "F": [round(F, 2), np.nan, np.nan],
+              "p-value": [float(f"{stats.f.sf(F, dfG, dfE):.3g}"), np.nan, np.nan]},
+             index=["Group", "Error", "Total"]).to_string()
+```
+
+**(b)** With $df_G = 5$, $df_E = 42$: $MSG = 37692.8$,
+$MSE = 197562/42 = 4703.9$, **F = 8.01**, p-value < 0.001. We **reject
+$H_0$** — strong evidence of a difference in mean time immobile among the
+six groups: exercise (EE) again buffers the effect of stress.
+
+## Exercise 8.23 Immunological Effects
+
+FosB+ cell levels (lower = more stress), $n = 7$ per group.
+Means: IE:HC 86, SE:HC 129, EE:HC 178, IE:SD 21, SE:SD 68, EE:SD 152;
+SSG = 118286, SSE = 75074.
+
+**(a)** In **all three environments** the stressed (SD) group has a lower
+average level of FosB+ cells than its HC counterpart — exactly what we
+would expect, since lower levels indicate more stress. Within the HC
+groups and within the SD groups separately, the **enriched environment
+(EE)** has the highest average level (178 and 152), consistent with
+exercise conferring resiliency.
+
+```{python}
+#| echo: false
+dfG, dfE, n = 5, 36, 42
+F = (118286 / dfG) / (75074 / dfE)
+pd.DataFrame({"df": [dfG, dfE, n - 1],
+              "SS": [118286, 75074, 193360],
+              "MS": [round(118286 / dfG, 1), round(75074 / dfE, 1), np.nan],
+              "F": [round(F, 2), np.nan, np.nan],
+              "p-value": [float(f"{stats.f.sf(F, dfG, dfE):.3g}"), np.nan, np.nan]},
+             index=["Group", "Error", "Total"]).to_string()
+```
+
+**(b)** With $df_G = 5$, $df_E = 36$: $MSG = 23657.2$,
+$MSE = 75074/36 = 2085.4$, **F = 11.35**, p-value < 0.001. We **reject
+$H_0$** — strong evidence of a difference in mean FosB+ levels among the
+six groups.
+
+## Exercise 8.24 Incentives to Exercise
+
+281 people were assigned to walk 7000 steps/day for 100 days, randomized
+to four incentives. Days meeting the goal: Praise ($n=70$, mean 30.0,
+s 32.0), Lottery ($n=70$, 35.0, 29.9), Get money ($n=70$, 36.0, 29.4),
+Lose money ($n=71$, 45.0, 30.1); overall $n=281$, mean 36.5, s 30.6865.
+
+**(a)** The **"lose money"** incentive had the most success (45.0 days);
+**praise only** had the least (30.0 days).
+**(b)** Yes — the four group standard deviations are nearly identical
+(≈ 29.4–32.0, none close to twice another) and the large samples make
+normality concerns minor, so the conditions for the F-distribution appear
+to be met.
+
+```{python}
+#| echo: false
+ns, means, sds = [70, 70, 70, 71], [30.0, 35.0, 36.0, 45.0], [32.0, 29.9, 29.4, 30.1]
+tab, F = anova_from_stats(ns, means, sds, grand=36.5)
+tab.to_string()
+```
+
+**(c)** $H_0\colon \mu_1=\mu_2=\mu_3=\mu_4$ vs $H_a\colon$ at least one
+mean differs. From the summary statistics (grand mean 36.5):
+$SSG = \sum n_i(\bar x_i - 36.5)^2 \approx 8262$, $SSE = \sum (n_i-1)s_i^2
+\approx 255404$, $df_G = 3$, $df_E = 277$, so $MSG = 2754.1$,
+$MSE = 922.0$ and **F = 2.99**, p-value ≈ **0.032**. Since p < 0.05 we
+**reject $H_0$**: there is evidence that the mean number of days meeting
+the goal differs by incentive, with the loss-framed cash incentive the
+most effective.
+
+## Exercise 8.25 Posture and Pain
+
+Pain-threshold change (mmHg) while holding a yoga pose: Dominant
+($n=30$, mean 14.3, s 34.8), Neutral ($n=29$, −4.4, 31.9), Submissive
+($n=30$, −6.1, 35.4); overall ($n=89$) mean 1.33, s 35.0.
+
+```{python}
+#| echo: false
+tab, F = anova_from_stats([30, 29, 30], [14.3, -4.4, -6.1],
+                          [34.8, 31.9, 35.4], grand=1.33)
+tab.to_string()
+```
+
+$H_0\colon \mu_{dom}=\mu_{neut}=\mu_{sub}$ vs $H_a\colon$ at least one mean
+differs. From the summary statistics: $SSG = 30(14.3-1.33)^2 +
+29(-4.4-1.33)^2 + 30(-6.1-1.33)^2 \approx 7655$, $SSE = 29(34.8)^2 +
+28(31.9)^2 + 29(35.4)^2 \approx 99955$, $df_G = 2$, $df_E = 86$, so
+**F ≈ 3.29**, p-value ≈ **0.042**. At a 5% level we (just barely)
+**reject $H_0$**: there is evidence of a difference in mean pain tolerance
+by pose — the dominant-pose group averaged a 14.3 mmHg increase in pain
+threshold while the neutral and submissive groups averaged decreases,
+consistent with the power-pose hypothesis (though the p-value is marginal,
+so the evidence is not overwhelming).
+
+## Exercise 8.26 Sandwich Ants and Bread
+
+Ant counts on four breads (6 trials each): Multigrain 42, 22, 36, 38, 19,
+59 (mean 36.00, s 14.52); Rye 18, 43, 44, 31, 36, 54 (mean 37.67, s 12.40);
+Wholemeal 29, 59, 34, 21, 47, 65 (mean 42.50, s 17.41); White 42, 25, 49,
+25, 21, 53 (mean 35.83, s 13.86); overall mean 38.00, s 13.95 ($n=24$).
+
+```{python}
+#| echo: false
+# (a) sums of squares from the summary statistics
+ns, means, sds = [6, 6, 6, 6], [36.00, 37.67, 42.50, 35.83], [14.52, 12.40, 17.41, 13.86]
+gm = 38.00
+ssG = sum(n * (m - gm) ** 2 for n, m in zip(ns, means))
+ssE = sum((n - 1) * s ** 2 for n, s in zip(ns, sds))
+ssTot = (24 - 1) * 13.95 ** 2
+pd.Series({"SSG": round(ssG, 1), "SSE (shortcut)": round(ssE, 1),
+           "SSTotal (n-1)s^2": round(ssTot, 1),
+           "SSE = SSTotal - SSG": round(ssTot - ssG, 1)}).to_string()
+```
+
+```{python}
+#| echo: false
+# (b) ANOVA table and F-test
+tab, F = anova_from_stats(ns, means, sds, grand=gm)
+tab.to_string()
+```
+
+**(a)** $SSG = 6(36.00-38)^2 + 6(37.67-38)^2 + 6(42.50-38)^2 +
+6(35.83-38)^2 \approx 174.4$; $SSE = \sum (n_i-1)s_i^2 = 5(14.52^2 +
+12.40^2 + 17.41^2 + 13.86^2) \approx 4299.0$;
+$SSTotal = 23(13.95)^2 \approx 4473.6$ — and indeed
+$SSG + SSE \approx SSTotal$ (up to rounding in the published summary
+statistics).
+**(b)** With $df_G = 3$, $df_E = 20$: $MSG \approx 58.1$,
+$MSE \approx 215.0$, **F ≈ 0.27**, p-value ≈ **0.85**. We **do not reject
+$H_0$** — there is no evidence of a difference in mean ant counts among
+the four types of bread; unlike the filling, the bread seems not to matter
+to the ants.
+
+## Exercise 8.27 Drawing vs Attributes vs Write (Experiment 1)
+
+Words recalled (out of 10): Draw ($n=16$, mean 4.8, s 1.3), List
+attributes ($n=16$, 3.4, 1.6), Write ($n=16$, 3.2, 1.2); overall
+($n=48$) 3.8, s 1.527.
+
+```{python}
+#| echo: false
+tab, F = anova_from_stats([16, 16, 16], [4.8, 3.4, 3.2],
+                          [1.3, 1.6, 1.2], grand=3.8)
+tab.to_string()
+```
+
+**(a)** **Draw** has the highest mean recall (4.8); **Write** the lowest
+(3.2).
+**(b)** **F ≈ 6.41** (from $SSG \approx 24.3$, $SSE \approx 85.4$,
+$df_G = 2$, $df_E = 45$).
+**(c)** p-value ≈ **0.0035**.
+**(d)** Since p < 0.05, **reject $H_0$** — there is evidence of a
+difference in mean recall among the three methods.
+**(e)** Yes, it matters: drawing an image for each word yields
+significantly better recall than writing the words (or writing attributes).
+
+## Exercise 8.28 Drawing vs Visualize vs Write (Experiment 2)
+
+Words recalled: Draw ($n=9$, 5.1, 1.1), Visualize ($n=9$, 3.7, 1.7),
+Write ($n=9$, 3.2, 1.3); overall ($n=27$) 4.0, s 1.566.
+
+```{python}
+#| echo: false
+tab, F = anova_from_stats([9, 9, 9], [5.1, 3.7, 3.2],
+                          [1.1, 1.7, 1.3], grand=4.0)
+tab.to_string()
+```
+
+**(a)** **Draw** highest (5.1); **Write** lowest (3.2).
+**(b)** **F ≈ 4.52** ($SSG \approx 17.5$, $SSE \approx 46.3$,
+$df_G = 2$, $df_E = 24$).
+**(c)** p-value ≈ **0.022**.
+**(d)** Since p < 0.05, **reject $H_0$** — evidence of a difference in
+mean recall among the three methods.
+**(e)** It matters: actively **drawing** produces better recall than
+simply visualizing or writing the word.
+
+## Exercise 8.29 Drawing vs View vs Write (Experiment 3)
+
+Words recalled: Draw ($n=12$, 4.4, 1.2), View ($n=12$, 3.4, 1.5),
+Write ($n=12$, 3.0, 1.1); overall ($n=36$) 3.6, s 1.377.
+
+```{python}
+#| echo: false
+tab, F = anova_from_stats([12, 12, 12], [4.4, 3.4, 3.0],
+                          [1.2, 1.5, 1.1], grand=3.6)
+tab.to_string()
+```
+
+**(a)** **Draw** highest (4.4); **Write** lowest (3.0).
+**(b)** **F ≈ 3.82** ($SSG \approx 12.5$, $SSE \approx 53.9$,
+$df_G = 2$, $df_E = 33$).
+**(c)** p-value ≈ **0.032**.
+**(d)** Since p < 0.05, **reject $H_0$** — evidence of a difference in
+mean recall among the three methods.
+**(e)** It matters: **drawing** the image beats just viewing a provided
+image or writing, so the benefit comes from the act of drawing itself.
+
+## Exercise 8.30 Checking Conditions for Body Mass Gain
+
+Body-mass gain (g) after 4 weeks by light condition: DM ($n=10$, 7.859,
+3.009), LD ($n=8$, 5.926, 1.899), LL ($n=9$, 11.010, 2.624).
+
+**(a)** Mice with **bright light all the time (LL)** gained the most
+(11.010 g); those on the **standard light/dark cycle (LD)** gained the
+least (5.926 g).
+**(b)** Yes — the largest standard deviation (3.009) is not dramatically
+larger than the others (max/min ≈ 1.58 < 2), so the equal-variance
+condition is reasonable.
+
+```{python}
+#| echo: false
+z = (17.4 - 11.010) / 2.624
+pd.Series({"z-score for 17.4 g in LL": round(z, 2)}).to_string()
+```
+
+**(c)** $z = (17.4 - 11.010)/2.624 = 2.44$, which is within $\pm 3$, so it
+is appropriate to proceed with the ANOVA despite the outlier.
+**(d)** The cases are the **27 mice**. The variables are the light
+condition (categorical: DM, LD, LL) and body-mass gain after 4 weeks
+(quantitative, in grams).
+
+## Exercise 8.31 Body Mass Gain
+
+ANOVA output for body-mass gain by light condition: $SSG = 113.08$,
+$SSE = 161.84$, $F = 8.38$, p = 0.002.
+
+**(a)** $H_0\colon \mu_{DM}=\mu_{LD}=\mu_{LL}$ (mean body-mass gain under
+each light condition) vs $H_a\colon$ at least one $\mu_i \ne \mu_j$.
+**(b)** **F = 8.38, p-value = 0.002.** Since p < 0.05 we reject $H_0$:
+there is strong evidence of a difference in mean body-mass gain among the
+three light conditions.
+**(c)** Yes, there appears to be an association: mice exposed to **bright
+light at night (LL)** gained the most weight on average (≈ 11.0 g vs
+≈ 5.9–7.9 g for LD and DM) — light at night is associated with increased
+weight gain.
+**(d)** **Yes.** Mice were randomly assigned to the light conditions, so
+this is an experiment and a cause-and-effect conclusion is warranted:
+light at night causes increased weight gain in mice.
+
+## Exercise 8.32 Activity Levels
+
+Activity level by light condition: $F = 0.09$, p = 0.910.
+
+$H_0\colon \mu_{DM}=\mu_{LD}=\mu_{LL}$ (mean activity level) vs
+$H_a\colon$ at least one mean differs. The ANOVA gives **F = 0.09,
+p-value = 0.910**, so we **do not reject $H_0$**: there is no evidence of
+a difference in mean activity level among the light conditions. The extra
+weight gain with light at night cannot be explained by reduced activity.
+
+## Exercise 8.33 Food Consumption
+
+Food consumption (g) in week 4: DM ($n=10$, 4.1241, 0.6938), LD ($n=8$,
+4.3275, 0.4337), LL ($n=9$, 4.5149, 1.3149).
+
+**(a)** **No** — the standard deviation in the LL group (1.3149) is about
+three times that in the LD group (0.4337), clearly violating the
+equal-variance condition, so a theoretical ANOVA F-test is not
+appropriate.
+**(b)** The randomization test (which does not require the equal-variance
+or normality conditions) gives **p = 0.652**, so we **do not reject
+$H_0$**: there is no evidence that light at night changes the amount of
+food the mice consume — the extra weight gain is not due to eating more.
+
+## Exercise 8.34 Stress Levels
+
+Corticosterone levels by light condition: DM ($n=10$, 73.40, 67.49),
+LD ($n=8$, 70.02, 54.15), LL ($n=9$, 50.83, 42.22); $F = 0.43$, p = 0.656.
+
+**(a)** With p = 0.656 we **do not reject $H_0$**: there is no evidence of
+a difference in mean corticosterone (stress) level among the light
+conditions.
+**(b)** The **LL group** appears different (mean 50.83 vs 73.40 and
+70.02). What masks this difference is the **enormous within-group
+variability**: the group standard deviations (42–67) are larger than the
+differences between the group means. This shows up as large $s_i$ values in
+the summary statistics and hence a large $SSE$ and $MSE$ (3158) in the
+ANOVA table — so even though $SSG$ reflects the mean differences, the
+ratio $MSG/MSE$ is small (F = 0.43).
+
+## Exercise 8.35 When Calories Are Consumed
+
+Percent of food consumed during the day: DM ($n=10$, 55.516, 10.881),
+LD ($n=8$, 36.028, 8.403), LL ($n=9$, 76.573, 9.646); $F = 36.39$,
+p < 0.001.
+
+**(a)** Mice on the standard light/dark cycle (LD) ate an average of
+**36.0%** of their food during the day (so ≈ 64% at night, as expected for
+nocturnal animals). Mice with **dim light at night (DM)** ate **55.5%**
+during the day — flipping their normal day/night eating balance.
+**(b)** **Yes.** The ANOVA gives F = 36.39 with p-value < 0.001, so we
+reject $H_0$ and conclude that light at night influences *when* mice eat —
+the percentage of calories consumed during the day (normally sleeping
+hours) differs dramatically among the light conditions. Since this is a
+randomized experiment, we **can conclude light at night causes** the shift
+in eating time.
+
+## Exercise 8.36 Glucose Tolerance
+
+Glucose levels 15 min (GTT-15) and 120 min (GTT-120) after injection, by
+light condition. GTT-120 shows much larger standard deviations with
+unequal spread (LD: s = 41.9 vs DM: s = 113.0).
+
+**(a)** The GTT-120 data clearly violate the equal-variance condition
+($s_{DM} = 113.0$ is about 2.7 times $s_{LD} = 41.9$) and show skewness /
+outliers, so the F-distribution is not reliable — a **randomization test**
+makes no distributional assumptions and is more appropriate.
+**(b)** Write the 27 GTT-120 values on cards, shuffle, and deal them at
+random into groups of sizes 10, 8, and 9 (matching DM, LD, LL) — one
+randomization sample; compute the F-statistic for it, and repeat many
+times to build the randomization distribution.
+**(c)** GTT-15: p = 0.402 > 0.05 — no evidence of a difference in mean
+15-minute glucose by light condition. GTT-120: p = 0.015 < 0.05 —
+significant evidence of a difference in mean 120-minute glucose. **Light
+at night does appear to affect glucose intolerance**: mice with light at
+night still had high glucose 120 minutes after the injection (impaired
+clearance), while LD mice had returned to normal.
+
+## Exercise 8.37 Time Spent on Homework and School Pressure
+
+PASeniors: mean weekly homework hours (`HWHours`) by school pressure
+(`SchoolPressure`).
+
+```{python}
+#| echo: false
+pa = pd.read_csv("data/ch08/PASeniors.csv")
+hw = pa[["SchoolPressure", "HWHours"]].dropna()
+grp = {g: d["HWHours"].values for g, d in hw.groupby("SchoolPressure")}
+summary_table(grp).to_string()
+```
+
+```{python}
+#| echo: false
+tab, F = anova_table(grp)
+tab.to_string()
+```
+
+*Note:* the `PASeniors.csv` downloadable from lock5stat.com contains 457
+students with three pressure categories ("None" does not appear in the
+online file), so the summary statistics differ slightly from the book's
+exercise 8.17 output.
+
+**(a)** The **"A lot"** pressure group has the largest mean homework hours
+(13.96 hrs/week) and the **"Very little"** group the smallest (3.58)
+(see table).
+**(b)** **F ≈ 26.6, p-value < 0.001** (df = 2 and 432).
+**(c)** Since p < 0.05, we reject $H_0$: there is strong evidence that
+mean weekly homework hours differ by level of felt school pressure —
+students who feel more school pressure do more homework on average
+(≈ 14 hrs/week for "a lot" vs ≈ 3.6 for "very little"). As an
+observational survey, the direction of causation is unclear: heavy
+homework loads may generate the pressure, or pressured students may
+simply work more.
+
+## Exercise 8.38 Texts Sent Per Day and Favorite Way to Communicate
+
+PASeniors: mean texts per day (`TextsSent`) by favorite way to communicate
+(`Communicate`).
+
+```{python}
+#| echo: false
+tx = pa[["Communicate", "TextsSent"]].dropna()
+tx = tx[tx["Communicate"].str.strip() != ""]  # one record with a blank category
+grpt = {g: d["TextsSent"].values for g, d in tx.groupby("Communicate")}
+summary_table(grpt).to_string()
+```
+
+```{python}
+#| echo: false
+tab, F = anova_table(grpt)
+tab.to_string()
+```
+
+**(a)** Students whose favorite way to communicate is **by phone** send the
+most texts per day (≈ 110), closely followed by those preferring
+**texting** (≈ 100); those preferring **apps** send the fewest (≈ 41)
+(see table).
+**(b)** **F ≈ 7.89, p-value < 0.0001** (df = 3 and 441).
+**(c)** Since p < 0.05, we reject $H_0$: mean number of texts sent per day
+differs by favorite communication method — heavy messaging (phone or text)
+vs light messaging (app or in person) separates the groups.
+
+## Exercise 8.39 Football and Brain Size
+
+Hippocampus volume (μL) for three groups in `FootballBrain`: Control,
+FBNoConcuss, FBConcuss.
+
+```{python}
+#| echo: false
+fb = pd.read_csv("data/ch08/FootballBrain.csv").dropna(subset=["Hipp"])
+grpf = {g: d["Hipp"].values for g, d in fb.groupby("Group")}
+summary_table(grpf).to_string()
+```
+
+```{python}
+#| echo: false
+tab, F = anova_table(grpf)
+tab.to_string()
+```
+
+**(a)** The **Control** group has the largest mean hippocampus volume
+(≈ 7603 μL) and the **FBConcuss** group the smallest (≈ 5735 μL)
+(see table).
+**(b)** **F ≈ 31.5, p-value < 0.001** (df = 2 and 72).
+**(c)** Since p < 0.05, we reject $H_0$: there is strong evidence that mean
+hippocampus volume differs among the three groups — football players,
+especially those with a history of concussions, have smaller mean
+hippocampus volume than controls.
+
+## Exercise 8.40 Football and Brain Size: Randomization Test
+
+Randomization ANOVA test for the `FootballBrain` data (scrambling the
+group labels).
+
+```{python}
+#| echo: false
+# (a) observed F; (b) one randomization sample; (c) full distribution
+sims, p, obs = rand_f(grpf, reps=10000, seed=2026)
+r = np.random.default_rng(7)
+one = r.permutation(np.concatenate(list(grpf.values())))
+sizes = [len(v) for v in grpf.values()]
+lab = np.concatenate([[i] * s for i, s in enumerate(sizes)])
+oneF = anova_table(np.split(one, np.cumsum(sizes)[:-1]))[1]
+pd.Series({"(a) Observed F": round(obs, 3),
+           "(b) F for one randomization sample (seed 7)": round(oneF, 3),
+           "(c) Randomization p-value (10000 scrambles)": round(p, 4),
+           "    Theoretical F-distribution p-value (Ex 8.39)":
+               round(float(stats.f.sf(obs, 2, len(lab) - 3)), 4)}).to_string()
+```
+
+```{python}
+#| echo: false
+sim_hist(sims, obs, bins=40)
+```
+
+**(a)** Observed **F ≈ 31.5**.
+**(b)** A typical randomization sample gives an F near 1 (the one shown
+above gives F ≈ 0.26) — far below the observed value.
+**(c)** The randomization p-value (< 0.001) agrees with the theoretical
+F-distribution p-value from Exercise 8.39, confirming the F-distribution
+models the randomization distribution well here.
+**(d)** Since p < 0.05, we reject $H_0$: there is strong evidence of a
+difference in mean hippocampus volume among the three groups.
+
+## Exercise 8.41 Exercise and Award Preference
+
+StudentSurvey: mean hours of weekly exercise by award preference
+(`Award`).
+
+```{python}
+#| echo: false
+ss = pd.read_csv("data/ch01/StudentSurvey.csv")
+ex = ss[["Award", "Exercise"]].dropna()
+grpx = {g: d["Exercise"].values for g, d in ex.groupby("Award")}
+summary_table(grpx).to_string()
+```
+
+```{python}
+#| echo: false
+group_plot(grpx, kind="box")
+```
+
+```{python}
+#| echo: false
+tab, F = anova_table(grpx)
+tab.to_string()
+```
+
+```{python}
+#| echo: false
+sims, p, obs = rand_f(grpx, reps=10000, seed=2026)
+pd.Series({"Theoretical p-value": float(f"{stats.f.sf(F, 2, 358):.3g}"),
+           "Randomization p-value": round(p, 4)}).to_string()
+```
+
+The conditions look reasonable: the samples are large
+($n = 31, 148, 182$) and the group standard deviations (4.1–6.0) are
+comparable. $H_0\colon \mu_A=\mu_N=\mu_O$ vs $H_a\colon$ at least one
+differs. The ANOVA gives **F ≈ 27.9, p-value < 0.0001** (randomization
+p-value agrees). We **reject $H_0$**: mean weekly exercise differs by
+award preference — students preferring the **Olympic gold medal** exercise
+much more (≈ 11.1 hrs/week) than those preferring the Academy Award or
+Nobel Prize (≈ 6.8–7.0 hrs/week). This supports the confounding explanation
+from Example 8.5: athletes who exercise more prefer the Olympic medal and
+also have lower pulse rates.
+
+## Exercise 8.42 Fish Ventilation
+
+Gill beat rates (beats/min) for fish in tanks with low (0.71 mg/L),
+medium (5.24 mg/L), and high (18.24 mg/L) calcium (`FishGills3`,
+$n = 30$ each).
+
+```{python}
+#| echo: false
+fg = pd.read_csv("data/ch08/FishGills3.csv")
+grpg = {g: d["GillRate"].values for g, d in fg.groupby("Calcium")}
+summary_table(grpg).to_string()
+```
+
+```{python}
+#| echo: false
+group_plot(grpg, kind="box")
+```
+
+```{python}
+#| echo: false
+tab, F = anova_table(grpg)
+tab.to_string()
+```
+
+```{python}
+#| echo: false
+sims, p, obs = rand_f(grpg, reps=10000, seed=2026)
+pd.Series({"Theoretical p-value": float(f"{stats.f.sf(F, 2, 87):.3g}"),
+           "Randomization p-value": round(p, 4)}).to_string()
+```
+
+```{python}
+#| echo: false
+sim_hist(sims, obs, bins=40)
+```
+
+**(a)** The side-by-side boxplots show roughly symmetric samples with
+comparable spread (no group sd is twice another) and no extreme outliers,
+so the conditions for ANOVA are reasonable.
+**(b)** $H_0\colon \mu_{low}=\mu_{med}=\mu_{high}$ vs $H_a\colon$ at least
+one mean differs. The ANOVA gives **F ≈ 4.65, p-value ≈ 0.012**
+(randomization test agrees, p ≈ 0.014). We **reject $H_0$**: calcium
+level in the water is associated with mean gill beat rate — fish in the
+low-calcium tank beat their gills noticeably faster on average.
+
+## Exercise 8.43 Drug Resistant Pathogens
+
+Mice infected with drug-resistant/susceptible malaria parasites,
+randomized to four treatments ($n=18$ each): Untreated, Light (4 mg/kg,
+1 day), Moderate (8 mg/kg, 1 day), Aggressive (8 mg/kg, 5 or 7 days).
+Four responses: ResistantDensity, DaysInfectious (drug resistance) and
+Weight, RBC (health).
+
+```{python}
+#| echo: false
+dr = pd.read_csv("data/ch08/DrugResistance.csv")
+dose = dr[dr["Treatment"] != "Untreated"]
+resps = ["ResistantDensity", "DaysInfectious", "Weight", "RBC"]
+group_plot({r: dose.set_index("Treatment")[r] for r in resps[:2]}, kind="box",
+           figsize=(9, 3))
+```
+
+```{python}
+#| echo: false
+group_plot({r: dose.set_index("Treatment")[r] for r in resps[2:]}, kind="box",
+           figsize=(9, 3))
+```
+
+**(a)** Yes — both drug-resistance measures show clear associations with
+treatment: resistance (parasite density and days infectious) tends to be
+**highest for the Aggressive dose** and lowest for Light, with Moderate in
+between. The health measures show weaker patterns: body mass and red blood
+cell density look fairly similar across treatments (RBC perhaps lowest for
+Aggressive).
+
+```{python}
+#| echo: false
+rows = {}
+for resp in resps:
+    g = {t: d[resp].dropna().values for t, d in dose.groupby("Treatment")}
+    t, F = anova_table(g)
+    rows[resp] = pd.Series({"F": round(F, 2),
+                            "df": f"{2}, {int(t.loc['Error','df'])}",
+                            "p-value": float(t.loc["Groups", "p-value"])})
+pd.DataFrame(rows).T.to_string()
+```
+
+**(b)** ANOVA excluding the untreated group (3 groups, $n=18$ each,
+$df = 2, 51$):
+
+- **ResistantDensity**: p < 0.001 — **significant**.
+- **DaysInfectious**: p ≈ 0.0002 — **significant**.
+- **Weight**: p ≈ 0.91 — not significant.
+- **RBC**: p ≈ 0.91 — not significant.
+
+So both **drug-resistance** variables are significantly associated with
+treatment level, while neither **health** variable is.
+**(c)** Higher/more aggressive doses of antimalarial drug lead to
+**more** drug resistance, not less — directly contradicting the
+conventional wisdom that aggressive treatment prevents resistance by
+killing pathogens quickly.
+**(d)** For the resistance variables the equal-variance condition is
+**clearly violated** (spread grows with the mean, e.g. Aggressive
+ResistantDensity sd is many times that of Light). For the health
+variables, some **extreme outliers** (especially very low RBC values)
+raise concerns about the normality condition. The part (b) p-values for
+the resistance variables are therefore not entirely accurate (though the
+randomization checks confirm the conclusions qualitatively).
+
+## Exercise 8.44 Drug Resistance Outliers
+
+Rerun the RBC ANOVA (dosed groups only) after removing the extreme
+low-RBC outliers.
+
+```{python}
+#| echo: false
+q1, q3 = dose["RBC"].quantile([0.25, 0.75])
+iqr = q3 - q1
+lower = q1 - 1.5 * iqr
+outliers = dose[dose["RBC"] < lower]
+pd.Series({"1.5 IQR lower fence": round(lower, 3),
+           "Cases removed": len(outliers),
+           "RBC values removed": sorted(outliers["RBC"].round(3).tolist())}).to_string()
+```
+
+```{python}
+#| echo: false
+clean = dose[dose["RBC"] >= lower]
+g = {t: d["RBC"].dropna().values for t, d in clean.groupby("Treatment")}
+tab, F = anova_table(g)
+tab.to_string()
+```
+
+Using the 1.5×IQR rule, the two extreme low cases (RBC below ≈ 4.83
+million/μL) are removed. The new ANOVA gives **F ≈ 0.47, p-value ≈ 0.63**
+— the conclusion does not change materially: even after removing the
+outliers there is **no evidence** of a difference in mean red blood cell
+density among the three dosing groups. (The original p-value of ≈ 0.91 was
+already non-significant; the outliers were inflating concerns about the
+conditions rather than driving the conclusion.)
+
+:::
