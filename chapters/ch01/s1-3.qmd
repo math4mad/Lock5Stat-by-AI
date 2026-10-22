@@ -1,0 +1,798 @@
+---
+execute-dir: project
+title: "Chapter 1 · Section 1.3"
+subtitle: "Experiments and Observational Studies — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 1.3 of Lock⁵ asks the central question of data collection: **when does an
+association justify a causal conclusion?** In an **observational study** researchers
+merely record the explanatory and response variables as they occur, so a third,
+**confounding variable** — one that is associated with the explanatory variable and
+is itself a cause of the response — may account for the association. In a
+**randomized experiment** the researchers actively impose the explanatory variable
+and assign it at random, which balances confounders between the groups and licenses
+causal conclusions. Well-designed experiments use **control groups** for comparison,
+**placebos** to counter the placebo effect, **blinding** (single- or double-blind)
+to hide who gets which treatment, and enough **replication**; the two standard
+designs are the **randomized comparative experiment** (separate groups) and the
+**matched pairs** experiment (each case measured under both conditions).
+The exercises below are from *Statistics: Unlocking the Power of Data*
+(Lock⁵, 3rd ed., pp. 45–51). Skill Builders 1.76–1.91 classify headline claims,
+hunt for confounders, and tell experiments from observational studies; 1.92–1.94
+revisit questions first asked in Section 1.1; 1.95–1.124 apply the ideas to real
+studies, including several where you design the experiment yourself. Tabs based on
+Lock5 data files include a small executable EDA.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+sns.set_theme(style="whitegrid")
+```
+
+::: {.panel-tabset}
+
+## Exercise 1.76
+
+**“Daily exercise improves mental performance.”**
+*(Skill Builder 1: state whether the claim is one of association and causation, association only, or neither.)*
+
+- **Association and causation.** “Improves” claims both that mental performance
+  differs between people who exercise daily and those who do not (association) and
+  that the exercise is what produces the better performance (causation).
+
+## Exercise 1.77
+
+**“Among college students, no link found between number of friends on social
+networking websites and size of the university.”**
+
+- **Neither association nor causation.** The headline explicitly reports finding
+  *no link*, so no association is claimed — and without an association there is
+  certainly no claim of causation.
+
+## Exercise 1.78
+
+**“Cell phone radiation leads to deaths in honey bees.”**
+
+- **Association and causation.** “Leads to” asserts that the radiation causes the
+  deaths (and, implicitly, that the two are associated).
+
+## Exercise 1.79
+
+**“Wealthy people are more likely than other folks to lie, cheat, and steal.”**
+
+- **Association only.** “More likely than” compares groups — an association between
+  wealth and dishonest behavior — but the headline does not claim that wealth
+  *causes* anyone to behave badly.
+
+## Exercise 1.80
+
+**“Cat owners tend to be more educated than dog owners.”**
+
+- **Association only.** A comparison of education levels between two groups of pet
+  owners, with no causal language anywhere in the headline.
+
+## Exercise 1.81
+
+**“Want to lose weight? Eat more fiber!”**
+
+- **Association and causation.** The advice implies that eating more fiber will
+  *cause* weight loss, not merely that fiber intake and weight happen to be
+  associated.
+
+## Exercise 1.82
+
+**More ice cream sales have been linked to more deaths by drowning.**
+*(Skill Builder 2: give a confounding variable that may help account for the association.)*
+
+- **Confounder: hot weather (season/temperature).** In hot weather people buy more
+  ice cream *and* more people go swimming, so drownings increase. Weather is
+  associated with the explanatory variable (ice cream sales) and is itself a cause
+  of the response (drownings) — exactly the definition of a confounding variable.
+
+## Exercise 1.83
+
+**The total amount of beef consumed and the total amount of pork consumed worldwide
+are closely related over the past 100 years.**
+
+- **Confounder: world population.** As the human population has grown over the past
+  century, total consumption of *both* meats has risen with it. Population is
+  positively associated with each variable and plausibly causes part of both.
+  (Growth of the world economy would serve equally well.)
+
+## Exercise 1.84
+
+**People who own a yacht are more likely to buy a sports car.**
+
+- **Confounder: wealth.** Wealthier people are more likely to own a yacht and also
+  more likely to buy a sports car. Wealth is associated with each variable and
+  helps cause both purchases.
+
+## Exercise 1.85
+
+**Sales of toboggans tend to be higher when sales of mittens are higher.**
+
+- **Confounder: winter weather (cold, snowy conditions).** Cold and snow send
+  people out to buy both toboggans and mittens, producing the association between
+  the two sets of sales.
+
+## Exercise 1.86
+
+**Air pollution is higher in places with a higher proportion of paved ground
+relative to grassy ground.**
+
+- **Confounder: size of the city (degree of urbanization).** Larger, more urban
+  places have both more pavement relative to grass and more traffic and industry,
+  hence more air pollution.
+
+## Exercise 1.87
+
+**People with shorter hair tend to be taller.**
+
+- **Confounder: sex.** Men tend to be taller than women and, on average, wear their
+  hair shorter. Sex is associated with hair length and directly influences height.
+
+## Exercise 1.88
+
+**To examine whether eating brown rice affects metabolism, ask a random sample of
+people whether they eat brown rice and also measure their metabolism rate.**
+*(Skill Builder 3: experiment or observational study?)*
+
+- **Observational study.** The researchers only record an existing habit and measure
+  a variable; nothing is imposed on the cases.
+
+## Exercise 1.89
+
+**To examine whether playing music in a store increases the amount customers spend,
+randomly assign some stores to play music and some to stay silent and compare
+average spending.**
+
+- **Experiment.** The explanatory variable (music vs silence) is actively imposed by
+  the researchers — and randomly assigned, at that.
+
+## Exercise 1.90
+
+**To examine whether planting trees reduces air pollution, plant trees in half of a
+sample of similar city blocks and later measure pollution levels.**
+
+- **Experiment.** The researchers control which blocks receive the treatment
+  (trees), actively imposing the explanatory variable.
+
+## Exercise 1.91
+
+**To examine whether farm-grown salmon contain more omega-3 oils if water is more
+acidic, collect salmon and water samples from multiple fish farms and see if the
+variables are related.**
+
+- **Observational study.** Existing farms are sampled as they are; the acidity of
+  the water is not manipulated.
+
+## Exercise 1.92
+
+**“Is there a sprinting gene?”** *(Revisiting Section 1.1: introduced in Example 1.5
+on page 9 — the *ACTN3* variant tested among world-class sprinters, world-class
+marathon runners, and non-athletes.)*
+
+- **Observational study.** The subjects arrived at their groups (and their genes) on
+  their own; the researchers only recorded which group each person belongs to and
+  whether they have the gene variant. No treatment was assigned to anyone.
+
+## Exercise 1.93
+
+**“Do metal tags on penguins harm them?”** *(Revisiting Section 1.1: Data 1.3 on
+page 10 — 100 penguins followed for 10 years.)*
+
+- **Experiment.** The penguins were *randomly given* either metal or electronic
+  tags, so tag type — the explanatory variable — was assigned by the researchers.
+  Later differences in survival, number of chicks, or foraging time can therefore
+  support causal conclusions.
+
+## Exercise 1.94
+
+**“Are there human pheromones?”** *(Revisiting Section 1.1: three studies on
+page 11 in which men were exposed to the scent of women’s tears or to a salt
+solution. Indicate for each study whether it is an experiment or an observational
+study.)*
+
+- **Study 1 (pad on the upper lip, 25 men):** **Experiment** — researchers applied
+  the “treatment” (tears vs salt solution) and measured how sexually alluring the
+  men rated female faces.
+- **Study 2 (sniffing, 50 men):** **Experiment** — the men were given tears or a
+  salt solution to sniff and testosterone levels were compared.
+- **Study 3 (sniffing, 16 men):** **Experiment** — again the substance sniffed was
+  determined by the researchers, with brain-cell activity as the response.
+- In all three studies the explanatory variable (tears vs salt solution) was
+  actively administered rather than merely observed, which is what makes each an
+  experiment.
+
+## Exercise 1.95
+
+**Salt on Roads and Accidents.** An association is described between the amount of
+salt spread on roads and the number of accidents. Describe a possible confounding
+variable and explain how it fits the definition.
+
+- **Confounder: severity of the winter weather (or volume of traffic).** Towns that
+  spread more salt are typically those with harsher, icier winters and busier roads
+  — and those same conditions themselves cause more accidents. Weather is
+  associated with salt use and is a direct cause of accidents, so it satisfies the
+  definition of a confounding variable.
+
+## Exercise 1.96
+
+**Height and Reading Ability.** In elementary school (grades 1 to 6) taller children
+tend to read at a higher level. A very significant confounding variable influences
+both height and reading ability. What is it?
+
+- **Confounder: age.** Within elementary school, older children are both taller and
+  better readers. Age is associated with height and directly influences reading
+  ability, so it accounts for much of the association between the two.
+
+## Exercise 1.97
+
+**Golfing for a Long Life?** A quote on a health site tells us “golfers’ average
+life expectancy was 5 years longer than other people’s.”
+
+- **(a) Cases:** the people whose life expectancy was reported (golfers and others).
+  **Variables:** whether the person plays golf (**categorical**) and life expectancy
+  (**quantitative**).
+- **(b)** **Observational study** — nobody was assigned to become a golfer; people
+  choose their own pastimes.
+- **(c) Confounder: wealth.** Wealthier people can afford to golf and also enjoy
+  better healthcare, nutrition, and working conditions. Wealth is associated with
+  golfing and itself influences life expectancy, fitting the definition of a
+  confounding variable. (General fitness/activity level would be another candidate.)
+
+## Exercise 1.98
+
+**How to Debate a Science Denier.** 1773 participants first listened to a science
+denier and were then randomly assigned to one of four conditions: no rebuttal,
+topic rebuttal, technique rebuttal, or both. Attitudes toward the science topic
+were measured three times: before participation, after the science denier, and
+after the rebuttal.
+
+- **(a) Cases:** the 1773 participants.
+- **(b) Explanatory variable:** the type of rebuttal received (none / topic /
+  technique / both) — **categorical**. (The three time points organize the repeated
+  attitude measurements, which serve as responses.)
+- **(c)** **Experiment** — the rebuttal condition was randomly assigned.
+- **(d)** **1773 rows** (one per participant). At minimum **4 columns**: the rebuttal
+  condition plus the three attitude measurements (before, after the denier, after
+  the rebuttal); any additional recorded variables would add more columns.
+
+## Exercise 1.99
+
+**Music Volume and Beer Consumption.** Researchers went into bars, controlled the
+music volume according to a randomization scheme, and measured beer consumption.
+Louder music corresponded to more beer consumed. Does this provide evidence that
+louder music causes people to drink more beer? Why or why not?
+
+- **Yes.** The volume was actively manipulated *and* randomly assigned, so
+  confounding variables (type of bar, clientele, time of day, ...) are balanced
+  between the loud and quiet settings. That is precisely the situation in which a
+  causal conclusion is warranted — for the bars and settings studied.
+
+## Exercise 1.100
+
+**Nuts and Cholesterol.** In Study 1, participants were assigned to eat nuts each
+day or to follow a nut-free diet. In Study 2, participants ate their own diets and
+reported how many nuts they consumed. Both studies found nut consumption
+associated with lower LDL cholesterol. Which study provides better evidence that
+nut consumption reduces LDL cholesterol?
+
+- **Study 1.** It is a randomized experiment: the researcher assigns the
+  explanatory variable, so confounding variables (overall diet, health
+  consciousness, income, ...) are balanced between the groups. In Study 2 people
+  choose whether to eat nuts, so nut-eaters may differ systematically in other
+  ways — a classic setup for confounding.
+
+## Exercise 1.101
+
+**Antibiotics in Infancy and Obesity in Adults.** In a mouse study, infant mice
+were *randomly assigned* to receive antibiotics or not, and the treated mice were
+more likely to be obese as adults. A separate human study found that children given
+antibiotics before age one were more likely to be obese as adults. Is the headline
+“Antibiotics in infancy may cause obesity in adults” appropriate:
+
+- **(a) For mice? Yes.** The mouse study randomly assigned the antibiotics, so the
+  association can reasonably be read as causal *for mice*.
+- **(b) For humans? No.** The human study is observational: families differ in many
+  ways associated with both antibiotic use and later obesity, so confounding is not
+  ruled out. The causal headline is not appropriate for humans.
+
+## Exercise 1.102
+
+**Fast-Food Diet and Depression.** In a study of 84 middle-school students,
+researchers measured urinary sodium and potassium (a marker of processed-food
+intake) and evaluated depressive symptoms on a 100-point scale. High sodium and low
+potassium were both associated with higher depression levels.
+
+- **(a)** **Observational study.** Diets were not assigned; sodium and potassium
+  were measured as they occurred.
+- **(b) No.** We cannot conclude that the diet pattern *increases* the likelihood of
+  depression: there is no random assignment, so only an association — not a causal
+  link — has been established.
+- **(c) Possible confounder: stress (or family income).** Students under more
+  stress may both eat more convenient processed food and experience more depressive
+  symptoms. Stress is associated with the explanatory variables and plausibly
+  causes differences in the response, which fits the definition of a confounding
+  variable.
+
+## Exercise 1.103
+
+**Potassium Levels in Spinach.** Spinach leaves from a variety of locations were
+examined; spinach grown in soil with high amounts of iron tends to have lower
+levels of potassium.
+
+- **(a)** Two variables: amount of iron in the soil (**quantitative**) and potassium
+  level in the spinach (**quantitative**).
+- **(b)** The amount of iron in the soil is the **explanatory** variable; potassium
+  level is the response.
+- **(c)** **Observational study** — locations were sampled as found; nothing was
+  applied or assigned.
+- **(d) No.** Observational data cannot establish that iron in the soil *causes*
+  lower potassium in the spinach.
+- **(e) Possible confounder: the overall soil type/composition (or climate) of the
+  location.** Locations with iron-rich soil may differ systematically in other soil
+  minerals or conditions that affect how much potassium spinach absorbs — a
+  variable associated with soil iron that also directly influences potassium levels.
+
+## Exercise 1.104
+
+**Encourage Kids to Read!** Researchers asked parents of 19 American children
+(ages 8–12) about hours spent reading and on screen-based media; each child also
+underwent MRI to assess brain connectivity. More reading was associated with higher
+connectivity; more screen time with lower connectivity.
+
+- **(a)** **19 cases** (the children) and **3 variables**.
+- **(b)** All three variables are **quantitative** (hours of reading, hours of
+  screen media, brain connectivity). **Explanatory variables:** reading hours and
+  screen-time hours; **response variable:** brain connectivity.
+- **(c)** **Observational study** — reading and screen habits were reported, not
+  assigned.
+- **(d) No.** With no random assignment (and only 19 children), we cannot conclude
+  that reading *increases* connectivity; the study shows an association only.
+- **(e) Possible confounder: parental involvement (or family income).** Parents who
+  strongly encourage reading may also provide other enriching experiences.
+  Parental engagement is associated with the child’s reading hours and can
+  itself influence brain development, fitting the definition of a confounder.
+
+## Exercise 1.105
+
+**Want to Be Healthier? Take a Vacation!** Health characteristics (triglycerides,
+cholesterol, blood glucose) were measured for 63 adults, who also reported how many
+vacations they had taken in the last year. More vacations went along with better
+health measures.
+
+- **(a)** **Observational study.**
+- **(b) Confounder: income (or wealth).** People with higher incomes take more
+  vacations and generally have better healthcare, nutrition, and working
+  conditions. Income is associated with taking vacations and itself influences
+  health — the definition of a confounding variable.
+- **(c)** Appropriate conclusions from this study:
+  - **(i) Yes** — the observed association is consistent with this (association is
+    symmetric: healthier people do take more vacations).
+  - **(ii) Yes** — this is the association as reported.
+  - **(iii) No** — a causal claim, not warranted from an observational study.
+  - **(iv) No** — also a causal claim (in the reverse direction).
+- **(d) No.** The title “Take a Vacation!” implies that taking vacations *will*
+  improve health — a causal conclusion the study cannot support.
+
+## Exercise 1.106
+
+**Do Online Cat Videos Improve Mood?** People who clicked on a link were asked
+about their mood before and after the most recent time they watched a cat video.
+Participants reported more energy and more positive emotions afterwards. Can we
+conclude that watching cat videos increases energy and improves emotional state?
+
+- **No.** This is an observational study: participants *chose* whether and when to
+  watch the videos, and no comparison group was randomly assigned. Self-selected
+  participants may differ systematically, and expectation effects are possible, so
+  the before/after differences show association — not causation.
+
+## Exercise 1.107
+
+**Green Spaces Make Kids Smarter.** The study involved 2623 schoolchildren in
+Barcelona: researchers measured greenery around each school and the children’s
+working memories and attention spans. More vegetation went along with better
+memory and attention.
+
+- **(a) Cases:** the 2623 schoolchildren.
+- **(b) Explanatory variable:** the amount of greenery around the child’s school.
+- **(c) Response variable:** working memory and attention span (test performance).
+- **(d) Yes** — “make kids smarter” is causal language.
+- **(e)** **Observational study** — greenery was measured, not assigned.
+- **(f) No** — it is not appropriate to conclude causation from this study.
+- **(g) Confounder: neighborhood wealth / school funding.** Wealthier neighborhoods
+  have both more greenery and better-resourced schools (and families with more
+  resources). Wealth is associated with the explanatory variable and itself
+  influences the response, satisfying the definition of a confounding variable.
+
+## Exercise 1.108
+
+**Infections Can Lower IQ.** Scientists gave an IQ test to Danish men at age 19 and
+examined their hospital records: 35% had been hospitalized with an infection, and
+average IQ was lower for the men who had.
+
+- **(a) Cases:** the Danish men who were tested.
+- **(b) Explanatory variable:** whether the man had been hospitalized with an
+  infection (yes / no) — **categorical**.
+- **(c) Response variable:** IQ score — **quantitative**.
+- **(d) Yes** — “can lower IQ” implies causation.
+- **(e)** **Observational study** — infections were not assigned; existing records
+  were analyzed.
+- **(f) No.** Because the men were not randomly assigned, confounding variables
+  (e.g., socioeconomic background, which affects both infection risk and IQ
+  scores) prevent a causal conclusion.
+
+## Exercise 1.109
+
+**Sitting Is the New Smoking.** A large 2015 study followed 69,260 men and 77,462
+women; among women, those who spent more leisure time sitting were significantly
+more likely to get cancer.
+
+- **(a) Explanatory variable:** amount of leisure time spent sitting
+  (**quantitative**, possibly grouped into levels); **response variable:** whether
+  the woman developed cancer (**categorical**).
+- **(b)** **Observational study** — a cohort followed over time; no one was assigned
+  to a sitting regimen.
+- **(c) No.** The study shows an association. Women who sit more may differ in
+  exercise habits, weight, diet, or healthcare access, and any of these could
+  account for the difference, so causation is not established.
+- **(d) No.** The study cannot show that sitting *does not* cause cancer — it found
+  an association, and failure to prove causation is not evidence of no causation.
+
+## Exercise 1.110
+
+**Late Night Eating.** 44 people aged 21–50 were limited to 4 hours of sleep per
+night for three nights. On the fourth night all stayed up until 4 am, but they
+were *randomized* into two groups: one had access only to water from 10 pm, while
+the other kept unlimited access to food and drink. The fasting group performed
+significantly better on reaction-time tests and had fewer attention lapses.
+
+- **(a) Explanatory variable:** late-night access to food (food and drink vs water
+  only) — **categorical**; **response variable:** performance on reaction-time and
+  attention tests (**quantitative**).
+- **(b)** **Randomized experiment** — participants were randomized to the two
+  late-night conditions.
+- **(c) Yes.** Because the explanatory variable was randomly assigned, the group
+  difference in performance can reasonably be attributed to the late-night eating
+  itself: eating late at night worsens some of the typical effects of sleep
+  deprivation.
+- **(d) No — confounding variables are unlikely to be a problem.** Randomization
+  balances confounders (age, sleep habits, diet, ...) between the two groups on
+  average, which is exactly why randomized experiments support causal conclusions.
+
+## Exercise 1.111
+
+**Does Early Language Reduce Tantrums?** A study recorded the language skill level
+and the number of tantrums for a sample of preschoolers; early language skills
+were associated with fewer tantrums.
+
+- **(a)** **Observational study.**
+- **(b) No.** “Reduce” is causal language, but the study supports at most an
+  association between language skills and tantrums — no treatment was assigned.
+- **(c) Potential confounder: age.** Older preschoolers tend to have better
+  language skills *and* fewer tantrums, so age is associated with the explanatory
+  variable and directly influences the response. (Parenting quality would be
+  another reasonable choice.)
+
+## Exercise 1.112
+
+**Does Buying Organic Food Improve Your Health?** In the 2009–2010 NHANES survey,
+46% of people who had bought organic food reported their health as very good or
+excellent, versus only 33% of those who had not. Three possible explanations:
+(i) causal association, (ii) association due to confounding, (iii) no actual
+association (chance).
+
+- **(a) No.** NHANES simply records what people already do — nothing is assigned —
+  so the study provides no evidence that the two groups were comparable to begin
+  with. There is no randomization to balance the groups, so confounding is very
+  much alive.
+- **(b) Potential confounder: income (or general health consciousness).** People
+  who buy organic tend to be wealthier, and income also buys better healthcare and
+  healthier food overall; the health-conscious also exercise more and smoke less.
+- **(c) No.** Because explanation (ii) — confounding — has not been ruled out, the
+  study does not provide convincing evidence that buying organic food improves
+  general health.
+
+*Data:* `data/ch01/NHANES.csv` (NHANES 2009–2010 subset, n = 4716), downloaded from
+<https://www.lock5stat.com/datasets3e/NHANES.csv>. The file reproduces the numbers
+in the exercise: 46% vs 33% report very good or excellent health — and it also
+exposes the confounder:
+
+```{python}
+#| echo: false
+nh = pd.read_csv("data/ch01/NHANES.csv")
+nh.head()
+```
+
+```{python}
+#| echo: false
+pct = nh.groupby("Organic")["HealthBinary"].apply(
+    lambda s: (s == "Very good / Excellent").mean())
+pd.DataFrame({
+    "n": nh.groupby("Organic").size(),
+    "Pct very good/excellent health": (pct * 100).round(1),
+    "Mean income": nh.groupby("Organic")["Income"].mean().round(0),
+})
+```
+
+Organic buyers do report better health — but they also earn about \$1000 more on
+average, the very confounding described in (b):
+
+```{python}
+#| echo: false
+#| fig-cap: Self-reported health by organic-food purchase, as proportions within each group
+ct = pd.crosstab(nh["Organic"], nh["Health"], normalize="index")[
+    ["Poor", "Fair", "Good", "Very good", "Excellent"]]
+fig, ax = plt.subplots(figsize=(6, 3.2))
+ct.plot.bar(ax=ax, rot=0,
+            color=["#c44e52", "#dd8452", "#ccb974", "#4c72b0", "#2f5f8f"])
+ax.set_xlabel("Bought organic food")
+ax.set_ylabel("Proportion")
+ax.legend(title="Health", fontsize=8)
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 1.113
+
+**Does Eating Organic Food Make Fruit Flies Live Longer?** For a high-school
+science project, a 16-year-old *randomly divided* fruit flies into two groups, fed
+one group organic food and the other conventional food, and found the organic group
+lived an average of 3.25 days longer.
+
+- **(a) Yes.** The flies were **randomly divided** into the two groups, so
+  confounding variables (sex, age, genetics, cage conditions, ...) are balanced
+  between groups by design. The study provides evidence against explanation (ii):
+  the groups did not differ to begin with.
+- **(b)** Not needed here — randomization means there should be no *systematic*
+  difference between the groups at the outset. (In a small sample the groups could
+  still differ by chance, but that is explanation (iii), not confounding.)
+- **(c) Yes.** With random assignment ruling out confounding, and explanation (iii)
+  (chance) addressed in Chapter 5, the evidence supports the causal conclusion that
+  eating organic food causes fruit flies to live longer — in this experiment, at
+  least.
+
+## Exercise 1.114
+
+**Goldilocks Effect: Read to Your Kids! (Part 2).** Each of 27 four-year-olds was
+presented with stories in all three formats (audio, illustrated, animated) while an
+MRI machine measured brain connectivity. Audio and animation showed low
+connectivity; the illustrated format showed the highest.
+
+- **(a)** **A matched pairs type experiment.** Each child is measured under *all
+  three* conditions, so each child serves as their own control, and the formats are
+  actively presented by the researchers. (More generally, a within-subjects
+  randomized experiment.)
+- **(b) Yes.** Because the treatments were imposed on the children and each child is
+  compared against themselves, we can conclude that the illustrated format produces
+  higher brain connectivity than listening to a story or watching an animated
+  version for children like these.
+- **(c)** Randomization should determine the **order** in which each child
+  experiences the three formats (randomly permuted for each child), so that order
+  or fatigue effects cannot favor one format over the others.
+
+## Exercise 1.115
+
+**Sleep and Recognition of Facial Expressions.** 18 healthy young adults were shown
+70 images of facial expressions both after a full night of sleep and after 24 hours
+awake, with the order randomly determined. People were much worse at recognizing
+expressions after being kept awake.
+
+- **(a) Explanatory variable:** sleep condition (full night’s sleep vs sleep
+  deprived) — **categorical**; **response variable:** ability to recognize facial
+  expressions, e.g. accuracy on the 70 images — **quantitative**.
+- **(b)** **Randomized experiment** — and since every volunteer is tested under both
+  conditions, it is a **matched pairs** experiment.
+- **(c) Yes.** The condition (and its order) was randomly assigned, so the worse
+  performance after sleep deprivation can be attributed causally to missing a night
+  of sleep.
+- **(d) No.** Here the explanatory variable — quality of REM sleep — was **not
+  randomly assigned**; it is an observed characteristic, so this part is an
+  observational comparison. Confounding variables (e.g., overall sleep health)
+  prevent a causal conclusion.
+
+## Exercise 1.116
+
+**Diet Cola and Weight Gain in Humans.** American senior citizens who drink diet
+soda regularly experience a greater increase in weight and waist circumference than
+those who do not.
+
+- **(a) No.** This is an observational study, so confounding is possible: for
+  example, people who are already gaining weight may *switch* to diet soda
+  (reverse causation), or diet-soda drinkers may differ in overall diet or health
+  consciousness. The association alone does not establish that diet soda causes
+  weight gain.
+- **(b)** Together the two studies strengthen the case: the randomized rat
+  experiment (Exercise 1.70) shows that in a controlled setting the association
+  persists even without confounding, which makes the causal explanation more
+  plausible for humans as well. Still, the human evidence remains observational —
+  so the combined studies suggest diet cola *may* cause weight gain in humans, but
+  they do not prove it.
+
+## Exercise 1.117
+
+**Urban Brains and Rural Brains.** A 2010 study showed city dwellers have a 21%
+higher risk of anxiety disorders and a 39% higher risk of mood disorders. A 2011
+follow-up scanned the brains of city and country dwellers during a stressful math
+test and found greater activity in stress centers for urban dwellers.
+
+- **(a)** The 2010 study is an **observational study** — people already lived where
+  they lived.
+- **(b) No.** Confounding variables (income, lifestyle, access to healthcare, ...)
+  could explain the difference, so causation cannot be concluded.
+- **(c)** The 2011 study is also an **observational study** with respect to living
+  location — dwelling was not assigned (only the stressful test was imposed on
+  everyone).
+- **(d)** Explanatory variable: whether the person lives in a city or the country —
+  **categorical**. Response variable: level of activity in the stress centers of
+  the brain — **quantitative**.
+- **(e) No.** The 2011 study is still observational; people were not randomly
+  assigned to live in cities, so confounding variables could account for the
+  different brain activity.
+
+## Exercise 1.118
+
+**Split the Bill?** Suppose you design an experiment to see whether agreeing in
+advance to split a restaurant bill equally affects what people order. The
+variables recorded are the type of payment (split or individual), the sex of each
+person, the number of items ordered, and the cost of each person’s order. Identify
+which variables are explanatory and which are response, and whether each
+explanatory variable should be randomly assigned.
+
+- **Explanatory variables:**
+  - **Payment type (split vs individual)** — the treatment whose effect on ordering
+    is of interest. It **should be randomly assigned**: for example, randomly
+    decide which tables pay individually and which agree to split the bill, so
+    that the two kinds of tables are comparable otherwise.
+  - **Sex** — a pre-existing characteristic that may also help explain what people
+    order, so it is explanatory, but it **cannot (and should not) be randomly
+    assigned**.
+- **Response variables:** the number of items ordered and the cost of each
+  person’s order.
+
+*Data:* `data/ch01/SplitBill.csv` (n = 48), downloaded from
+<https://www.lock5stat.com/datasets3e/SplitBill.csv> — data from exactly this
+experiment, with the four variables named in the exercise:
+
+```{python}
+#| echo: false
+sb = pd.read_csv("data/ch01/SplitBill.csv")
+sb.head()
+```
+
+```{python}
+#| echo: false
+sb.groupby("Payment")[["Items", "Cost"]].mean().round(2)
+```
+
+Tables (or diners) that agreed to split the bill ordered more items and spent
+about \$13.60 more per person — the kind of treatment effect the experiment in the
+exercise is designed to detect:
+
+```{python}
+#| echo: false
+#| fig-cap: Cost of each person's order by payment arrangement in the split-bill experiment
+fig, ax = plt.subplots(figsize=(4.5, 3))
+sns.boxplot(data=sb, x="Payment", y="Cost", ax=ax, color="#4c72b0", width=0.45)
+ax.set_xlabel("Payment arrangement")
+ax.set_ylabel("Cost per person")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 1.119
+
+**Be Sure to Get Your Beauty Sleep!** 23 subjects were photographed twice — once
+after a good night’s sleep and once after being kept awake for 31 hours — with
+hair, make-up, clothing, and lighting identical. Observers rated the photographs
+for attractiveness, and the two averages were compared.
+
+- **(a) Explanatory variable:** sleep condition (well rested vs sleep deprived) —
+  **categorical**; **response variable:** attractiveness rating given by the
+  observers — **quantitative**.
+- **(b)** **Experiment** — the sleep condition was imposed. Because each subject
+  appears in both photographs, it is a **matched pairs** design.
+- **(c) Yes.** Only the sleep differed between the two photographs of the same
+  face; everything else was held constant, and observers (blind to condition)
+  rated the sleep-deprived photos lower. Sleep deprivation *causes* people to look
+  less attractive, as measured by these ratings.
+
+## Exercise 1.120
+
+**Do Antidepressants Work?** Design a randomized comparative experiment to test
+whether fluoxetine is effective at reducing depression, using 50 participants and
+the change on a standard depression questionnaire as the response variable.
+
+- **(a) Randomization:** randomly divide the 50 participants into two groups of 25;
+  one group receives fluoxetine for the study period, the other does not. Random
+  assignment balances severity of depression and all other background variables
+  between the groups.
+- **(b) Placebo:** the control group receives an identical-looking pill with no
+  active ingredient, so expectations (the placebo effect) are comparable in the
+  two groups and any difference can be attributed to the fluoxetine itself.
+- **(c) Double-blind:** neither the participants nor the people who interact with
+  them and record the questionnaire scores know who is taking fluoxetine; only,
+  say, the statistician analyzing the data knows the group labels.
+
+## Exercise 1.121
+
+**Do Children Need Sleep to Grow?** About 60% of a child’s growth hormone is
+secreted during sleep, so lack of sleep might stunt growth.
+
+- **(a)** Explanatory variable: amount of sleep (e.g., reduced sleep vs normal
+  sleep); response variable: growth, such as height gained over the study period
+  (or a measured growth-hormone level).
+- **(b)** Randomized comparative experiment: recruit children and, with consent,
+  randomly assign some to a reduced-sleep schedule and others to their normal
+  sleep schedule for a fixed period; then compare the average growth of the two
+  groups.
+- **(c)** It is difficult and unethical because deliberately depriving children of
+  sleep could stunt their growth — a serious and possibly permanent harm inflicted
+  with no compensating benefit to the child — and guardians would be unlikely to
+  consent. So objective experimental verification is hard to obtain, and we rely
+  on observational evidence.
+
+## Exercise 1.122
+
+**Carbo Loading.** Does carbo loading (eating lots of carbohydrates the day
+before) actually improve athletic performance the following day? You recruit 50
+athletes.
+
+- **(a) Randomized comparative experiment:** randomly split the 50 athletes into
+  two groups; one group eats a high-carbohydrate diet the day before the test and
+  the other eats a normal (lower-carb) diet. All athletes then complete the same
+  endurance test, and the two groups’ performances are compared.
+- **(b) Matched pairs experiment:** each athlete completes the endurance test
+  twice — once after a day of carbo loading and once after a day of normal eating —
+  with the order of the two conditions randomly assigned for each athlete and
+  enough recovery time between tests. Each athlete’s two performances are then
+  compared.
+- **(c)** The **matched pairs** design is better here. Athletic ability varies
+  enormously from person to person, and matching each athlete against themselves
+  removes that person-to-person variability, making it much easier to detect a
+  real effect of the carbohydrate loading.
+
+## Exercise 1.123
+
+**Alcohol and Reaction Time.** Design a randomized experiment on 40 college
+seniors, with the response variable the time to react to an image on a screen
+after drinking either alcohol or water.
+
+- **(a) A randomized comparative experiment:** randomly divide the 40 seniors into
+  two groups of 20 — randomization decides who drinks alcohol and who drinks
+  water — then measure each person’s reaction time and compare the average
+  reaction times of the two groups.
+- **(b) A matched pairs experiment:** every senior takes the reaction-time test
+  twice, once after drinking alcohol and once after drinking water, with the order
+  of the two conditions randomly assigned for each participant (and enough time
+  allowed between for the alcohol to wear off). Each person’s two reaction times
+  are compared.
+
+## Exercise 1.124
+
+**Causation and Confounding.** Causation does not necessarily mean that there is
+no confounding variable. Give an example of an association between two variables
+that have a causal relationship *and* have a confounding variable.
+
+- **Example:** amount of fertilizer used and crop yield. Fertilizer genuinely
+  *causes* higher yields, yet the observed association is also partly confounded
+  by **soil quality**: farmers with better soil tend to use more fertilizer (they
+  expect more from good fields), and good soil itself produces higher yields. Soil
+  quality is associated with fertilizer use and also directly affects yield — a
+  confounding variable coexisting with a genuine causal relationship.
+- (Another valid example: exercise and fitness, confounded by a health-conscious
+  diet — people who exercise also tend to eat better, and diet directly affects
+  fitness.)
+
+:::

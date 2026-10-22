@@ -1,0 +1,634 @@
+---
+execute-dir: project
+title: "Chapter 1 · Section 1.2"
+subtitle: "Sampling from a Population — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section 1.2 of Lock⁵ asks the question behind every statistic: **how were the
+data collected?** A *population* is the collection of all cases we want to
+understand, while a *sample* is the subset we actually measure. A statistic
+computed from a sample can be generalized to the population only when the
+sample was selected **randomly** — a *simple random sample* gives every set of
+*n* cases the same chance of being chosen. Non-random methods (voluntary
+response, convenience samples, haphazard picking) invite **sampling bias**, and
+even a random sample can be ruined by a leading question, nonresponse, or
+untruthful answers. Two properties of a statistic matter: its *bias* (does it
+hit the population value on average?) and its *variance* (how much does it
+bounce from sample to sample?) — randomness is what keeps both under control.
+The exercises below are from *Statistics: Unlocking the Power of Data*
+(Lock⁵, 3rd ed., pp. 27–31). Skill Builders 1.34–1.51 drill the definitions,
+1.52–1.56 ask “is it biased?”, and the rest apply the ideas to real studies;
+tabs based on Lock5 data files include a small executable EDA.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+sns.set_theme(style="whitegrid")
+```
+
+::: {.panel-tabset}
+
+## Exercise 1.34
+
+**To estimate the size of trout in a lake, an angler records the weight of 12
+trout he catches over a weekend.**
+*(Skill Builder 1: population or sample?)*
+
+- **Sample.** The 12 trout caught are a subset of all the trout in the lake.
+  The sample mean weight of the 12 fish would be a statistic used to estimate
+  the population mean weight of all trout in the lake.
+
+## Exercise 1.35
+
+**A subscription-based music website tracks its total number of active users.**
+
+- **Population.** The website tracks *every* active user, not a subset — the
+  count is a parameter, computed from the whole population of users.
+
+## Exercise 1.36
+
+**The US Department of Transportation announces that of the 250 million
+registered passenger vehicles in the US, 2.1% are electro-gas hybrids.**
+
+- **Population.** The percentage is computed from *all* 250 million registered
+  passenger vehicles — the entire population — so 2.1% is a parameter, not a
+  statistic from a sample.
+
+## Exercise 1.37
+
+**A questionnaire to understand athletic participation on a college campus is
+emailed to 50 college students, and all of them respond.**
+
+- **Sample.** The 50 students are a subset of the campus community. Since all
+  50 responded there is no nonresponse bias, but the data still describe only
+  a sample of the population of all students at the college.
+
+## Exercise 1.38
+
+**A sociologist conducting a survey at a mall interviews 120 people about
+their cell phone use.**
+*(Skill Builder 2: describe the sample and a reasonable population.)*
+
+- **Sample:** the 120 people interviewed at the mall.
+- **Reasonable population:** all people who shop at that mall (perhaps more
+  broadly, people who shop at malls). Because mall patrons are a convenience
+  sample, generalizing beyond mall shoppers would be risky.
+
+## Exercise 1.39
+
+**Five hundred Canadian adults are asked if they are proficient on a musical
+instrument.**
+
+- **Sample:** the 500 Canadian adults questioned.
+- **Reasonable population:** all Canadian adults.
+
+## Exercise 1.40
+
+**A cell phone carrier sends a satisfaction survey to 100 randomly selected
+customers.**
+
+- **Sample:** the 100 randomly selected customers (strictly, those who
+  respond).
+- **Reasonable population:** all customers of the cell phone carrier.
+
+## Exercise 1.41
+
+**The Nielsen Corporation attaches databoxes to televisions in 1000 households
+throughout the US to monitor what shows are watched and produce the Nielsen
+Ratings.**
+
+- **Sample:** the 1000 US households with databoxes on their televisions.
+- **Reasonable population:** all US households with televisions.
+
+## Exercise 1.42
+
+**To estimate the proportion of Americans who support changing the drinking
+age from 21 to 18, a random sample of 100 college students are asked “Would
+you support a measure to lower the drinking age from 21 to 18?”**
+*(Skill Builder 3: (a) sample, (b) population of interest, (c) population we can generalize to.)*
+
+- **(a) Sample:** the 100 college students.
+- **(b) Population of interest:** all Americans.
+- **(c) Generalize to:** college students — particularly students at similar
+  colleges. College students likely view the drinking age differently than the
+  general adult population.
+
+## Exercise 1.43
+
+**To estimate the average number of tweets from all Twitter accounts in 2019,
+an author randomly selected 10 of his followers and counted their tweets.**
+
+- **(a) Sample:** the 10 followers who were selected.
+- **(b) Population of interest:** all Twitter accounts in 2019.
+- **(c) Generalize to:** the author's followers (people who follow this
+  particular account) — nothing broader.
+
+## Exercise 1.44
+
+**To investigate interest across all residents of the US in a new type of ice
+skate, a random sample of 1500 people in Minnesota are asked about their
+interest.**
+
+- **(a) Sample:** the 1500 people in Minnesota.
+- **(b) Population of interest:** all residents of the US.
+- **(c) Generalize to:** residents of Minnesota — perhaps people living in
+  similarly cold-weather climates, but not the whole country.
+
+## Exercise 1.45
+
+**To determine the height distribution of female high school students, the
+rosters are collected from 20 randomly selected high school girls basketball
+teams.**
+
+- **(a) Sample:** the members of the 20 sampled girls basketball teams.
+- **(b) Population of interest:** all female high school students.
+- **(c) Generalize to:** female high school basketball players — basketball
+  players tend to be taller, so the height distribution would be biased for
+  the population of interest.
+
+## Exercise 1.46
+
+**The population is incoming students at a particular university. Each name is
+thrown into a hat, the names are mixed, and 20 names (each corresponding to a
+different student) are drawn.**
+*(Skill Builder 4: random sample or not?)*
+
+- **Random sample.** Every student has an equal chance of being drawn, the
+  names are mixed, and no student is listed twice — this is a simple random
+  sample.
+
+## Exercise 1.47
+
+**The population is the approximately 25,000 protein-coding genes in human
+DNA. Each gene is assigned a number from 1 to 25,000, and software randomly
+selects 100 numbers, yielding a sample of 100 genes.**
+
+- **Random sample.** Numbering the population and letting software pick the
+  numbers is exactly the technology-based equivalent of drawing names from a
+  hat.
+
+## Exercise 1.48
+
+**The population is all employees at a company. All employees are emailed a
+link to a survey.**
+
+- **Not a random sample** (as described). Inviting everyone is an attempt at a
+  census, not a random selection of a subset. The eventual sample consists of
+  whoever chooses to respond — a voluntary response sample — and there is no
+  guarantee it represents all employees.
+
+## Exercise 1.49
+
+**The population is adults between the ages of 18 and 22. A sample of 100
+students is collected from a local university, and each student at the
+university had an equal chance of being selected.**
+
+- **Not a random sample from the given population.** Only students at the
+  local university can be chosen, so adults aged 18–22 who are not students
+  there have no chance of being included. The sample is random within the
+  university's students, but that is a different population.
+
+## Exercise 1.50
+
+**The population is all trees in a forest. We walk through the forest and pick
+out trees that appear to be representative of all the trees.**
+
+- **Not a random sample.** This is a haphazard, judgment-based selection;
+  human choice tends to oversample some kinds of trees (big, healthy, easy to
+  reach) and undersample others.
+
+## Exercise 1.51
+
+**The population is all people who visit the website CNN.com. All visitors are
+invited to take part in the daily online poll.**
+
+- **Not a random sample.** Everyone is invited, but the sample consists only
+  of visitors who volunteer to click — a classic voluntary response sample.
+
+## Exercise 1.52
+
+**Ask a random sample of students at the library on a Friday night “How many
+hours a week do you study?” to estimate the average for all college
+students.**
+*(Is it biased?)*
+
+- **Biased.** Students found at the library on a Friday night are plausibly
+  the campus's heaviest studiers — people who study little are elsewhere. The
+  estimate of average weekly study hours would almost certainly be too high.
+  A random sample only removes sampling bias if it is drawn from the whole
+  population of interest, not from a subgroup.
+
+## Exercise 1.53
+
+**Ask a random sample of people in a school district, “Excellent teachers are
+essential to the well-being of children in this community, and teachers truly
+deserve a salary raise this year. Do you agree?”**
+
+- **Biased.** This is a leading question: the wording stacks the deck in favor
+  of agreement before the respondent answers. The estimated proportion
+  supporting a raise would be inflated (wording bias, not sampling bias).
+
+## Exercise 1.54
+
+**Take 10 apples off the top of a truckload of apples and measure their
+bruising to estimate average bruising for the whole truckload.**
+
+- **Biased.** The 10 apples are not randomly selected — they come from one
+  convenient location. Bruising is likely to differ by position in the load
+  (apples on top were loaded last; apples at the bottom bear the weight of the
+  pile), so the top-of-the-load sample is not representative.
+
+## Exercise 1.55
+
+**Take a random sample of one type of printer and test each printer to see
+how many pages it will print before the ink runs out; use the average to
+estimate the average for all printers of this type.**
+
+- **Not biased.** The sample is randomly selected from exactly the population
+  of interest (printers of this type), so the sample average is a reasonable
+  estimate of the population average — provided the printers are tested under
+  the same conditions.
+
+## Exercise 1.56
+
+**Email a random sample of students at a university asking whether the
+university should fund an ultimate frisbee team; a small number reply, and
+the replies are used to estimate support among all students.**
+
+- **Biased.** Even though the initial sample was random, only a small,
+  self-selected group replied. Students who care about ultimate frisbee are
+  far more likely to respond, so the estimated support would be inflated —
+  a nonresponse / voluntary response bias.
+
+## Exercise 1.57
+
+**Do Parents Regret Having Children?** The *Kansas City Star* selected a
+random sample of parents from Kansas City and asked “If you had it to do over
+again, would you have children?” In this sample, 94% said “Yes.” To what
+population can this statistic be generalized?
+
+- To **parents in Kansas City** — that is where the random sample was drawn.
+  Randomness earns generalization only as far as the sampling frame: the 94%
+  is a trustworthy estimate for Kansas City parents, not for all parents in
+  the US. (Recall Data 1.4: a voluntary write-in poll of parents gave 30%,
+  while a random national sample gave about 91%.)
+
+## Exercise 1.58
+
+**Wearing a Uniform to Work.** The website fox6now.com held an online poll
+asking “What do you think about the concept of having an everyday uniform for
+work, like Steve Jobs did?” Of the people who answered, 24% loved the idea,
+58% hated it, and 18% already wore a uniform to work.
+
+- **(a)** Unlikely. This is a voluntary online poll: respondents choose
+  whether to participate, so people with strong opinions about uniforms are
+  overrepresented, and the audience is limited to visitors of one local news
+  website.
+- **(b)** No. Because the respondents are self-selected and non-representative,
+  the 24% cannot be generalized to all adult workers.
+
+## Exercise 1.59
+
+**Canadians Stream Music.** In a random sample of 3500 Canadian consumers,
+about 71% report that they regularly stream music.
+
+- **(a)** Yes, likely. The consumers were *randomly selected* from the
+  population of Canadian consumers, so the sample should be representative
+  (barring nonresponse or untruthful answers).
+- **(b)** Yes. With a random sample it is reasonable to estimate that about
+  71% of all Canadian consumers regularly stream music; the true percentage
+  should be close to the sample percentage.
+
+## Exercise 1.60
+
+**Climate Change.** In June 2018, a poll asked a random sample of 1000 US
+adults whether global warming will be a serious problem for the United States:
+51% said very serious, 27% somewhat serious, and 21% not serious.
+
+- **(a) Sample:** the 1000 US adults polled. **Intended population:** all US
+  adults.
+- **(b)** Yes. Since the sample was randomly selected from US adults, it is
+  reasonable to estimate that about 21% of all US adults think global warming
+  will not be a serious problem.
+
+## Exercise 1.61
+
+**Do You Use a Food Delivery App?** A 2019 eMarketer study asked 800 US
+smartphone users whether they had used a food delivery app at least once in
+the last month; 16.3% had. Of those, 27.6% used DoorDash, 26.7% Grubhub, 25.2%
+UberEats, and the rest another app.
+
+- **(a) Sample:** the 800 US smartphone users surveyed. **Intended
+  population:** US smartphone users (the population to whom eMarketer wants to
+  speak is smartphone users, roughly US adults with smartphones).
+- **(b) Cases:** the 800 smartphone users. **Variables:** whether the person
+  used a food delivery app in the last month (yes/no) — **categorical**; and,
+  for users, which app was used (DoorDash / Grubhub / UberEats / other) —
+  **categorical**. Note the second variable is recorded only for the subset
+  who answered yes.
+
+## Exercise 1.62
+
+**Pennsylvania High School Seniors.** `PASeniors` contains a random sample of
+457 Pennsylvania Grade-12 students drawn by the US Census at School website
+from students who matched those criteria between 2010 and 2019. For each
+group below, discuss whether generalizing the sample results would be
+reasonable.
+
+- **(a) The 457 students in the original sample:** trivially yes — statistics
+  such as the sample mean describe these 457 cases exactly; no generalization
+  is needed.
+- **(b) All Pennsylvania high school seniors who participated in the Census at
+  School survey:** reasonable. The 457 were randomly selected from exactly
+  this group, so results generalize well to it.
+- **(c) All Pennsylvania high school seniors:** more questionable. Only
+  seniors whose schools/teachers opted into Census at School can be sampled,
+  and participation is voluntary — participants may differ systematically
+  (more engaged in math and science projects, for example) from seniors who
+  never took part. Generalize with caution.
+- **(d) All students in the United States who participated in Census at
+  School:** no. The sample is restricted to Pennsylvania and to Grade 12;
+  students in other states and grades had no chance of being included.
+
+*Data:* `data/ch01/PASeniors.csv` (n = 457, 36 variables), downloaded from
+<https://www.lock5stat.com/datasets3e/PASeniors.csv>.
+
+```{python}
+#| echo: false
+pas = pd.read_csv("data/ch01/PASeniors.csv")
+pd.DataFrame({"Survey year": pas["Year"].value_counts().sort_index()})
+```
+
+The sample spans the 2010–2019 window of the Census at School project; every
+case is a Pennsylvania student who chose to participate — the boundary of
+generalization discussed above.
+
+## Exercise 1.63
+
+**How Easily are You Influenced?** Asked to mentally simulate ten tosses of a
+fair coin by writing H's and T's, over 80% of a random sample of people wrote
+Heads as the first flip. When the instructions said “Tails and Heads,”
+participants were more likely to start with Tails; with a purple/orange
+imaginary coin, they started with whichever color was mentioned first.
+
+- **(a)** This is **wording bias, not sampling bias** — the sample itself was
+  random. The bias enters through how the question presents the options: the
+  first option mentioned is preferentially chosen (the primacy effect).
+  (People are also simply bad at simulating randomness.)
+- **(b)** Present **Option W first**. Since people gravitate to the first
+  option listed, leading with W stacks the choice in favor of the option you
+  hope they pick.
+
+## Exercise 1.64
+
+**Does Chocolate Milk Come from Brown Cows?** A US National Dairy Council
+survey appeared to show that 7% of Americans (about 16.4 million people)
+believe chocolate milk comes from brown cows; the sampling method was never
+made public.
+
+- **(a)** We cannot know. Without knowing how the sample was determined we
+  cannot judge whether generalizing to all Americans is appropriate, and a
+  dairy advocacy group hoping for a fun, shareable headline had every
+  incentive to produce a striking number. Plausible biasing schemes include
+  an opt-in online poll, or sampling only from audiences likely to joke
+  around (e.g., a comedy-show audience), either of which would inflate the
+  “brown cows” percentage.
+- **(b)** Yes — the wording invites bias. Respondents were forced to choose
+  among “(a) Brown cows, (b) Black and white spotted cows, (c) I don’t know”:
+  both real options are cows, “I don’t know” nudges people to guess between
+  them, and no “other” option is offered. A fairer wording would be
+  open-ended — “Where does chocolate milk come from?” — allowing answers such
+  as “from cows, with chocolate flavoring added” or “none of the above.”
+
+## Exercise 1.65
+
+**How Many People Wash Their Hands after Using the Washroom?** Harris
+Interactive researchers stood in public restrooms (at Turner Field in
+Atlanta, Penn Station and Grand Central in New York, the Museum of Science
+and Industry and Shedd Aquarium in Chicago, and the San Francisco Ferry
+Terminal) pretending to comb their hair while observing patrons. Of over 6000
+people observed, 85% washed; 93% of women and 77% of men.
+
+- **(a) Cases:** the 6000+ restroom patrons observed. **Variables:** whether
+  the person washed their hands (yes/no) — **categorical**; gender —
+  **categorical**; the restroom/location where the person was observed —
+  **categorical**. All variables as recorded are categorical.
+- **(b)** In the telephone survey over 96% claimed they always wash, versus
+  85% actually observed. People do not answer truthfully about embarrassing
+  behavior: they report what they *should* do, not what they *do* (social
+  desirability bias). Observation does not depend on the subject's candor,
+  which is exactly why the two numbers differ so much.
+
+## Exercise 1.66
+
+**Teaching Ability.** In a sample survey of professors at the University of
+Nebraska, 94% described themselves as “above average” teachers.
+
+- **(a) Sample:** the University of Nebraska professors surveyed. **(b) —
+  population:** all professors at the University of Nebraska.
+- **(b)** No. Nothing above suggests the professors were selected in a biased
+  way; the sample comes from the group of interest. The red flag here is not
+  sampling bias.
+- **(c)** No. It is logically impossible for 94% of teachers to be above
+  average. The professors' self-ratings are not truthful measures of teaching
+  ability — most people rate themselves favorably — so the statistic measures
+  self-image, not the quantity it claims to estimate.
+
+## Exercise 1.67
+
+**Effects of Alcohol and Marijuana.** In 1986 the Australian Federal Office of
+Road Safety tested combinations of alcohol and marijuana on mood and
+performance. Participants were volunteers who responded to advertisements on
+two rock radio stations in Sydney; each volunteer was given a randomly
+determined combination of the two drugs. Is the sample likely representative
+of all Australians?
+
+- **No.** The sample consists of self-selected volunteers from the audience of
+  two Sydney rock stations — plausibly younger, more risk-tolerant, and more
+  interested in drugs than the average Australian. Note the randomization was
+  in *assigning treatments*, which supports causal conclusions, but says
+  nothing about *how the sample was chosen* — that was no random sample of all
+  Australians. At best, results generalize to similar young adults who would
+  volunteer for such a study.
+
+## Exercise 1.68
+
+**What Percent of Young Adults Move Back in with Their Parents?** The Pew
+Research Center polled a random sample of n = 808 US residents aged 18–34; 24%
+had moved back in with their parents for economic reasons after living on
+their own. Is this a representative sample of all US residents aged 18–34?
+
+- **Yes, likely.** The sample was randomly selected from exactly the target
+  population (US residents aged 18–34), so it should be representative of that
+  group. As always, the estimate also depends on truthful answers and
+  manageable nonresponse, but the method of selection itself is sound.
+
+## Exercise 1.69
+
+**Do Cat Videos Improve Mood?** Dr. Jessica Gall Myrick posted an online
+survey on Facebook and Twitter about feelings before and after the last cat
+video watched; everyone who clicked and completed it was included. Over 6000
+people completed the survey, generally reporting more energy and more positive
+emotions afterwards.
+
+- **(a)** No. This is a self-selected (voluntary response) sample of people
+  who happened to see the link and chose to complete it — not a simple random
+  sample from any defined target population.
+- **(b)** Several other bias channels: cat lovers are overrepresented among
+  those who click; the questions rely on recall and self-report of mood;
+  the wording of the questions can shape answers; and links spread through
+  networks of like-minded friends, compounding the selection bias. People
+  also may not accurately remember or admit their moods.
+
+## Exercise 1.70
+
+**Diet Cola and Weight Gain in Rats.** Rats fed yogurt sweetened with a
+zero-calorie artificial sweetener gained more weight and body fat than rats
+fed sugar-sweetened yogurt. News articles implied that people who drink diet
+soda gain more weight. Explain why we cannot conclude that.
+
+- The study was on **rats, not people**. Even a flawless experiment on rats
+  only establishes cause and effect for rats; metabolism differs between
+  species, so the result cannot automatically be generalized to humans. (The
+  experiment itself was well designed — the issue is the leap from rats to
+  people, not the internal validity.)
+
+## Exercise 1.71
+
+**Armoring Military Planes.** In WWII the US military recorded bullet holes on
+B-24 bombers that returned from missions; most holes were in the wings and
+tail, so the military proposed armoring those regions. Abraham Wald argued
+instead for armoring the *center* of the plane. What was his argument?
+
+- **Survivorship bias.** The sample includes only planes that *made it back*.
+  Holes in the wings and tail show places a plane can be hit and still return;
+  planes hit in the center (engines, cockpit) never came back to be counted.
+  The *missing* data — the absent holes in the center of returning planes —
+  reveal where hits are fatal, so that is where armor belongs.
+
+## Exercise 1.72
+
+**Employment Surveys.** US employment statistics rely on the Current
+Population Survey (CPS), sampling about 60,000 US households for employment
+status, job type, and demographics of each resident, and the Current
+Employment Statistics (CES) survey, sampling 140,000 nonfarm businesses and
+government agencies for payroll jobs, pay rates, and related information.
+
+- **(a) CPS population:** all US households (the residents of the United
+  States living in households).
+- **(b) CES population:** all nonfarm businesses and government agencies in
+  the US.
+- **(c)** 
+  - i. Do larger companies tend to have higher salaries? → **CES** (firms are
+    the cases).
+  - ii. What percentage of Americans are self-employed? → **CPS** (people in
+    households are the cases).
+  - iii. Are married men more or less likely to be employed than single men?
+    → **CPS**.
+
+## Exercise 1.73
+
+**National Health Statistics.** The CDC's NHANES interviews and examines a
+random sample of about 5000 people in the US each year; the NHAMCS collects
+information from hospital records for a random sample of individuals treated
+in hospital emergency rooms.
+
+- **(a)** NHANES findings generalize to the **US population** (people living
+  in the US).
+- **(b)** NHAMCS findings generalize to **emergency room visits in the US**
+  (people treated in hospital emergency rooms), not to the general population.
+- **(c)**
+  - i. Are overweight people more likely to develop diabetes? → **NHANES**
+    (needs a sample of people, not ER visitors).
+  - ii. What proportion of ER visits involve sports-related injuries? →
+    **NHAMCS**.
+  - iii. Difference in average ER waiting time between male and female
+    patients? → **NHAMCS**.
+  - iv. What proportion of US residents have visited an ER in the past year? →
+    **NHANES** (a random sample of US residents can simply be asked).
+
+## Exercise 1.74
+
+**Interviewing the Film Crew on Hollywood Movies.** There were 1295 movies
+made in Hollywood between 2012 and 2018. For a documentary, a random sample of
+5 movies will be selected for in-depth crew interviews. Assuming the movies
+are numbered 1 to 1295, use a random number generator to select the sample.
+
+- Number the movies 1–1295 and let the generator pick five numbers; the
+  movies with those numbers are the sample. With seed 2026 the selected
+  numbers, matched to the Lock5 `HollywoodMovies` file, are:
+
+*Data:* `data/ch01/HollywoodMovies.csv` (n = 1295), downloaded from
+<https://www.lock5stat.com/datasets3e/HollywoodMovies.csv>.
+
+```{python}
+#| echo: false
+hm = pd.read_csv("data/ch01/HollywoodMovies.csv")
+rng = np.random.default_rng(2026)
+picks = np.sort(rng.choice(np.arange(1, 1296), size=5, replace=False))
+sel = hm.iloc[picks - 1][["Movie", "Genre", "AudienceScore", "Year"]].copy()
+sel.insert(0, "Number", picks)
+sel
+```
+
+Every set of five movies has the same chance of being chosen — this is a
+simple random sample. Different samples give different statistics: with 10,000
+replications of “sample 5 movies and average their AudienceScore,” the
+statistic centers on the population mean but bounces from sample to sample,
+which is the sampling variability Chapter 3 will quantify.
+
+```{python}
+#| echo: false
+#| fig-cap: "Sampling distribution of the mean AudienceScore over 10000 random samples of 5 movies"
+rng = np.random.default_rng(2026)
+pop = hm["AudienceScore"].dropna().to_numpy()
+means = np.array([pop[rng.choice(len(pop), size=5, replace=False)].mean()
+                  for _ in range(10000)])
+fig, ax = plt.subplots(figsize=(6, 3.5))
+ax.hist(means, bins=40, color="#4c72b0", edgecolor="white")
+ax.axvline(pop.mean(), color="#c44e52", lw=2,
+           label=f"Population mean = {pop.mean():.1f}")
+ax.axvline(means.mean(), color="#55a868", lw=2, ls="--",
+           label=f"Mean of sample means = {means.mean():.1f}")
+ax.set_xlabel("Mean AudienceScore in a sample of 5 movies")
+ax.set_ylabel("Samples")
+ax.legend()
+plt.tight_layout()
+plt.show()
+print(f"center (mean of 10000 sample means) = {means.mean():.2f}; "
+      f"spread (std dev) = {means.std():.2f}")
+```
+
+## Exercise 1.75
+
+**Sampling Some Starbucks Stores.** The Starbucks chain has about 24,000
+retail stores in 70 countries. A member of the administration wishes to visit
+six stores, randomly selected. Suppose the stores are numbered 1 to 24,000;
+use a random number generator to select the numbers for the 6 stores.
+
+- Number the stores 1–24,000 and select six *distinct* numbers (a store
+  visited twice would waste a visit, so we sample without replacement). With
+  seed 2026:
+
+```{python}
+#| echo: false
+rng = np.random.default_rng(2026)
+stores = np.sort(rng.choice(np.arange(1, 24001), size=6, replace=False))
+pd.DataFrame({"Store number (1-24000)": stores})
+```
+
+These six numbers identify the stores to visit. Each store — and each set of
+six stores — has the same chance of being chosen, so the sample is a simple
+random sample of the chain's stores.
+
+:::

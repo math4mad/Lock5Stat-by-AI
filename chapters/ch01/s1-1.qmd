@@ -15,7 +15,7 @@ and **categorical** when it places each case into a group (yes/no answers,
 brands, regions). When one variable helps explain or predict another, the first
 is the **explanatory variable** and the second is the **response variable**.
 The exercises below are from *Statistics: Unlocking the Power of Data*
-(Lock⁵, 3rd ed., pp. 13–16). Skill Builders 1.1–1.10 drill the definitions; the
+(Lock⁵, 3rd ed., pp. 13–17). Skill Builders 1.1–1.10 drill the definitions; the
 rest apply them to real studies, and tabs based on Lock5 data files include a
 small executable EDA.
 
@@ -461,5 +461,175 @@ ax.set_ylabel("Students")
 plt.tight_layout()
 plt.show()
 ```
+
+## Exercise 1.25
+
+**US College Scorecard.** The data in `CollegeScores` contain information from
+the US Department of Education's College Scorecard on all postsecondary
+educational institutions in the US. For each question, decide whether the
+answer gives a value for a **quantitative variable**, a **categorical
+variable**, or is **not a value for a variable** in this dataset.
+
+- **(a)** What is the total tuition and fees for in-state students at the
+  school? → **Quantitative** — a dollar amount, the variable `TuitionIn`.
+- **(b)** How many of these schools are located in the Northeast? → **Not a
+  value for a variable**: it is a count computed across all cases. The
+  case-level variable `Region` (Northeast / Midwest / Southeast / West /
+  Territory) is categorical.
+- **(c)** Is the school public, private, or for profit? → **Categorical**, the
+  variable `Control` (Public / Private / Profit).
+- **(d)** How many undergraduates are enrolled at the school? →
+  **Quantitative**, the variable `Enrollment`.
+- **(e)** What percentage of undergraduates at the school are part-time
+  students? → **Quantitative**, the variable `PartTime`.
+- **(f)** Which school has the highest average faculty salary? → **Not a value
+  for a variable**: the answer names a case (a school) singled out by a summary
+  statistic. The case-level variable `FacSalary` (average faculty salary) is
+  quantitative.
+
+*Data:* `data/ch01/CollegeScores.csv` (n = 6141, 37 variables), downloaded
+from <https://www.lock5stat.com/datasets3e/CollegeScores.csv>.
+
+```{python}
+#| echo: false
+cs = pd.read_csv("data/ch01/CollegeScores.csv")
+cs[["Name", "Control", "Region", "Enrollment", "PartTime",
+    "TuitionIn", "FacSalary"]].head()
+```
+
+Like (c) and (f) in Exercise 1.24, the quantities in (b) and (f) live at the
+sample level, not the case level:
+
+```{python}
+#| echo: false
+pd.DataFrame({
+    "Sample-level quantity": ["Schools in the Northeast",
+                              "School with the highest faculty salary"],
+    "Value": [(cs["Region"] == "Northeast").sum(),
+              cs.loc[cs["FacSalary"].idxmax(), "Name"]],
+})
+```
+
+```{python}
+#| echo: false
+#| fig-cap: "Public, private, and for-profit institutions in the College Scorecard data"
+fig, ax = plt.subplots(figsize=(5, 3))
+cs["Control"].value_counts().plot.bar(ax=ax, color="#4c72b0")
+ax.set_xlabel("Control")
+ax.set_ylabel("Schools")
+plt.tight_layout()
+plt.show()
+```
+
+## Exercise 1.26
+
+**Hookahs and Health.** Hookahs are waterpipes used for smoking flavored
+tobacco. One study of 3770 university students in North Carolina found that
+40% had smoked a hookah at least once, many claiming the smoke is safer than
+cigarette smoke. A second study observed people at a hookah bar; a third
+measured tar, nicotine, and heavy metals in samples of hookah smoke. For each
+of the three studies, identify the individual cases, the variables, and
+whether each variable is quantitative or categorical.
+
+- **Study 1 (the survey):** cases are the 3770 university students; variables:
+  whether the student has ever smoked a hookah (yes / no) — **categorical**;
+  beliefs about the safety of hookah smoke vs cigarette smoke —
+  **categorical**.
+- **Study 2 (the hookah bar):** cases are the people (smoking sessions)
+  observed; variables: length of the session — **quantitative**; frequency of
+  puffing — **quantitative**; depth of inhalation — **quantitative**.
+- **Study 3 (the chemical analysis):** cases are the samples of hookah smoke;
+  variables: the amount of tar, nicotine, and heavy metals in the sample —
+  each **quantitative**.
+
+## Exercise 1.27
+
+**Is Your Nose Getting Bigger?** Unlike most body parts, noses and ears keep
+growing throughout our lifetime. A study recorded the sex of its 859
+participants and reported "Age significantly influenced all analyzed
+measurements," including volume, surface area, height, and width of noses,
+with larger male increments in nasal dimensions.
+
+- **(a)** Six variables are mentioned: age, sex, and the four nasal
+  measurements (volume, surface area, height, width).
+- **(b)** One variable is **categorical** (sex); five are **quantitative**
+  (age, volume, surface area, height, width).
+- **(c)** With cases as rows and variables as columns, the dataset would have
+  **859 rows** (one per participant) and **6 columns**.
+
+## Exercise 1.28
+
+**Don't Text While Studying!** For the 2015 Intel Science Fair, two brothers
+recruited 47 classmates: each read two passages and answered questions on
+both, with no distractions for one passage and incoming text messages while
+reading the other. Scores were significantly worse when texting — even for
+students confident of their multitasking abilities.
+
+- **(a) Cases:** the 47 classmates who took part in the study.
+- **(b) Variables:** score on the passage read without distractions —
+  **quantitative**; score on the passage read while receiving texts —
+  **quantitative**; whether the participant thinks they are good at
+  multitasking (yes / no) — **categorical**.
+- **(c) Dataset size:** 47 rows and 3 columns.
+
+## Exercise 1.29
+
+**Help for Insomniacs.** Forty people diagnosed with insomnia were randomly
+divided into two groups of 20 each; one group received a one-hour cognitive
+behavioral therapy (CBT) session, the other received no treatment. Three
+months later, 14 of the therapy group reported sleep improvements vs only 3 in
+the other group.
+
+- **(a) Cases:** the 40 people diagnosed with insomnia in the study.
+- **(b) Variables:** treatment received (CBT session vs no treatment) —
+  **categorical**; whether sleep improved three months later (yes / no) —
+  **categorical**.
+- **(c) Dataset size:** 40 rows and 2 columns.
+
+## Exercise 1.30
+
+**How Are Age and Income Related?** An economist collects data from many
+people; how the information is recorded determines whether the variables are
+quantitative or categorical.
+
+- **Both quantitative:** record each person's age in years and income in
+  dollars, so each variable takes numerical values for which arithmetic
+  (differences, averages) makes sense.
+- **Both categorical:** record each person's age as an age group (e.g., under
+  30 / 30–50 / over 50) and income as an income bracket (e.g., under \$30k /
+  \$30k–\$60k / over \$60k), so each variable simply places people into
+  groups.
+
+## Exercise 1.31
+
+**Political Party and Voter Turnout.** To investigate "Does voter turnout
+differ by political party?", we could sample registered voters — for example,
+from public voter files, or via a survey shortly after an election.
+
+- **Cases:** the registered voters in the sample.
+- **Variables:** political party (Democrat / Republican / Independent /
+  Other) — **categorical**; whether the person voted in the last election
+  (yes / no) — **categorical**.
+
+## Exercise 1.32
+
+**Wealth and Happiness.** To investigate "Are richer people happier?", we
+could survey a sample of people (or use an existing national survey that asks
+both income and happiness questions).
+
+- **Cases:** the people in the sample.
+- **Variables:** wealth, e.g. annual income or net worth — **quantitative**;
+  happiness, e.g. a self-rating on a 1–10 scale — **quantitative** (or a
+  category such as very / fairly / not happy — **categorical**).
+
+## Exercise 1.33
+
+**Choose Your Own Question.** *Question:* "Do students who regularly eat
+breakfast do better on exams?" *Data collection:* survey a sample of students
+about their breakfast habits and obtain their scores on a common exam.
+
+- **Cases:** the students in the sample.
+- **Variables:** whether the student regularly eats breakfast (yes / no) —
+  **categorical**; exam score — **quantitative**.
 
 :::
