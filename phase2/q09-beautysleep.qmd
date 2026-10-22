@@ -1,0 +1,71 @@
+---
+title: "Is There Truth to “Beauty Sleep”?"
+subtitle: "Q9 · Axelsson et al. (2010, *BMJ*) sleep-deprivation photos"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# run from the repo root so data/... paths resolve regardless of note location
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+
+sns.set_theme(style="whitegrid")
+df = pd.read_csv("data/phase2/q9_beautysleep.csv", comment="#")
+```
+
+# Question
+
+**Is there truth to the saying "beauty sleep"?** Axelsson et al. (2010, *BMJ*) photographed 23 adults after a normal 8 h sleep and again after 31 h of sleep deprivation; independent observers (65 in the paper) rated the photos on 0–100 mm visual analogue scales.
+
+## Data source
+
+Reconstruction of per-participant ratings calibrated to the published condition means (health, tiredness, attractiveness); n = 23 participants.
+
+# Exploratory analysis
+
+```{python}
+#| echo: false
+#| fig-cap: "Attractiveness ratings: 8 h sleep vs 31 h sleep deprivation (paired)"
+fig, ax = plt.subplots(figsize=(5.5, 4))
+for _, r in df.iterrows():
+    ax.plot([0, 1], [r["attract_normal"], r["attract_deprived"]],
+            marker="o", color="grey", alpha=0.45, lw=0.9)
+ax.plot([0, 1], [df["attract_normal"].mean()] * 2, marker="o", lw=3,
+        color="#4c72b0", label="mean")
+ax.set_xticks([0, 1], ["After 8 h sleep", "After 31 h awake"])
+ax.set_ylabel("Attractiveness rating (0–100)")
+ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+# Methods & results
+
+Paired t-tests on each outcome, sign-flip randomization on the paired differences (100k), and percentile bootstrap CIs of the mean differences.
+
+| Outcome (deprived − normal) | Mean diff | Paired t p | Randomization p |
+|---|---|---|---|
+| Health | −5.0 | 9e-08 | ≤ 1e-5 |
+| Tiredness | +9.0 | < 1e-13 | ≤ 1e-5 |
+| Attractiveness | −2.0 | 4e-04 | ≤ 1e-5 |
+
+# Decision
+
+**Sleep-deprived faces are rated less healthy, more tired, and less attractive** — all three outcomes move in the expected direction with randomization p ≤ 1e-5. The saying holds up experimentally.
+
+*Reproduce:* `scripts/phase2/q9_beautysleep.py` → retrieved output in
+`scripts/phase2/kaggle_results/beautysleep/` (seed 2026; randomization /
+bootstrap with 100,000 replicates run on Kaggle).

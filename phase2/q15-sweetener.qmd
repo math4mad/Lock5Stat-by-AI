@@ -1,0 +1,66 @@
+---
+title: "Do Artificial Sweeteners Cause Weight Gain?"
+subtitle: "Q15 · Fowler et al. (2008, *Obesity*), San Antonio Heart Study"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# run from the repo root so data/... paths resolve regardless of note location
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+
+sns.set_theme(style="whitegrid")
+df = pd.read_csv("data/phase2/q15_sweetener.csv", comment="#")
+```
+
+# Question
+
+**Do artificial sweeteners cause weight gain?** Fowler et al. (2008, *Obesity*) followed 3,682 San Antonio Heart Study participants for 7–8 years, comparing diet-soda users with non-users on BMI change and overweight/obesity incidence.
+
+## Data source
+
+Baseline 2×2 back-calculated from the published figures; ΔBMI SDs derived from published CIs. Observational cohort — users vs non-users were not randomized.
+
+# Exploratory analysis
+
+```{python}
+#| echo: false
+#| fig-cap: "Mean BMI change over 7–8 years by diet-soda consumption"
+d = df[df["metric"] == "mean_dbmi_kg_m2"].sort_values("value")
+fig, ax = plt.subplots(figsize=(6.5, 3.6))
+ax.barh(d["group"], d["value"], color="#4c72b0")
+ax.set_xlabel("Mean ΔBMI (kg/m² over follow-up)")
+plt.tight_layout()
+plt.show()
+```
+
+# Methods & results
+
+Two-proportion z and Fisher exact for the overweight/obesity contrast, odds ratio with bootstrap CI, 100k-replicate randomization; published incidence ORs and adjusted ΔBMI reported alongside.
+
+| Analysis | Result |
+|---|---|
+| Overweight/obesity, user vs non-user | OR = 1.38, z = 4.44, p = 8.9e-6 · Fisher p = 1.0e-5 · rand. p = 2e-5 |
+| ΔBMI over 7–8 y | users +1.48 vs non-users +1.01 kg/m² (+47%, published p < 0.0001) |
+| Published incidence ORs | 1.93 (overweight), 2.03 (obesity) |
+
+# Decision
+
+A **strong observational association** — consistent in the cross-section and the incidence analyses. But causation is unproven: reverse causality (overweight people switching to diet soda) and confounding by baseline adiposity remain live alternatives.
+
+*Reproduce:* `scripts/phase2/q15_sweetener.py` → retrieved output in
+`scripts/phase2/kaggle_results/sweetener/` (seed 2026; randomization /
+bootstrap with 100,000 replicates run on Kaggle).

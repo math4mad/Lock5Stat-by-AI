@@ -1,0 +1,75 @@
+---
+title: "Do High Fives Help Teams Win?"
+subtitle: "Q6 · Kraus, Huang & Keltner (2010), NBA touch study"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# run from the repo root so data/... paths resolve regardless of note location
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+
+sns.set_theme(style="whitegrid")
+df = pd.read_csv("data/phase2/q6_highfives.csv", comment="#")
+```
+
+# Question
+
+**Does giving lots of high fives to teammates help sports teams win?** Kraus, Huang & Keltner (2010, *Emotion*) had two independent coder teams record celebratory teammate touch — high fives, fist bumps, chest bumps, hugs, huddles — for 294 players across all 30 NBA teams in the first two months of the 2008–09 season, then asked whether early-season touch predicted later performance.
+
+## Data source
+
+`win_pct` = real 2008–09 final standings (public record); per-player touch seconds were never published, so that column is a seeded (2026) reconstruction calibrated to the paper's 1.80 s mean and to Boston / L.A. being the touchiest teams. Results characterise the documented reconstruction, not a literal replication of the paper's statistics.
+
+# Exploratory analysis
+
+```{python}
+#| echo: false
+#| fig-cap: "Early-season celebratory touch vs final win percentage, 2008–09 NBA"
+fig, ax = plt.subplots(figsize=(6.5, 4.2))
+ax.scatter(df["touch_sec_per_player"], df["win_pct"], s=42,
+           color="#4c72b0", alpha=0.85)
+b, a = np.polyfit(df["touch_sec_per_player"], df["win_pct"], 1)
+xs = np.linspace(df["touch_sec_per_player"].min(),
+                 df["touch_sec_per_player"].max(), 50)
+ax.plot(xs, a + b * xs, color="#c44e52")
+ax.set_xlabel("Touch seconds per player (first 2 months)")
+ax.set_ylabel("Final win percentage")
+plt.tight_layout()
+plt.show()
+```
+
+# Methods & results
+
+Pearson correlation with Fisher-z CI (parametric), 100k-permutation randomization test, and 100k-resample percentile bootstrap.
+
+| Quantity | Value |
+|---|---|
+| Teams (n) | 30 |
+| Pearson r | **0.750** |
+| R² | 0.562 |
+| Parametric p (t) | 1.9e-06 |
+| Randomization p (100k) | < 1e-05 |
+| Fisher-z 95% CI | (0.534, 0.874) |
+| Bootstrap 95% CI | (0.553, 0.896) |
+
+# Decision
+
+**Reject H₀: teams whose players touch more win more** — touch alone explains 56% of the variance in final win percentage. Direction matches the paper's cooperation interpretation; caveats: reconstructed touch column, and observational association (winning may also cause celebration).
+
+*Reproduce:* `scripts/phase2/q6_highfives.py` → retrieved output in
+`scripts/phase2/kaggle_results/highfives/` (seed 2026; randomization /
+bootstrap with 100,000 replicates run on Kaggle).

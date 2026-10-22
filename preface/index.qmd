@@ -1,0 +1,30 @@
+---
+execute-dir: project
+title: "Preface — Phase 1 Workflow Test"
+subtitle: "Three questions that validated research → dataset → analysis → note → publish"
+author: "Lock5Stat-by-AI"
+date: today
+---
+
+Phase 1 was a dry run of the whole pipeline on three Lock⁵ case studies. Each
+note follows the same skeleton: question → published study → dataset → several
+statistical methods (parametric + randomization + bootstrap) → decision.
+
+| Question | Note | Headline result |
+|---|---|---|
+| Is there a "sprinting gene"? | [Sprinting Gene](sprinting_gene.qmd) | ACTN3 R577X: χ² = 19.54, p < 0.0001; XX genotype rare in sprinters (5.6% vs 18.3%) |
+| Does tagging penguins harm them? | [Penguin Tagging](penguin_tagging.qmd) | 20% vs 36% survival; z p = 0.037 but randomization p = 0.057 → suggestive, not decisive |
+| Do humans emit pheromones? | [Pheromones](pheromones.qmd) | Estratetraenol shifts gender perception; t(71) = 2.49, p = 0.0075, CI excludes 0 |
+
+## What Phase 1 established
+
+- A repeatable note template: **Question → Data source → EDA → Methods →
+  Decision**, always pairing parametric tests with non-parametric validation
+  (randomization / bootstrap, 100k replicates, seed 2026).
+- Data provenance discipline: every note states whether the CSV is published
+  counts, digitized means, or a documented reconstruction.
+- Automatic publishing to GitHub Pages on every push to `master`
+  ([site](https://math4mad.github.io/Lock5Stat-by-AI/)).
+
+Phase 2 scaled the same workflow to 17 questions in parallel — see the
+[Phase 2 index](../phase2/index.qmd).

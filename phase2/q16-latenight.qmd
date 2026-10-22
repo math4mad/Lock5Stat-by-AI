@@ -1,0 +1,69 @@
+---
+title: "Does Late-Night Eating Impair Concentration?"
+subtitle: "Q16 · Spaeth, Dinges & Goel (SLEEP 2015), UPenn sleep-restriction lab"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# run from the repo root so data/... paths resolve regardless of note location
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+
+sns.set_theme(style="whitegrid")
+df = pd.read_csv("data/phase2/q16_latenight.csv", comment="#")
+```
+
+# Question
+
+**Does late-night eating impair concentration?** Spaeth, Dinges & Goel (SLEEP 2015) studied 44 adults during a week of sleep restriction (4 h/night); some were allowed to eat at night, others fasted — a randomized experiment with PVT reaction time and attention lapses as endpoints.
+
+## Data source
+
+Reconstruction calibrated to the published qualitative claims (the conference abstract reports no numeric tables). Lock⁵ 3e exercise 1.110 "Late Night Bites."
+
+# Exploratory analysis
+
+```{python}
+#| echo: false
+#| fig-cap: "Change in PVT reaction time (night 4 − night 1) by group"
+df["rt_change"] = df["pvt_rt_n4_ms"] - df["pvt_rt_n13_ms"]
+fig, ax = plt.subplots(figsize=(5.5, 4))
+sns.boxplot(data=df, x="group", y="rt_change", hue="group",
+            palette=["#c76c6c", "#8fbf8f"], legend=False, ax=ax)
+ax.axhline(0, color="k", lw=0.8)
+ax.set_xlabel("Group")
+ax.set_ylabel("Δ reaction time night 4 − night 1 (ms)")
+plt.tight_layout()
+plt.show()
+```
+
+# Methods & results
+
+Welch two-mean tests at night 4, 100k-replicate randomization and bootstrap CIs; within-subject change and a difference-in-differences comparison with randomization p-values.
+
+| Endpoint (night 4) | Eaters vs fasters | p |
+|---|---|---|
+| PVT reaction time | +28.9 ms worse | 0.026 |
+| Attention lapses | +2.1 more | 0.011 |
+| Within-subject decline (diff-in-diff, lapses) | eaters declined, fasters stable | rand. p = 0.0025 |
+
+# Decision
+
+**Consistent with the published claim**: allowing late-night eating did not protect — eaters showed worse reaction times and more lapses than fasters by night 4. Caveat: reconstruction calibrated to qualitative claims, so magnitudes are approximate.
+
+*Reproduce:* `scripts/phase2/q16_latenight.py` → retrieved output in
+`scripts/phase2/kaggle_results/latenight/` (seed 2026; randomization /
+bootstrap with 100,000 replicates run on Kaggle).

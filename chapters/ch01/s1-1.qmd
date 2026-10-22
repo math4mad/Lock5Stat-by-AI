@@ -1,0 +1,27 @@
+---
+execute-dir: project
+title: "Chapter 1 · Section 1.1"
+subtitle: "Exercises — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+---
+
+Exercises for *Statistics: Unlocking the Power of Data* (Lock⁵, 3rd ed.),
+Section 1.1. Each tab holds one exercise: question → data → analysis →
+decision, following the same template as the Phase 1/2 notes.
+
+::: {.panel-tabset}
+
+## Exercise 1.1
+
+*Placeholder — filled in during Phase 3.*
+
+## Exercise 1.2
+
+*Placeholder — filled in during Phase 3.*
+
+## Exercise 1.3
+
+*Placeholder — filled in during Phase 3.*
+
+:::

@@ -1,0 +1,70 @@
+---
+execute-dir: project
+title: "Phase 2 — Ford Mobile Lines"
+subtitle: "17 questions, one per note — executed on Kaggle, retrieved & verified"
+author: "Lock5Stat-by-AI"
+date: today
+---
+
+# Pipeline
+
+Phase 2 followed the 4-step workflow from `phase2-instruction.md`:
+
+1. **17 parallelized sub-agent runs (3 batches)** — research paper / get dataset / create processing script
+2. **Code collection & queue** — `scripts/phase2/build_kaggle_queue.py` auto-discovers `q*_*.py`
+   and packages each script (with a self-containment shim embedding its CSV) as a Kaggle kernel
+3. **Watched runs** — all 17 kernels status `COMPLETE` on Kaggle (CPU sessions, waves of 5)
+4. **Retrieval** — outputs pulled via `kaggle kernels output`, verified against local smoke tests
+
+Each question now has its own dedicated note with question, data provenance,
+EDA, parametric + non-parametric results, and decision:
+
+| Q | Note | One-line answer |
+|---|---|---|
+| 1 | [Handwashing](q01-handwashing.qmd) | 82% observed vs 91% self-reported — hygiene claims inflated |
+| 2 | [Turning Back Time](q02-turnback.qmd) | "30% wouldn't do it again" was voluntary-response bias; random samples say 91–94% |
+| 3 | [Spider Foreplay](q03-spider.qmd) | Play courtship costs aggressive males matings — suggestive (p = 0.033–0.063) |
+| 4 | [Intergenerational Effects](q04-intergen.qmd) | Paternal high-fat diet halves daughters' insulinogenic index without obesity |
+| 5 | [Above-Average Teachers](q05-aboveavg.qmd) | 94% rate themselves above average — statistically impossible |
+| 6 | [High Fives](q06-highfives.qmd) | r = 0.75 between NBA touch and win% (touch column reconstructed) |
+| 7 | [Warm-Up](q07-warmup.qmd) | Short mild beats long intense by 0.8 s — not significant, n = 11 |
+| 8 | [Urban vs Rural](q08-urban.qmd) | City dwellers: mood OR = 2.06, anxiety OR = 1.39 |
+| 9 | [Beauty Sleep](q09-beautysleep.qmd) | Sleep-deprived faces rated less healthy, more tired, less attractive |
+| 10 | [Boomerang](q10-boomerang.qmd) | 52% of US 18–29 y/o lived with parents (Jul 2020) — record since 1940 |
+| 11 | [Bar Music](q11-barmusic.qmd) | 88 dB vs 72 dB → +0.8 glasses, −3.1 min per glass |
+| 12 | [Nose Growth](q12-nose.qmd) | Yes — width keeps growing all adulthood (r = 0.99) |
+| 13 | [Cat Videos](q13-catvideos.qmd) | All 11 emotion scales improve — retrospective association |
+| 14 | [Sleep & Faces](q14-sleepfaces.qmd) | Happiness/sadness recognition impaired; average looks null |
+| 15 | [Sweeteners](q15-sweetener.qmd) | OR = 1.38 overweight/obesity, ΔBMI +47% — observational |
+| 16 | [Late-Night Eating](q16-latenight.qmd) | Eaters: +28.9 ms RT, +2.1 lapses by night 4 |
+| 17 | [Organic Food](q17-organic.qmd) | −92.7% urinary pesticides in two weeks (real Lock5 data) |
+
+# Reproducibility & caveats
+
+| Q | Data provenance |
+|---|---|
+| Q1 | Published counts (Harris/ASM 2005) — exact |
+| Q2 | Reconstructed from published percentages; Newsday n=1373 unverified vs primary source |
+| Q3 | Calibrated simulation (raw per-male data never published) |
+| Q4 | Seeded rescale to published mean±sem; p-values approximate paper's |
+| Q5 | 94% headline published; n=250 assumed |
+| Q6 | Win% real; touch rates reconstructed (rho target documented) |
+| Q7 | Group means/SDs exact; pairing assumption r=0.50 documented |
+| Q8 | Published Table 2 counts (NEMESIS) — near-exact |
+| Q9 | Condition means exact; per-person ratings reconstructed |
+| Q10 | Published percentages; subgroup denominators documented constructions |
+| Q11 | Group means exact; 20/20 split + SDs assumed |
+| Q12 | Published Table 1 grouped means (519 men); women's table inaccessible |
+| Q13 | Published Table 2 aggregates; analytic paired t verified |
+| Q14 | Means digitized from Fig. 3; paired-SD calibration documented |
+| Q15 | Baseline 2×2 back-calculated; ΔBMI SDs from published CIs |
+| Q16 | Reconstruction calibrated to qualitative published claims (conference abstract) |
+| Q17 | REAL Lock5 dataset (OrganicEffect.csv) — exact |
+
+All reconstruction assumptions are documented in each script's docstring and
+results JSON. Analyses use numpy/scipy/pandas with fixed seeds; the Lock⁵-spirit
+randomization/bootstrap tests used 100,000 replicates on Kaggle. Per-question
+note pages re-render the EDA plots live from `data/phase2/q*.csv`.
+
+Phase 3 moves on to textbook exercises organized by chapter — see
+[Chapter 1 · Section 1.1](../chapters/ch01/s1-1.qmd).

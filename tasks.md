@@ -49,3 +49,19 @@
 • Does late night eating impair concentration?
 
 • Does eating organic food improve your health?
+
+
+---  
+## phase 3   chapter 1    
+- complete    Exercises  for Section 1.1  as quarto notebook 
+
+workflow: question->searching->dataset->analysis->decision->quarto notebook
+
+all sections 1.1.1 are completed, publish to github pages
+
+## phase 4  chapter 1   
+- complete    Exercises  for Section 1.2  as quarto notebook 
+- complete    Exercises  for Section 1.3  as quarto notebook 
+
+workflow: question->searching->dataset->analysis->decision->quarto notebook
+all sections 1.2, 1.3 are completed, publish to github pages

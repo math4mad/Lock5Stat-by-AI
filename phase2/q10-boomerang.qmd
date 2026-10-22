@@ -1,0 +1,75 @@
+---
+title: "Moving Back in With Mom and Dad?"
+subtitle: "Q10 · Pew Research Center (Fry, Passel & Cohn 2020), CPS counts"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# run from the repo root so data/... paths resolve regardless of note location
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+
+sns.set_theme(style="whitegrid")
+df = pd.read_csv("data/phase2/q10_boomerang.csv", comment="#")
+```
+
+# Question
+
+**What percent of young adults in the US move back in with their parents?** Pew Research Center tracked CPS counts of 18–29-year-olds living with parents through the COVID-19 pandemic (Fry, Passel & Cohn, Sept 2020).
+
+## Data source
+
+Published percentages / counts from the Pew report (CPS Feb & Jul 2020); subgroup denominators documented constructions.
+
+# Exploratory analysis
+
+```{python}
+#| echo: false
+#| fig-cap: "Share of 18–29-year-olds living with parents, July 2020 (dashed: Feb 2020 overall)"
+g = df.pivot_table(index=["group", "period"], columns="response",
+                   values="count", aggfunc="sum").reset_index()
+g["share"] = g["with_parent"] / (g["with_parent"] + g["not_with_parent"])
+jul = g[g["period"] == "jul_2020"].sort_values("share")
+feb_overall = g[(g["period"] == "feb_2020") &
+                (g["group"] == "overall")]["share"].iloc[0]
+fig, ax = plt.subplots(figsize=(7.5, 4.2))
+ax.barh(jul["group"], jul["share"], color="#4c72b0")
+ax.axvline(feb_overall, ls="--", color="#c44e52")
+ax.text(feb_overall + 0.005, 0.1, "Feb 2020 overall", color="#c44e52", fontsize=8)
+ax.set_xlim(0, 0.85)
+ax.set_xlabel("Share living with parents (Jul 2020)")
+plt.tight_layout()
+plt.show()
+```
+
+# Methods & results
+
+One-proportion Wald + bootstrap CIs; two-proportion z for Feb-vs-Jul and demographic contrasts, validated with 100k-replicate randomization.
+
+| Comparison | Result |
+|---|---|
+| All 18–29 y/o, Jul 2020 | **52.0%** with parents (26.6 M) — record since 1940 |
+| vs Feb 2020 (47.0%) | diff +5.0 pp, p < 1e-15 |
+| Men vs women (Jul) | 55% vs 49% |
+| Ages 18–24 vs 25–29 (Jul) | 71% vs 28% |
+
+# Decision
+
+The pandemic "boomerang" pushed a **majority of young adults back home** for the first time since the Great Depression era; the steep age gradient shows the effect concentrates among the youngest adults.
+
+*Reproduce:* `scripts/phase2/q10_boomerang.py` → retrieved output in
+`scripts/phase2/kaggle_results/q10-boomerang/` (seed 2026; randomization /
+bootstrap with 100,000 replicates run on Kaggle).

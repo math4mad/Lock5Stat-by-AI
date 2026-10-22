@@ -1,0 +1,72 @@
+---
+title: "Does Sleep Deprivation Blur Emotional Faces?"
+subtitle: "Q14 · Killgore et al., 54-participant within-subject study"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# run from the repo root so data/... paths resolve regardless of note location
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+
+sns.set_theme(style="whitegrid")
+df = pd.read_csv("data/phase2/q14_sleepfaces.csv", comment="#")
+```
+
+# Question
+
+**Does sleep deprivation hurt one's ability to interpret facial expressions?** Killgore, Balkin, Yarnell & Capaldi had 54 healthy adults recognize Ekman morphed faces after a rested night vs 23.5 h awake (within-subject).
+
+## Data source
+
+Reconstruction of per-participant percent-correct (20 trials per emotion) calibrated to means digitized from the paper's Fig. 3; paired-SD calibration documented.
+
+# Exploratory analysis
+
+```{python}
+#| echo: false
+#| fig-cap: "Mean recognition difference (deprived − rested) by emotion"
+emotions = ["happiness", "sadness", "surprise", "fear", "disgust", "anger"]
+diffs = [(df[f"{e}_deprived"] - df[f"{e}_rested"]).mean() for e in emotions]
+sig = [e in ("happiness", "sadness") for e in emotions]
+fig, ax = plt.subplots(figsize=(6.5, 4))
+ax.bar(emotions, diffs,
+       color=["#c76c6c" if s else "#999999" for s in sig])
+ax.axhline(0, color="k", lw=0.8)
+ax.set_ylabel("Mean difference (deprived − rested), % correct")
+plt.tight_layout()
+plt.show()
+```
+
+# Methods & results
+
+Paired t-tests per emotion, sign-flip randomization on paired differences (100k), and percentile bootstrap CIs; overall average also tested.
+
+| Emotion | Mean diff (deprived − rested) | Randomization p |
+|---|---|---|
+| Happiness | −1.30 | **0.0050** |
+| Sadness | −2.59 | **0.0047** |
+| Surprise | −0.46 | 0.78 |
+| Fear / disgust / anger | ≈ 0 | n.s. |
+| Overall average | ≈ 0 | 0.86 |
+
+# Decision
+
+The deficit is **emotion-specific**: recognition of happiness and sadness is impaired while the average across emotions looks null (p = 0.86). Averaging would have masked the effect entirely — a nice argument against blindly collapsing multi-outcome experiments.
+
+*Reproduce:* `scripts/phase2/q14_sleepfaces.py` → retrieved output in
+`scripts/phase2/kaggle_results/sleepfaces/` (seed 2026; randomization /
+bootstrap with 100,000 replicates run on Kaggle).

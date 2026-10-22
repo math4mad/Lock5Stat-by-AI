@@ -1,0 +1,71 @@
+---
+title: "Are City Dwellers More Anxious and Depressed?"
+subtitle: "Q8 · Peen et al. (2007), NEMESIS (n = 7,076 Dutch adults)"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# run from the repo root so data/... paths resolve regardless of note location
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+
+sns.set_theme(style="whitegrid")
+df = pd.read_csv("data/phase2/q8_urban.csv", comment="#")
+```
+
+# Question
+
+**Are city dwellers more likely than country dwellers to have mood and anxiety disorders?** Peen, Dekker, Schoevers & ten Have (2007) analysed the NEMESIS population survey across five urbanization levels; Lock⁵'s phase-2 question contrasts the most vs least urbanized.
+
+## Data source
+
+Published Table 2 counts from NEMESIS-1 (Peen et al. 2007) — near-exact reconstruction. Headline context: Peen, Schoevers, Beekman & Dekker (2010) meta-analysis.
+
+# Exploratory analysis
+
+```{python}
+#| echo: false
+#| fig-cap: "Mood and anxiety disorder rates by urbanization level (NEMESIS)"
+u = df.assign(mood=df["mood_cases"] / df["n"],
+              anx=df["anxiety_cases"] / df["n"])
+x = np.arange(len(u))
+w = 0.38
+fig, ax = plt.subplots(figsize=(8, 4.2))
+ax.bar(x - w / 2, u["mood"], w, label="Mood disorders", color="#c76c6c")
+ax.bar(x + w / 2, u["anx"], w, label="Anxiety disorders", color="#4c72b0")
+ax.set_xticks(x, [s.replace(" ", "\n") for s in u["urbanization"]], fontsize=8)
+ax.set_ylabel("Prevalence")
+ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+# Methods & results
+
+Two-proportion z (pooled) and Fisher exact for city vs country contrasts on each outcome, odds ratios with bootstrap CIs, and 100k-replicate randomization tests.
+
+| Outcome | City vs country | OR | p |
+|---|---|---|---|
+| Mood disorders | 10.4% vs 5.3% (+5.1 pp) | 2.06 (bootstrap CI excludes 1) | z p = 3.7e-6 · Fisher p = 3.8e-6 · rand. p < 1e-5 |
+| Anxiety disorders | 14.4% vs 10.8% (+3.6 pp) | 1.39 | z p = 0.0075 · rand. p = 0.008 |
+
+# Decision
+
+**Reject H₀ for both outcomes** — urbanicity is significantly associated with mood and anxiety disorders, matching the Peen et al. (2010) meta-analysis headline. Observational: urbanicity may proxy for other risk factors (social drift, crowding, pollution), so the causal pathway is open.
+
+*Reproduce:* `scripts/phase2/q8_urban.py` → retrieved output in
+`scripts/phase2/kaggle_results/urban/` (seed 2026; randomization /
+bootstrap with 100,000 replicates run on Kaggle).

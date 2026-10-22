@@ -1,0 +1,70 @@
+---
+title: "Is Your Nose Getting Bigger?"
+subtitle: "Q12 · Sforza et al. (2011), digital anthropometry, 859 Italians"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# run from the repo root so data/... paths resolve regardless of note location
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+
+sns.set_theme(style="whitegrid")
+df = pd.read_csv("data/phase2/q12_nose.csv", comment="#")
+```
+
+# Question
+
+**Is your nose getting bigger?** Sforza et al. (2011, *Forensic Sci Int*) measured external nose dimensions by digital anthropometry in Italians aged 4–80; here the 519 men of published Table 1 (grouped means by age).
+
+## Data source
+
+Published Table 1 grouped means by age (men); the women's table was inaccessible, so the analysis covers men only.
+
+# Exploratory analysis
+
+```{python}
+#| echo: false
+#| fig-cap: "Mean nasal height and width by age (men, 4–80)"
+m = df[df["sex"] == "men"]
+fig, ax = plt.subplots(figsize=(6.5, 4))
+ax.scatter(m["age_mid"], m["height_mean_mm"], label="Nasal height", color="#4c72b0")
+ax.scatter(m["age_mid"], m["width_mean_mm"], label="Nasal width", color="#c76c6c")
+ax.set_xlabel("Age (years)")
+ax.set_ylabel("Mean dimension (mm)")
+ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+# Methods & results
+
+Pearson correlations of each dimension with age (full span and adults-only), validated with 100k-replicate randomization tests.
+
+| Association with age | r | Randomization p |
+|---|---|---|
+| Nasal height, ages 4–80 | 0.78 | 1.5e-4 |
+| Nasal width, ages 4–80 | 0.92 | < 1e-4 |
+| Nasal height, adults 18–80 | plateaus | — |
+| Nasal width, adults 18–80 | **0.99** | 0.008 |
+
+# Decision
+
+**Yes — the nose keeps growing throughout adulthood**, and it is mainly the *width* (cartilage growth + gravity), while height plateaus after adolescence.
+
+*Reproduce:* `scripts/phase2/q12_nose.py` → retrieved output in
+`scripts/phase2/kaggle_results/nose/` (seed 2026; randomization /
+bootstrap with 100,000 replicates run on Kaggle).

@@ -1,0 +1,67 @@
+---
+title: "Do Cat Videos Improve Mood?"
+subtitle: "Q13 · Myrick (2015), N = 6,795 retrospective pre/post ratings"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# run from the repo root so data/... paths resolve regardless of note location
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+
+sns.set_theme(style="whitegrid")
+df = pd.read_csv("data/phase2/q13_catvideos.csv", comment="#")
+```
+
+# Question
+
+**Does watching cat videos improve mood?** Myrick (2015, *Computers in Human Behavior*) surveyed 6,795 respondents about cat-video viewing and rated 11 emotion scales before vs after (retrospective pre/post).
+
+## Data source
+
+Published Table 2 aggregates (means/SDs, published t); the analytic paired t from these moments reproduces the published t within Δ ≈ 0.34.
+
+# Exploratory analysis
+
+```{python}
+#| echo: false
+#| fig-cap: "Mean emotion change (after − before) across the 11 scales"
+d = df.assign(change=df["mean_after"] - df["mean_prior"]).sort_values("change")
+fig, ax = plt.subplots(figsize=(7, 4.6))
+ax.barh(d["label"], d["change"],
+        color=np.where(d["change"] > 0, "#8fbf8f", "#c76c6c"))
+ax.axvline(0, color="k", lw=0.8)
+ax.set_xlabel("Mean change (after − before), 1–5 scale")
+plt.tight_layout()
+plt.show()
+```
+
+# Methods & results
+
+Analytic paired t-tests from published moments for all 11 scales; for the two composites, per-person paired data simulated (seed 2026) for sign-flip randomization (100k) and bootstrap CIs.
+
+| Composite | Mean change | Paired t | Randomization p | Bootstrap 95% CI |
+|---|---|---|---|---|
+| Positive emotions | +0.77 | t = 51.1 | < 1e-5 | (0.74, 0.80) |
+| Negative emotions | −0.74 | t = −60.1 | < 1e-5 | (−0.77, −0.71) |
+
+# Decision
+
+**Mood improves substantially after cat videos** — all 11 emotion scales move favourably (|t| ≥ 26). But this is a within-person retrospective association (recall and mood-congruent biases possible), not a causal experiment.
+
+*Reproduce:* `scripts/phase2/q13_catvideos.py` → retrieved output in
+`scripts/phase2/kaggle_results/catvideos/` (seed 2026; randomization /
+bootstrap with 100,000 replicates run on Kaggle).

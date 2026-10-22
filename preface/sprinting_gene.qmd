@@ -1,4 +1,5 @@
 ---
+execute-dir: project
 title: "Is there a 'Sprinting Gene'?"
 subtitle: "ACTN3 R577X — Lock5 Phase 1 Workflow Test"
 author: "Lock5Stat-by-AI"
@@ -12,6 +13,14 @@ format:
 
 ```{python}
 #| include: false
+import os
+from pathlib import Path
+
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt

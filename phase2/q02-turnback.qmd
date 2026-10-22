@@ -1,0 +1,81 @@
+---
+title: "Would Parents Choose Children Again?"
+subtitle: "Q2 · Ann Landers (1976) vs Newsday / Kansas City Star random samples"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# run from the repo root so data/... paths resolve regardless of note location
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+
+sns.set_theme(style="whitegrid")
+df = pd.read_csv("data/phase2/q2_turnback.csv", comment="#")
+```
+
+# Question
+
+**If parents could turn back time, would they still choose to have children?** In 1976 advice columnist Ann Landers posed this question to her readers and received ≈10,000 responses — about 70% said "no." Lock⁵ contrasts this famous result with contemporary random-sample polls of parents.
+
+## Data source
+
+Counts compiled in Lock⁵ (Lock et al. 2021): Landers voluntary column (n = 10,000), Newsday nationwide random sample (n = 1,373), Kansas City Star random sample of KC parents (n = 409). No Lock5 dataset file; Newsday counts reconstructed from the published 91% figure.
+
+# Exploratory analysis
+
+```{python}
+#| echo: false
+#| fig-cap: "Would do it again — by sampling method (voluntary column vs random samples)"
+w = df.pivot_table(index=["study", "method"], columns="response",
+                   values="count", aggfunc="sum")
+w["phat"] = w["yes"] / (w["yes"] + w["no"])
+labels = {"landers_1976": "Ann Landers\n(voluntary column)",
+          "newsday_1976": "Newsday\n(random sample)",
+          "kc_star_1976": "KC Star\n(random sample)"}
+fig, ax = plt.subplots(figsize=(6.5, 4.2))
+ax.bar([labels[s] for s in w.index.get_level_values("study")], w["phat"],
+       color=["#c76c6c", "#8fbf8f", "#8fbf8f"])
+ax.set_ylim(0, 1)
+ax.set_ylabel("Proportion answering \"yes\"")
+for x, p in enumerate(w["phat"]):
+    ax.text(x, p + 0.02, f"{p:.0%}", ha="center")
+plt.tight_layout()
+plt.show()
+```
+
+# Methods & results
+
+One-proportion CIs for each sample; two-proportion z-tests with pooled SE for the three pairwise contrasts, each validated with 100k-replicate randomization and bootstrap.
+
+| Sample | Method | "Yes" share |
+|---|---|---|
+| Ann Landers 1976 | voluntary column | **30.0%** (3,000 / 10,000) |
+| Newsday 1976 | random, US parents | 91.0% (1,250 / 1,373) |
+| Kansas City Star 1976 | random, KC parents | 93.9% (384 / 409) |
+
+| Comparison | Diff | Test |
+|---|---|---|
+| Newsday − Landers | +61.0 pp | z = 43.8, p ≈ 0 (randomization p < 1e-5) |
+| KC Star − Landers | +63.9 pp | p ≈ 0 |
+| KC Star − Newsday | +2.9 pp | p = 0.067 (not significant) |
+
+# Decision
+
+The infamous "70% wouldn't do it again" was pure **voluntary-response bias**: aggrieved readers self-select into writing in. Random samples agree at ~91–94%, and the two random samples are statistically indistinguishable from each other — a textbook demonstration of why sampling method dominates sample size.
+
+*Reproduce:* `scripts/phase2/q2_turnback.py` → retrieved output in
+`scripts/phase2/kaggle_results/q2-turnback/` (seed 2026; randomization /
+bootstrap with 100,000 replicates run on Kaggle).

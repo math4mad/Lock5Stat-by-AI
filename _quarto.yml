@@ -5,16 +5,61 @@ website:
   title: "Lock5Stat-by-AI"
   navbar:
     left:
-      - href: sprinting_gene.qmd
-        text: "Sprinting Gene"
-      - href: penguin_tagging.qmd
-        text: "Penguin Tagging"
-      - href: pheromones.qmd
-        text: "Pheromones"
-      - href: phase2_results.qmd
-        text: "Phase 2 Results"
+      - text: "Preface"
+        menu:
+          - href: preface/index.qmd
+            text: "Overview"
+          - href: preface/sprinting_gene.qmd
+            text: "Sprinting Gene"
+          - href: preface/penguin_tagging.qmd
+            text: "Penguin Tagging"
+          - href: preface/pheromones.qmd
+            text: "Pheromones"
+      - text: "Phase 2 · Ford Mobile Lines"
+        menu:
+          - href: phase2/index.qmd
+            text: "Overview (Q1–Q17)"
+          - href: phase2/q01-handwashing.qmd
+            text: "Q1 · Handwashing"
+          - href: phase2/q02-turnback.qmd
+            text: "Q2 · Turning Back Time"
+          - href: phase2/q03-spider.qmd
+            text: "Q3 · Spider Foreplay"
+          - href: phase2/q04-intergen.qmd
+            text: "Q4 · Intergenerational Effects"
+          - href: phase2/q05-aboveavg.qmd
+            text: "Q5 · Above-Average Teachers"
+          - href: phase2/q06-highfives.qmd
+            text: "Q6 · High Fives"
+          - href: phase2/q07-warmup.qmd
+            text: "Q7 · Warm-Up"
+          - href: phase2/q08-urban.qmd
+            text: "Q8 · Urban vs Rural"
+          - href: phase2/q09-beautysleep.qmd
+            text: "Q9 · Beauty Sleep"
+          - href: phase2/q10-boomerang.qmd
+            text: "Q10 · Boomerang"
+          - href: phase2/q11-barmusic.qmd
+            text: "Q11 · Bar Music"
+          - href: phase2/q12-nose.qmd
+            text: "Q12 · Nose Growth"
+          - href: phase2/q13-catvideos.qmd
+            text: "Q13 · Cat Videos"
+          - href: phase2/q14-sleepfaces.qmd
+            text: "Q14 · Sleep & Faces"
+          - href: phase2/q15-sweetener.qmd
+            text: "Q15 · Sweeteners"
+          - href: phase2/q16-latenight.qmd
+            text: "Q16 · Late-Night Eating"
+          - href: phase2/q17-organic.qmd
+            text: "Q17 · Organic Food"
+      - text: "Chapters"
+        menu:
+          - href: chapters/ch01/s1-1.qmd
+            text: "Ch. 1 · Section 1.1"
 
 format:
   html:
     theme: cosmo
     toc: true
+    toc-depth: 3

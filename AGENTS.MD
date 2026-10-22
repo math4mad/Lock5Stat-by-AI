@@ -5,6 +5,7 @@
 > based on  ./tasks.md 's problem , answer question in statistics methods 
 
      book source : /Users/mac/Library/Mobile\ Documents/com\~apple\~Preview/Documents/☁️数学和统计学/☁️Statistics/Statistics\_\ Unlocking\ the\ Power\ of\ Data,\ 3rd\ (2021).pdfs
+>  dataset: https://www.lock5stat.com/datapage3e.html
 
 ## 1. Env
 
