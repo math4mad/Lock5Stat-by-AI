@@ -1,0 +1,1057 @@
+---
+execute-dir: project
+title: "Unit B · Essential Synthesis (B.1–B.44)"
+subtitle: "Randomization tests & bootstrap CIs across all five worlds"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+The Unit B Essential Synthesis exercises (Lock⁵, 3rd ed., pp. 378–390) are the
+workout where everything meets at once: deciding how the data were collected
+(randomized experiment or observational study), choosing the tool — a
+**randomization distribution** to test a claim or a **bootstrap distribution**
+to size an effect — and reading the verdict off a p-value or a confidence
+interval, with the familiar bridge that a null value outside the matching
+confidence interval gets rejected. Several exercises are built around printed
+figures (sampling distributions, dotplots, boxplots); their figure-based
+answers are read off here and, wherever a real Lock⁵ dataset exists, re-run
+for real: every simulation below uses 10,000 replicates with seed 2026, so all
+p-values and intervals are reproducible, and they agree with the book's StatKey
+runs up to Monte Carlo wobble.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+sns.set_theme(style="whitegrid")
+
+def boot_stats(samples, stat_fn, reps=10000, seed=2026):
+    """Bootstrap: resample each array in `samples` with replacement, apply stat_fn."""
+    rng = np.random.default_rng(seed)
+    out = np.empty(reps)
+    for i in range(reps):
+        res = [s[rng.integers(0, len(s), len(s))] for s in samples]
+        out[i] = stat_fn(res)
+    return out
+
+def boot_pairs(x, y, stat_fn, reps=10000, seed=2026):
+    """Bootstrap for paired data: resample (x, y) pairs jointly by index."""
+    rng = np.random.default_rng(seed)
+    n = len(x)
+    out = np.empty(reps)
+    for i in range(reps):
+        idx = rng.integers(0, n, n)
+        out[i] = stat_fn(x[idx], y[idx])
+    return out
+
+def rand_label(values, n1, stat_fn, reps=10000, seed=2026):
+    """Randomization by re-assigning labels: shuffle `values`, split n1 / rest."""
+    rng = np.random.default_rng(seed)
+    out = np.empty(reps)
+    for i in range(reps):
+        p = rng.permutation(values)
+        out[i] = stat_fn(p[:n1], p[n1:])
+    return out
+
+def samp_means(pop, n, reps=10000, seed=2026):
+    """Sampling distribution: draw samples WITHOUT replacement from a population."""
+    rng = np.random.default_rng(seed)
+    return np.array([pop[rng.permutation(len(pop))[:n]].mean() for _ in range(reps)])
+
+def dist_plot(boots, xlabel, obs=None, tail="two", bins=30, figsize=(6, 3)):
+    """Histogram of simulated statistics, optionally marking the observed statistic."""
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.histplot(x=boots, bins=bins, ax=ax, color="#4c72b0")
+    if obs is not None:
+        lines = (-abs(obs), abs(obs)) if tail == "two" else ((obs,) if tail == "right" else (-abs(obs),))
+        for v in lines:
+            ax.axvline(v, color="#c44e52", ls="--", lw=1)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Simulated statistics")
+    plt.tight_layout()
+    plt.show()
+```
+
+::: {.panel-tabset}
+
+## Exercise B.1
+
+**Does Vitamin C Cure the Common Cold?** College-campus study; $p = 0.003$ for
+testing whether students with colds given large doses of vitamin C recover
+faster.
+
+- **(a)** A p-value of 0.003 is small at any usual significance level →
+  **reject $H_0$**.
+- **(b) Inappropriate collection:** let students *choose* whether to take
+  vitamin C. Students who volunteer for vitamins tend to be more
+  health-conscious in general — better diet, more sleep — so the vitamin-C
+  group's faster recoveries could reflect lifestyle, not the vitamin. (The
+  same bias arises if we hand vitamin C only to students whose colds already
+  look mild.)
+- **(c) Appropriate collection:** a randomized experiment — take students with
+  colds and **randomly assign** some to large vitamin C doses and the rest to
+  a placebo (ideally double-blind), so the groups differ only by chance. To
+  extend results to the broader student population, the participants should
+  also be a random (or clearly representative) sample of those students.
+- **(d)** With such data, the small p-value supports a *causal* conclusion:
+  large doses of vitamin C help students with a common cold recover faster.
+
+## Exercise B.2
+
+**Can Dogs Smell Cancer?** Trained dogs sniff breath samples of new subjects,
+presented randomly and double-blind. Table B.1:
+
+|                  | Control | Cancer |
+|------------------|--------:|-------:|
+| Dog doesn't sit  | 99      | 3      |
+| Dog sits         | 6       | 45     |
+
+- **(a)** Each design feature guards a specific leak: samples from **new
+  subjects** mean the dogs cannot have memorized them during training — the
+  test measures generalization; **random presentation** prevents order or
+  position from giving hints; **double-blind** stops handlers who know a
+  sample's status from cueing the dog (a Clever-Hans effect); samples from
+  patients **not yet in treatment** keep breath chemistry unaltered by therapy
+  and match the early-detection goal. Yes — this is a well-designed
+  experiment.
+- **(b)** Smoking changes breath chemistry, so without accounting for it the
+  dogs might be sitting to *smoke*, not to *cancer*. The lung-cancer
+  experimenters matched smokers between the cancer and control groups.
+- **(c)** Let $p_c$ and $p_t$ be the proportions of samples that make the dog
+  sit for cancer and control subjects:
+  $H_0: p_c = p_t$ vs $H_a: p_c > p_t$. Statistics:
+  $\hat p_c = 45/48 = 0.938$, $\hat p_t = 6/105 = 0.057$.
+- **(d) Relatively small — essentially zero.** The dogs sat for almost every
+  cancer sample and almost no control sample, a gap far beyond what chance
+  label-shuffling produces; the evidence is overwhelming (so strong that a
+  formal test is barely needed).
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in proportions of dog sittings, cancer minus control
+canc = np.repeat([1.0, 0.0], [45, 3])
+ctrl = np.repeat([1.0, 0.0], [6, 99])
+pool = np.concatenate([canc, ctrl])
+obs = canc.mean() - ctrl.mean()
+boots = rand_label(pool, 48, lambda a, b: a.mean() - b.mean())
+dist_plot(boots, "Randomization differences in proportions (cancer - control)", obs=obs)
+```
+
+```{python}
+#| echo: false
+from math import comb
+p_exact = sum(comb(51, i) * comb(102, 48 - i) for i in range(45, 49)) / comb(153, 48)
+pd.Series({"Observed difference in proportions": round(obs, 3),
+           "Max simulated difference over 10000 randomizations": round(boots.max(), 3),
+           "One-tail p-value (simulation)": float((boots >= obs).mean()),
+           "One-tail p-value (exact hypergeometric)": p_exact}).to_string()
+```
+
+None of the 10,000 randomizations comes anywhere near the observed 0.88
+difference (the largest simulated difference is 0.24), and the exact
+hypergeometric p-value is about $2 \times 10^{-28}$ — the dogs' success is not
+a chance artifact.
+
+## Exercise B.3
+
+**Diet Cola and Calcium.** 16 women randomized to 24 oz of diet cola or water;
+urine calcium excretion (mg) over three hours (`ColaCalcium`, Table B.2).
+
+- **(a)** Randomization test on the difference in means, one-tailed
+  ($H_a: \mu_c > \mu_w$, cola leaches more calcium): the observed difference is
+  $\bar x_c - \bar x_w = 56.0 - 49.1 = 6.9$ mg and the one-tailed
+  **p-value ≈ 0.005** → **reject $H_0$**: diet cola drinkers excrete more
+  calcium on average.
+- **(b)** Since (a) is significant, we size the effect: a 95% bootstrap
+  confidence interval for $\mu_c - \mu_w$ runs from about **2.9 to 10.8 mg** —
+  we are 95% sure that women who drink diet cola excrete, on average, between
+  about 3 and 11 mg more urinary calcium over these three hours than water
+  drinkers.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization test and bootstrap confidence interval for the difference in mean calcium excretion
+cc = pd.read_csv("data/ch04/ColaCalcium.csv")
+cola = cc.loc[cc.Drink == "Diet cola", "Calcium"].to_numpy(float)
+water = cc.loc[cc.Drink == "Water", "Calcium"].to_numpy(float)
+allv = np.concatenate([cola, water])
+obs = cola.mean() - water.mean()
+rands = rand_label(allv, 8, lambda a, b: a.mean() - b.mean())
+boots = boot_stats([cola, water], lambda r: r[0].mean() - r[1].mean())
+ci95 = np.percentile(boots, [2.5, 97.5])
+fig, axes = plt.subplots(1, 2, figsize=(7, 3), sharex=True)
+sns.histplot(x=rands, bins=24, ax=axes[0], color="#55a868")
+for v in (obs, -obs):
+    axes[0].axvline(v, color="#c44e52", ls="--", lw=1)
+axes[0].set_title("Randomization (test)", fontsize=10)
+axes[0].set_xlabel("Differences in means")
+sns.histplot(x=boots, bins=24, ax=axes[1], color="#4c72b0")
+for v in ci95:
+    axes[1].axvline(v, color="#c44e52", ls="--", lw=1)
+axes[1].set_title("Bootstrap (confidence interval)", fontsize=10)
+axes[1].set_xlabel("Bootstrap differences in means")
+plt.tight_layout()
+plt.show()
+pd.Series({"Observed difference (mg)": round(obs, 2),
+           "One-tail randomization p-value": round(float((rands >= obs).mean()), 4),
+           "95% bootstrap CI (mg)": f"({ci95[0]:.1f}, {ci95[1]:.1f})"}).to_string()
+```
+
+## Exercise B.4
+
+**NFL Overtime.** Coin-toss winner: 240 wins, 188 losses, 17 ties in 445
+overtime games, 1974–2009.
+
+- **(a)** Discarding ties: $\hat p = 240/428 = 0.561$. Test
+  $H_0: p = 0.5$ vs $H_a: p > 0.5$ at $\alpha = 0.05$: one-tailed
+  **p-value ≈ 0.007** → **reject $H_0$**: the coin-toss winner has a real
+  advantage.
+- **(b)** Splitting at the 1994 rule change:
+
+| Era              | Coin-toss winner won | Lost | $\hat p$ |
+|------------------|---------------------:|-----:|---------:|
+| 1974–1993 (old)  | 94                   | 94   | 0.500    |
+| 1994–2009 (new)  | 146                  | 94   | 0.608    |
+
+  The old-rule games show *no* advantage at all (exactly .500), while the
+  new-rule games show a large one; a two-tailed test of
+  $H_0: p_{new} = p_{old}$ gives **p ≈ 0.03** — evidence of a genuine
+  difference between eras. Ironically, the advantage appeared only *after* the
+  rule change, and it is large enough to justify the NFL's later move to
+  modify sudden-death overtime.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distributions for the overtime win proportion and for the change in advantage across eras
+rng = np.random.default_rng(2026)
+randp = rng.binomial(428, 0.5, 10000) / 428
+p_obs = 240 / 428
+pool = np.repeat([1.0, 0.0], [240, 188])
+obs_d = 146/240 - 94/188
+randd = rand_label(pool, 240, lambda a, b: a.mean() - b.mean())
+fig, axes = plt.subplots(1, 2, figsize=(7, 3))
+sns.histplot(x=randp, bins=24, ax=axes[0], color="#4c72b0")
+for v in (0.5 - (p_obs - 0.5), p_obs):
+    axes[0].axvline(v, color="#c44e52", ls="--", lw=1)
+axes[0].set_title("Part (a): test p = 0.5", fontsize=10)
+axes[0].set_xlabel("Randomization proportions")
+sns.histplot(x=randd, bins=24, ax=axes[1], color="#55a868")
+for v in (-abs(obs_d), abs(obs_d)):
+    axes[1].axvline(v, color="#c44e52", ls="--", lw=1)
+axes[1].set_title("Part (b): old vs new era", fontsize=10)
+axes[1].set_xlabel("Randomization differences in proportions")
+plt.tight_layout()
+plt.show()
+pd.Series({"Part (a) one-tail p-value": round(float((randp >= p_obs).mean()), 4),
+           "Part (b) observed difference": round(obs_d, 3),
+           "Part (b) two-tail p-value": round(float((np.abs(randd) >= abs(obs_d)).mean()), 3)}).to_string()
+```
+
+## Exercise B.5
+
+**Impact of College Roommates on Grades.** 210 Berea College first-years
+randomly assigned roommates; does a roommate bringing a videogame hurt GPA?
+
+- **(a) Randomized experiment.** Roommates were assigned *randomly*, so on
+  average the videogame and no-videogame-roommate groups are alike in every
+  other respect (family background, study habits, …). That balance is what
+  licenses a causal conclusion — the one thing an observational comparison of
+  roommates could never give.
+- **(b)** Parameters $\mu_v$ and $\mu_n$ (mean first-semester GPA for students
+  whose roommate does / does not bring a videogame):
+  $H_0: \mu_v = \mu_n$ vs $H_a: \mu_v < \mu_n$.
+- **(c)** $p = 0.036 < 0.05$ → **reject $H_0$**: having a roommate bring a
+  videogame lowers average GPA.
+- **(d)** The 90% CI for $\mu_v - \mu_n$ is $(-0.315, -0.015)$ — *entirely
+  negative*, so the videogame-roommate group has the **lower** average GPA. We
+  are 90% sure that the roommate-videogame effect is a GPA drop between about
+  0.015 and 0.315 points.
+- **(e)** $p = 0.068 > 0.05$ → **do not reject $H_0$** among students who do
+  not themselves bring a videogame — not significant at the 5% level.
+- **(f)** $p = 0.026 < 0.05$ → **reject $H_0$** among students who themselves
+  bring a videogame.
+- **(g)** The effect is **larger for students who bring their own videogame**
+  (significant with a smaller p-value, while the other subgroup is not
+  significant). Plausible: a student who already games is more drawn to the
+  roommate's console, and the two systems multiply the gaming options.
+- **(h)** For videogame bringers the 90% CI for $\mu_v - \mu_n$ is
+  $(-0.526, -0.044)$: a GPA drop between about 0.04 and 0.53 points — a
+  clearly larger effect than the $(-0.315, -0.015)$ found for all students in
+  (d).
+- **(i)** From Table B.3, both variables matter and they compound: a student's
+  own videogame drops mean GPA (3.128 → 3.039 without a roommate game;
+  2.932 → 2.754 with one), a roommate's videogame drops it as well
+  (3.128 → 2.932; 3.039 → 2.754), and the lowest GPA (2.754) occurs when
+  *both* bring one.
+- **(j)** A natural companion test: does the student's **own** videogame hurt
+  GPA? Compare the 132 students without a roommate game (88 no / 44 yes) with
+  $H_0: \mu_{own} = \mu_{none}$ vs $H_a: \mu_{own} < \mu_{none}$ — or run the
+  roommate test separately within each own-videogame group (exactly what parts
+  (e)–(f) did).
+
+| Student brought | Roommate brought | n  | Mean GPA | Std. Dev. |
+|-----------------|------------------|---:|---------:|----------:|
+| No              | No               | 88 | 3.128    | 0.590     |
+| Yes             | No               | 44 | 3.039    | 0.689     |
+| No              | Yes              | 38 | 2.932    | 0.699     |
+| Yes             | Yes              | 40 | 2.754    | 0.639     |
+
+## Exercise B.6
+
+**Husbands Older Than Wives?** Ages of 105 newly married couples from
+St. Lawrence County marriage licenses (`MarriageAges`); the data are **paired**
+(husband–wife within a couple).
+
+- **(a)** Sign-flip test on the differences $d$ = husband − wife:
+  $\bar x_d = 2.83$ years, one-tailed **p < 0.001** → husbands are on average
+  older. A 95% bootstrap CI for the mean difference runs from **1.9 to
+  3.8 years**. Findings apply to marriages in this county (and similar
+  populations) at this time — not to all marriages everywhere.
+- **(b)** The husband is older in 75 of 105 couples: $\hat p = 0.714$. Testing
+  $H_0: p = 0.5$ vs $H_a: p > 0.5$ gives **p < 0.001**; a 95% bootstrap CI for
+  $p$ is **(0.63, 0.80)**.
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distributions for the mean husband-minus-wife age difference and the proportion of couples with an older husband
+ma = pd.read_csv("data/ch02/MarriageAges.csv")
+d = (ma.Husband - ma.Wife).to_numpy(float)
+older = (d > 0).astype(float)
+bm = boot_stats([d], lambda r: r[0].mean())
+bp = boot_stats([older], lambda r: r[0].mean())
+fig, axes = plt.subplots(1, 2, figsize=(7, 3))
+for ax, b, o, t in [(axes[0], bm, d.mean(), "Mean difference (years)"),
+                    (axes[1], bp, older.mean(), "Proportion husband older")]:
+    sns.histplot(x=b, bins=24, ax=ax, color="#4c72b0")
+    lo, hi = np.percentile(b, [2.5, 97.5])
+    for v in (lo, hi):
+        ax.axvline(v, color="#c44e52", ls="--", lw=1)
+    ax.axvline(o, color="black", lw=1)
+    ax.set_xlabel(t)
+plt.tight_layout()
+plt.show()
+pd.Series({"Mean difference (years)": round(d.mean(), 3),
+           "Sign-flip one-tail p-value": float(((np.random.default_rng(2026).choice([-1.0, 1.0], size=(10000, len(d))) * d).mean(axis=1) >= d.mean()).mean()),
+           "95% CI for mean difference": f"({np.percentile(bm, 2.5):.2f}, {np.percentile(bm, 97.5):.2f})",
+           "Proportion husband older": round(older.mean(), 3),
+           "95% CI for proportion": f"({np.percentile(bp, 2.5):.3f}, {np.percentile(bp, 97.5):.3f})"}).to_string()
+```
+
+Both routes agree: the entire mean-difference interval lies above 0 and the
+proportion interval above 0.5.
+
+## Exercise B.7
+
+**Correlation between Ages of Husbands and Wives.**
+
+- **(a) Positive.** People tend to marry partners of similar age, so couples
+  with an older husband usually also have an older wife.
+- **(b)** The sample correlation is $r = 0.914$ — a strong positive linear
+  association with no dramatic outliers; the points hug an upward line, with a
+  handful of couples whose ages differ by more than 10 years.
+- **(c)** Pairs bootstrap (resample *couples*, keeping each pair together),
+  10,000 resamples: 95% CI for the population correlation ≈ **(0.88, 0.94)** —
+  we are 95% sure the correlation between spouses' ages at marriage is between
+  about 0.88 and 0.94.
+- **(d) No.** A high correlation says the two ages *move together*, not who is
+  older — couples could be perfectly correlated with wives older every time.
+  The question in Exercise B.6 needs the *mean difference*, not the
+  correlation.
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the correlation between husbands and wives ages at marriage
+h = ma.Husband.to_numpy(float); w = ma.Wife.to_numpy(float)
+boots = boot_pairs(h, w, lambda a, b: np.corrcoef(a, b)[0, 1])
+ci = np.percentile(boots, [2.5, 97.5])
+dist_plot(boots, "Bootstrap correlations", obs=np.corrcoef(h, w)[0, 1])
+pd.Series({"Sample correlation": round(float(np.corrcoef(h, w)[0, 1]), 3),
+           "95% bootstrap CI": f"({ci[0]:.3f}, {ci[1]:.3f})"}).to_string()
+```
+
+## Exercise B.8
+
+**Customized Home Pages.** $n = 1675$ US internet users, January 2010; 469
+customized their home page.
+
+- **Population:** all US internet users (January 2010). **Parameter:** $p$, the
+  proportion who had customized their browser's home page to include favored
+  news sources and topics.
+- **Best estimate:** $\hat p = 469/1675 \approx 0.28$ — about 28%.
+- To get the parameter *exactly* we would need a census: ask every US internet
+  user (impossible in practice, and the population changes daily anyway).
+
+## Exercise B.9
+
+**Laptop Computers.** $n = 2252$ US adults, May 2010; 1238 own a laptop.
+
+- Estimating $p$, the proportion of **all US adults** who own a laptop
+  computer, using $\hat p = 1238/2252 \approx 0.55$.
+- Best estimate: $\hat p = 0.55$ — about 55% of US adults owned a laptop.
+
+## Exercise B.10
+
+**Do Violent Movies Lead to Violence in Society?** $n = 1000$ US adults, 57%
+say yes, margin of error ±3 points at 95% confidence.
+
+- **(a)** Population: all American adults. Parameter: $p$, the proportion of
+  all American adults who think violent movies lead to more violence in
+  society. Best estimate: $\hat p = 0.57$.
+- **(b)** 95% CI: $0.57 \pm 0.03 = (0.54, 0.60)$ — we are 95% sure that between
+  54% and 60% of all American adults think violent movies lead to more
+  violence in society.
+
+## Exercise B.11
+
+**Carbon Stored in Forest Biomass.** 95% CI of 9,600 to 13,600 tons for the
+mean carbon per square kilometer in the tropical forests of Latin America,
+sub-Saharan Africa, and southeast Asia.
+
+- **Interpretation:** we are 95% sure that the *average* amount of carbon
+  stored per square kilometer in these tropical forests is between 9,600 and
+  13,600 tons. (The 247-gigaton total then follows by combining this average
+  with the 2.5-billion-hectare area.)
+- **To compute it exactly**, the scientists would have to measure the carbon
+  content of *every* square kilometer of forest in these regions — a complete
+  census. The 4,079 inventory plots and satellite images stand in for that
+  census.
+
+## Exercise B.12
+
+**Training Fish to Pick a Color.** Mean time to reach the yellow mark
+$\bar x = 51$ s with standard error 2.4 s.
+
+- 95% CI: $51 \pm 2(2.4) = 51 \pm 4.8$ → **(46.2, 55.8) seconds**: we are 95%
+  sure the mean time for a golden shiner to reach the yellow mark (after a
+  week of training) is between about 46 and 56 seconds.
+- **60 seconds? Not plausible** — it lies above the entire interval.
+- **55 seconds? Plausible** — it is inside the interval.
+
+## Exercise B.13
+
+**How Often Does the Fish Majority Win?** 95% CI for the proportion of times
+the majority (blue) wins: **0.09 to 0.26**.
+
+- We are 95% sure that a school with an opinionated minority and a less
+  passionate majority swims to the majority's blue mark only between 9% and
+  26% of the time — the minority usually wins.
+- **Equally likely? No.** "Equally likely" means $p = 0.5$, which is far
+  outside the interval — the data rule out a 50-50 outcome.
+
+## Exercise B.14
+
+**What Is the Effect of Including Some Indifferent Fish?** Majority wins 17%
+without untrained fish, 61% with 10 no-opinion fish added; SE of the
+difference ≈ 0.14.
+
+- **Parameter:** $p_1 - p_2$, the difference in the proportion of times the
+  majority wins with versus without the indifferent fish.
+- **Point estimate:** $0.61 - 0.17 = 0.44$.
+- **95% CI:** $0.44 \pm 2(0.14) = (0.16, 0.72)$ — we are 95% sure that adding
+  ten indifferent fish raises the majority's win rate by between 16 and 72
+  percentage points.
+- **Plausible no effect? No** — 0 is nowhere in the interval: the indifferent
+  fish genuinely tip decisions back toward the majority (the "democracy"
+  effect).
+
+## Exercise B.15
+
+**What Proportion of Hollywood Movies Are Dramas?** All 1,295 Hollywood movies
+2012–2018 (`HollywoodMovies`); 386 are dramas.
+
+- **(a)** These 1,295 movies are the *population*, so the answer is exact:
+  $p = 386/1295 \approx 0.298$ — about 30%.
+- **(b)** For samples of size 50: $np = 50(0.298) \approx 15 \ge 10$ and
+  $n(1-p) \approx 35 \ge 10$, so the distribution of sample proportions is
+  roughly **bell-shaped** (some skew, since $p \ne 0.5$), **centered at
+  0.298**.
+
+## Exercise B.16
+
+**Sampling Distributions for Proportion of Dramas.** Figure B.6: 1,000 samples
+of $n = 50$ from the drama population ($p = 0.298$).
+
+- **(a) 0.06.** The histogram spans roughly 0.12 to 0.48 with the bulk within
+  about 0.18–0.42; a spread of ±2 SE around 0.30 gives SE ≈ 0.06. (Check:
+  $\sqrt{0.298 \cdot 0.702 / 50} = 0.065$.)
+- **(b) About the same as.** The center is set by $p$, not the sample size —
+  still ≈ 0.30.
+- **(c) Smaller than.** Quadrupling $n$ from 50 to 100 halves the SE, to about
+  0.046.
+- **(d) About the same as.** More samples sharpen the *picture* of the
+  distribution but do not move its center.
+- **(e) About the same as.** The SE depends on $n$ and $p$, not on how many
+  samples are drawn.
+
+## Exercise B.17
+
+**Defective Screws.** $p = 0.05$; Figure B.7 shows sampling distributions for
+$n = 100$ and $n = 1000$.
+
+- **(a)** Both distributions are centered at the population proportion
+  **0.05**.
+- **(b)** For $n = 100$: minimum about **0.00** and maximum about **0.12**.
+  For $n = 1000$: minimum about **0.02** and maximum about **0.08** — much
+  tighter.
+- **(c)** $n = 100$: SE $\approx \sqrt{0.05(0.95)/100} \approx$ **0.02**.
+  $n = 1000$: SE $\approx$ **0.007**.
+- **(d)** A sample proportion of 0.08 is **1.5 SEs** above 0.05 when $n = 100$
+  — reasonably likely (it sits inside the visible tail of that histogram).
+  When $n = 1000$ it is more than **4 SEs** above the center — beyond the
+  entire plotted distribution — so it would be very unlikely.
+
+## Exercise B.18
+
+**Number of Screws in a Box.** Claim $\mu = 50$; Figure B.8 shows the sampling
+distribution of $\bar x$ for samples of $n = 10$ boxes (spread roughly 46–54,
+most values between 48 and 52, so SE ≈ 1).
+
+- **(a)** With SE ≈ 1: being **more than 2** screws off (beyond 48 or 52) is
+  on the edge of the distribution — fairly unlikely; being **more than 5** off
+  (beyond 45 or 55) essentially never happens; **more than 10** off is
+  impossible from these data.
+- **(b) Yes.** A sample mean of 42 is 8 screws — about **8 standard errors** —
+  below 50. Chance alone essentially never does that, so the claim $\mu = 50$
+  is likely incorrect.
+- **(c) No.** A single box is one observation: individual boxes vary with SD
+  around 3 screws, so a 42-screw box is unusual but not startling, and one box
+  tells us almost nothing about the *average*. The strong evidence in (b)
+  comes from averaging 10 boxes.
+
+## Exercise B.19
+
+**Average Points for a Hockey Player.** All 26 Ottawa Senators 2019 regular
+players (`OttawaSenators2019`); take random samples of 5 Points values.
+
+- **(a)** One random sample (drawn here without replacement): 14, 44, 14, 28,
+  22 → $\bar x = 24.4$ points.
+- **(b)** A second sample: 8, 5, 48, 35, 22 → $\bar x = 23.6$ points.
+- **(c)** Population mean: $\mu = 24.885 \approx 24.9$ points. Both sample
+  means landed within about 1.3 points of $\mu$ — quite accurate, though
+  nothing guarantees that for every sample.
+- **(d)** The Points population is right-skewed (a few high scorers), so with
+  only $n = 5$ the sampling distribution keeps a **right skew**; it is
+  **centered at $\mu \approx 24.9$**.
+
+```{python}
+#| echo: false
+#| fig-cap: Sampling distribution of the mean Points from samples of 5 Ottawa Senators
+ot = pd.read_csv("data/ch03/OttawaSenators2019.csv")
+pts = ot.Points.to_numpy(float)
+sm5 = samp_means(pts, 5)
+dist_plot(sm5, "Sample means (n = 5)", obs=pts.mean())
+pd.Series({"Population mean mu": round(pts.mean(), 3),
+           "Smallest sample mean": sm5.min(),
+           "Largest sample mean": sm5.max(),
+           "Standard error": round(sm5.std(ddof=1), 2)}).to_string()
+```
+
+## Exercise B.20
+
+**Time to Finish, 2016 Olympic Men's Marathon.** 140 finish times in
+`OlympicMarathon2016` (Minutes column); random samples of 10.
+
+- **(a)** One random sample: 142.8, 141.3, 150.5, 144.1, 152.0, 141.2, 134.3,
+  156.4, 145.6, 151.9 → $\bar x = 146.0$ minutes.
+- **(b)** Second sample: 138.7, 131.2, 141.1, 142.9, 140.1, 136.2, 151.3,
+  135.4, 140.2, 150.3 → $\bar x = 140.7$ minutes. On a dotplot the two means
+  sit about 5 minutes apart.
+- **(c)** Population mean: $\mu = 142.4$ minutes. Each estimate misses by only
+  2–4 minutes — good accuracy, though other samples could miss by more.
+- **(d)** Marathon times are fairly symmetric, so the dotplot of many n = 10
+  means is roughly **bell-shaped and centered at $\mu = 142.4$** minutes.
+
+```{python}
+#| echo: false
+#| fig-cap: Sampling distribution of the mean finish time from samples of 10 marathon runners
+om = pd.read_csv("data/ch04/OlympicMarathon2016.csv")
+mns = om.Minutes.to_numpy(float)
+sm10 = samp_means(mns, 10)
+dist_plot(sm10, "Sample means (minutes, n = 10)", obs=mns.mean())
+pd.Series({"Population mean mu (minutes)": round(mns.mean(), 3),
+           "Smallest sample mean": round(sm10.min(), 2),
+           "Largest sample mean": round(sm10.max(), 2),
+           "Standard error": round(sm10.std(ddof=1), 3)}).to_string()
+```
+
+## Exercise B.21
+
+**A Sampling Distribution for Average Points.** StatKey-style sampling
+distribution of $\bar x$ with $n = 5$ from the 26 Points values (10,000
+samples above): smallest sample mean ≈ **4.8**, largest ≈ **52.0**, and the
+standard deviation of the sample means — the **standard error — is about
+7.5** points.
+
+## Exercise B.22
+
+**A Sampling Distribution for Marathon Times.** Sampling distribution of
+$\bar x$ with $n = 10$ from the 140 finish times: smallest sample mean ≈
+**133.9**, largest ≈ **152.1**, and the **standard error ≈ 2.35** minutes.
+
+## Exercise B.23
+
+**Cell Phones in the Classroom.** Two tests, p-values 0.93 and 0.0004.
+
+- **$p = 0.0004$ goes with the quiz-accuracy test** (material presented while
+  the phone rang): if a ringing phone did not hurt learning, results this
+  extreme would occur in only about 4 of 10,000 random chances — **very
+  strong evidence** that a ringing cell phone lowers students' accuracy on
+  concurrently presented material.
+- **$p = 0.93$ goes with the location test:** results this ordinary arise
+  constantly by chance, so there is no evidence that where the phone rings in
+  the room matters.
+
+## Exercise B.24
+
+**Better Traffic Flow.** Matched pairs: 24 simulation runs, differences
+(timed − flexible) with $\bar x_D = 61$ s, $s_D = 15.19$ s (`TrafficFlow`).
+
+- **(a)** $\mu_D$, the mean difference in public-transport delay between the
+  timed and flexible systems, over all possible simulation runs on this
+  stretch of road.
+- **(b)** Write each of the 24 differences on a slip. Draw one slip, record
+  its value, **put it back**, shuffle, and repeat until 24 values are recorded
+  — that is one bootstrap sample.
+- **(c)** The **mean** of the 24 values in the bootstrap sample.
+- **(d)** Roughly **bell-shaped**, **centered at the observed $\bar x_D = 61$**
+  seconds.
+- **(e)** The standard error is the **standard deviation of the bootstrap
+  statistics** — how far bootstrap means typically fall from 61.
+- **(f)** With SE = 3.1: $61 \pm 2(3.1) = (54.8, 67.2)$ seconds — we are 95%
+  sure Dresden would save, on average, between about 55 and 67 seconds of
+  public-transport delay per run by switching to the flexible system.
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the mean traffic-delay difference with a 95 percent confidence interval
+tf = pd.read_csv("data/ch04/TrafficFlow.csv")
+dif = tf.Difference.to_numpy(float)
+boots = boot_stats([dif], lambda r: r[0].mean())
+ci = np.percentile(boots, [2.5, 97.5])
+dist_plot(boots, "Bootstrap mean differences (seconds)", obs=dif.mean())
+pd.Series({"Mean difference (s)": round(dif.mean(), 2),
+           "Bootstrap SE (s)": round(boots.std(ddof=1), 2),
+           "95% bootstrap CI (s)": f"({ci[0]:.1f}, {ci[1]:.1f})"}).to_string()
+```
+
+## Exercise B.25
+
+**Do Ovulating Women Affect Men's Speech?** 123 men randomized: 38 of 61
+copied the less-fertile partner's sentence structure; 30 of 62 copied at peak
+fertility.
+
+- Test: $H_0: p_f = p_l$ vs $H_a: p_f < p_l$, where $p_f$ and $p_l$ are the
+  proportions of men who copy their partner's sentence construction at peak
+  fertility and at lower fertility. Statistics:
+  $\hat p_f = 30/62 = 0.484$, $\hat p_l = 38/61 = 0.623$,
+  difference $= -0.139$.
+- Label-reassignment randomization (68 "copied" men dealt out as 62/61),
+  10,000 repetitions: one-tailed **p-value ≈ 0.085**.
+- **Not significant at the 5% level; significant at the 10% level.** The data
+  hint that men copy less at peak fertility (as the attention-attracting
+  theory predicts), but the evidence is only moderate.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in proportions of men copying sentence structure, peak fertility minus less fertile
+pool = np.repeat([1.0, 0.0], [68, 55])
+obs = 30/62 - 38/61
+boots = rand_label(pool, 62, lambda a, b: a.mean() - b.mean())
+dist_plot(boots, "Randomization differences in proportions (fertile - less fertile)", obs=obs, tail="left")
+pd.Series({"Observed difference": round(obs, 3),
+           "One-tail p-value": round(float((boots <= obs).mean()), 3)}).to_string()
+```
+
+## Exercise B.26
+
+**Estimating Pizza Girl's Tips.** $\bar x = \$3.04$ per delivery, margin of
+error $\$0.86$.
+
+- Interval estimate: $3.04 \pm 0.86$ → **(\$2.18, \$3.90)** — we are (roughly
+  95%) sure the average tip for all her deliveries is between about \$2.18 and
+  \$3.90.
+- **Assumption:** the three shifts (one Friday, two Saturday nights) are
+  *representative* of all her deliveries — effectively a random sample of her
+  working time, with no systematic difference between the sampled nights and
+  other nights (no holiday surges, no route changes, …). Otherwise the point
+  estimate and interval describe only those three shifts.
+
+## Exercise B.27
+
+**Price of Textbooks.** Sets of 10 prices giving different strengths of
+evidence for $\mu > \$100$:
+
+- **(a) Strong evidence:** ten prices all just above \$100 with little
+  spread — e.g., 105, 108, 110, 112, 113, 115, 116, 118, 120, 123
+  ($\bar x \approx 114$, $s \approx 5.6$, SE ≈ 1.8; the mean is ~8 SEs above
+  100).
+- **(b) No evidence:** ten typical low prices — e.g., 40, 55, 60, 65, 70, 75,
+  80, 85, 90, 95 ($\bar x = 67.5$, far *below* 100).
+- **(c) Some but not strong evidence:** a mean just over \$100 with large
+  spread — e.g., 30, 45, 60, 75, 90, 105, 120, 135, 150, 195
+  ($\bar x = 100.5$, $s \approx 52$, SE ≈ 16.5; a mean 0.5 above 100 is well
+  within chance variation when the data are this variable). Any set with
+  $\bar x$ modestly above 100 and a big $s$ lands here.
+
+## Exercise B.28
+
+**Most Americans Don't Go Out to Movies.** $n = 1000$, 56% rarely or never go
+out to the movies, margin of error ±3 points at 95% confidence.
+
+- 95% CI: $0.56 \pm 0.03 = (0.53, 0.59)$ — we are 95% sure that between 53%
+  and 59% of American adults rarely or never go out to the movies.
+- **Yes, relatively sure:** the *entire* interval lies above 0.50, so the
+  data provide convincing evidence that a majority rarely or never go out.
+
+## Exercise B.29
+
+**Skateboard Prices.** 20 online prices (`SkateboardPrices`, Table B.5).
+
+- **(a)** Mean $\bar x = \$67.59$, standard deviation $s = \$50.02$ (the big
+  sd reflects prices from \$19.95 up to \$199.00).
+- **(b)** Write the 20 prices on slips; draw one, record it, replace, and
+  repeat 20 times — one bootstrap sample. Record the **mean** of the 20 drawn
+  values.
+- **(c)** Roughly **bell-shaped** (slightly right-skewed, echoing the data),
+  **centered near $\bar x = 67.6$**.
+- **(d)** With SE = 10.9: $67.6 \pm 2(10.9) = (45.8, 89.4)$ — we are 95% sure
+  the mean price of all skateboards for sale online (at that time) is between
+  about \$46 and \$89.
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the mean skateboard price with a 95 percent confidence interval
+sb = pd.read_csv("data/ch04/SkateboardPrices.csv").Price.to_numpy(float)
+boots = boot_stats([sb], lambda r: r[0].mean())
+ci = np.percentile(boots, [2.5, 97.5])
+dist_plot(boots, "Bootstrap mean prices ($)", obs=sb.mean())
+pd.Series({"Mean ($)": round(sb.mean(), 2), "StDev ($)": round(sb.std(ddof=1), 2),
+           "Bootstrap SE ($)": round(boots.std(ddof=1), 2),
+           "95% CI ($)": f"({ci[0]:.1f}, {ci[1]:.1f})"}).to_string()
+```
+
+## Exercise B.30
+
+**Comparing Methods for Having Dogs Identify Cancer.** Table B.6: dog picked
+the cancer sample in 33 of 36 breath tests and 37 of 38 stool tests.
+
+- Statistics: $\hat p_{breath} = 33/36 = 0.917$,
+  $\hat p_{stool} = 37/38 = 0.974$; difference (stool − breath) $= 0.057$.
+- Bootstrap (resample each set of tests, 10,000 reps): 90% CI for the
+  difference ≈ **(−0.03, 0.14)**.
+- **Yes, plausible there is no difference** — 0 is inside the interval. With
+  only 4 failures in 74 tests, a 5.7-point gap is well within chance
+  variation; both methods look comparably (and remarkably) accurate.
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the difference in success proportions, stool test minus breath test
+b = np.repeat([1.0, 0.0], [33, 3])
+s = np.repeat([1.0, 0.0], [37, 1])
+obs = s.mean() - b.mean()
+boots = boot_stats([b, s], lambda r: r[1].mean() - r[0].mean())
+ci90 = np.percentile(boots, [5, 95])
+dist_plot(boots, "Bootstrap differences in proportions (stool - breath)", obs=obs, bins=12)
+pd.Series({"Observed difference": round(obs, 3),
+           "90% bootstrap CI": f"({ci90[0]:.3f}, {ci90[1]:.3f})",
+           "0 inside the interval?": bool(ci90[0] <= 0 <= ci90[1])}).to_string()
+```
+
+## Exercise B.31
+
+**Standard Deviation of Penalty Minutes in the NHL.** 26 Ottawa Senators
+(`OttawaSenators2019`, PenMins).
+
+- **(a)** Bootstrap the 26 penalty-minute values, record the standard
+  deviation of each resample, take the 2.5th and 97.5th percentiles: 95% CI
+  for $\sigma$ ≈ **(14, 31)** penalty minutes — we are 95% sure the standard
+  deviation of season penalty minutes for NHL players is between about 14 and
+  31 minutes.
+- **(b)** The original sample has $s = 24.9$. It is **not** exactly in the
+  middle of the interval (midpoint ≈ 22.8): the bootstrap distribution of the
+  SD is right-skewed, so the interval is asymmetric and $s$ sits above the
+  midpoint.
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the standard deviation of penalty minutes
+pm = ot.PenMins.to_numpy(float)
+boots = boot_stats([pm], lambda r: r[0].std(ddof=1))
+ci = np.percentile(boots, [2.5, 97.5])
+dist_plot(boots, "Bootstrap standard deviations (minutes)", obs=pm.std(ddof=1))
+pd.Series({"Sample SD": round(float(pm.std(ddof=1)), 2),
+           "95% CI for the SD": f"({ci[0]:.1f}, {ci[1]:.1f})",
+           "Interval midpoint": round(float((ci[0] + ci[1]) / 2), 2)}).to_string()
+```
+
+## Exercise B.32
+
+**Average Land Area in Countries of the World.** Ten countries
+(`TenCountries`, Table B.7); 99% CI for mean country size.
+
+- Bootstrap the 10 land areas, record each resample mean, take the 0.5th and
+  99.5th percentiles: **99% CI ≈ (31, 229) thousand sq km** (the sample mean
+  is 111.3). We are 99% sure the average land area of a country in the world
+  is between about 31,000 and 229,000 square km.
+- The interval is strongly **right-skewed** — the sample (one huge value,
+  425.4 for Uzbekistan) makes the bootstrap means pile up low with a long
+  right tail, so the percentile interval is asymmetric around 111.
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the mean land area of the ten sampled countries
+tc = pd.read_csv("data/ch04/TenCountries.csv")
+ar = tc.Area.to_numpy(float)
+boots = boot_stats([ar], lambda r: r[0].mean())
+ci99 = np.percentile(boots, [0.5, 99.5])
+dist_plot(boots, "Bootstrap mean land area (1000 sq km)", obs=ar.mean())
+pd.Series({"Sample mean (1000 sq km)": round(ar.mean(), 2),
+           "99% bootstrap CI": f"({ci99[0]:.1f}, {ci99[1]:.1f})"}).to_string()
+```
+
+## Exercise B.33
+
+**Land Area and Percent Rural in Countries of the World.** Same ten countries;
+regress PctRural on Area.
+
+- **(a)** Least squares slope: $b = 0.0505$ — each additional 1,000 sq km of
+  land area predicts, on average, about 0.05 percentage points more of the
+  population living in rural areas.
+- **(b)** Pairs bootstrap of the ten (Area, PctRural) points, 10,000
+  resamples: 95% CI for the population slope ≈ **(−0.09, 0.09)**.
+- **(c) Yes.** The true slope (all 217 countries) is essentially 0, and 0 lies
+  inside the interval — this particular sample's interval succeeds in
+  capturing it (about 95% of such intervals do).
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the regression slope predicting percent rural from land area
+y = tc.PctRural.to_numpy(float)
+boots = boot_pairs(ar, y, lambda a, b: np.polyfit(a, b, 1)[0])
+ci = np.percentile(boots, [2.5, 97.5])
+dist_plot(boots, "Bootstrap regression slopes", obs=np.polyfit(ar, y, 1)[0])
+pd.Series({"Sample slope": round(float(np.polyfit(ar, y, 1)[0]), 4),
+           "95% bootstrap CI": f"({ci[0]:.3f}, {ci[1]:.3f})",
+           "Captures 0?": bool(ci[0] <= 0 <= ci[1])}).to_string()
+```
+
+## Exercise B.34
+
+**Effect of Smoking on Pregnancy Rate.** Table B.8: 38 of 135 smokers became
+pregnant in the first cycle vs 206 of 543 non-smokers.
+
+- **(a)** Best point estimate:
+  $\hat p_s - \hat p_{ns} = 38/135 - 206/543 = 0.281 - 0.379 = -0.098$ —
+  smokers were about 9.8 percentage points *less* likely to conceive.
+- **(b)** Bootstrap the two groups separately, 10,000 reps: 90% CI for
+  $p_s - p_{ns}$ ≈ **(−0.17, −0.02)**. We are 90% sure smokers' first-cycle
+  pregnancy rate is between 2 and 17 percentage points lower.
+  **Plausible no effect? No** — 0 lies outside the interval: smoking is
+  associated with a lower pregnancy rate. (Observational data — women were not
+  assigned to smoke — so the *cause* need not be smoking itself.)
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the difference in pregnancy proportions, smokers minus non-smokers
+ps_g = np.repeat([1.0, 0.0], [38, 97])
+ns_g = np.repeat([1.0, 0.0], [206, 337])
+obs = ps_g.mean() - ns_g.mean()
+boots = boot_stats([ps_g, ns_g], lambda r: r[0].mean() - r[1].mean())
+ci90 = np.percentile(boots, [5, 95])
+dist_plot(boots, "Bootstrap differences in proportions (smoker - non-smoker)", obs=obs, tail="left")
+pd.Series({"Observed difference": round(obs, 3),
+           "90% bootstrap CI": f"({ci90[0]:.3f}, {ci90[1]:.3f})",
+           "0 inside the interval?": bool(ci90[0] <= 0 <= ci90[1])}).to_string()
+```
+
+## Exercise B.35
+
+**Testing the Effect of Smoking on Pregnancy Rate.** Same data (Table B.8).
+
+- **(a) One-tailed** — the question asks specifically whether smokers' rate is
+  *lower*.
+- **(b)** $H_0: p_s = p_{ns}$ vs $H_a: p_s < p_{ns}$.
+- **(c)** Under $H_0$ the 678 women would succeed at the same rate regardless
+  of group, so we re-deal the actual group sizes: randomly assign **135**
+  women to the smoking group and **543** to the non-smoking group.
+- **(d)** Figure B.9's randomization distribution of the success count in the
+  smoking group is centered near 48 (the chance-expected count
+  $135 \cdot 244/678 \approx 48.6$). The observed count of **38** sits in the
+  lower tail: our simulation puts $P(\text{count} \le 38) \approx 0.03$–0.04,
+  so the best option is **0.04**.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the number of pregnancies assigned to the smoking group when ps equals pns
+pool = np.repeat([1.0, 0.0], [244, 434])
+counts = rand_label(pool, 135, lambda a, b: a.sum())
+dist_plot(counts, "Randomization counts of successes in the smoking group", obs=38, tail="left", bins=22)
+pd.Series({"Expected count under H0": round(counts.mean(), 1),
+           "Observed count": 38,
+           "One-tail p-value P(count <= 38)": round(float((counts <= 38).mean()), 4)}).to_string()
+```
+
+## Exercise B.36
+
+**Taxes and Soda Consumption: Dotplots of Samples.** Testing
+$H_0: \mu = 50$ vs $H_a: \mu < 50$ (arrow marks 50); Figure B.10.
+
+- **(a) Sample B.** The two samples have similar spread, but Sample B's center
+  (≈ 43) is farther below 50 than Sample A's (≈ 46–47) — a bigger gap in SE
+  units means stronger evidence.
+- **(b) Sample B.** Both centers sit at about 48, but Sample B's values are
+  much less spread out, so the same 2-gallon shortfall is more standard errors
+  below 50 — stronger evidence.
+- **(c) Neither.** Both sample centers (≈ 52 for A, ≈ 57 for B) are *above*
+  50; nothing here suggests mean consumption is below 50. (If anything, the
+  data hint the opposite direction, which $H_a$ does not anticipate.)
+
+## Exercise B.37
+
+**Taxes and Soda Consumption: Boxplots of Samples.** Same test, Figure B.11;
+sample sizes matter.
+
+- **(a) Sample A.** Sample A's center (≈ 44) is clearly below 50 while Sample
+  B's (≈ 50) sits right at the null value — B gives essentially no evidence.
+- **(b) Sample B.** Both centers are a few gallons below 50, but Sample B's
+  box is far tighter (IQR ≈ 6 vs ≈ 25), so B's shortfall is many more SEs from
+  50 — same gap, much stronger evidence.
+- **(c) Sample A.** The centers (≈ 45) and spreads are alike, but Sample A has
+  $n = 500$ against $n = 10$: its SE is roughly $\sqrt{50}$ times smaller, so
+  the same 5-gallon gap is far more standard errors below 50.
+
+## Exercise B.38
+
+**Taxes on Soda: Interpreting P-values.** $H_0: \mu = 50$ vs $H_a: \mu < 50$.
+
+- **(a) $p = 0.02$:** if a sales tax had *no* effect on consumption (mean
+  still 50 gallons), only about 2% of random samples of communities would
+  show a sample mean as far below 50 as the one observed. Such results are
+  rare by chance alone.
+- **(b) $p = 0.41$:** if the tax had no effect, about 41% of samples would
+  look this extreme — completely ordinary, nothing to write home about.
+- **(c) 0.02** gives stronger evidence that the tax reduces consumption.
+- **(d) 0.02** is more statistically significant (the smaller p-value is
+  stronger evidence against $H_0$ at any fixed level).
+
+## Exercise B.39
+
+**Standard Error for Proportion of Action Movies.** 170 of 1,295 Hollywood
+movies (2012–2018) are action movies.
+
+- **(a)** These 1,295 movies are the population:
+  $p = 170/1295 \approx 0.131$.
+- **(b)** Sampling distribution for $n = 100$ ($np \approx 13 \ge 10$):
+  roughly **bell-shaped**, **centered at 0.131**, with standard error
+  $\sqrt{0.131(0.869)/100} \approx$ **0.034**.
+
+## Exercise B.40
+
+**Average Size of a Performing Group in the Rock and Roll Hall of Fame.**
+(`RockandRoll2019`); 230 performer inductees through 2019.
+
+- **(a)** These 230 are the population of interest:
+  $\bar x = 3.06$ members per performer inductee (mean group size, counting
+  solo artists as 1).
+- **(b)** The distribution of the 230 group sizes is **heavily right-skewed**
+  — most inductees are solo artists or duos, a few are large ensembles. The
+  two largest groups: **Parliament-Funkadelic (16 members)** and **The
+  Grateful Dead (12 members)**.
+- **(c)** Sampling distribution of $\bar x$ with $n = 10$ (10,000 samples):
+  still **slightly right-skewed**, **centered at 3.06**, standard error ≈
+  **0.74** members.
+- **(d)** One dot = the **mean group size of one random sample of 10 performer
+  inductees**.
+
+```{python}
+#| echo: false
+#| fig-cap: Sampling distribution of the mean group size from samples of 10 performer inductees
+rr = pd.read_csv("data/ch03/RockandRoll2019.csv")
+perf = rr.loc[rr.Category == "Performer", "People"].to_numpy(float)
+sm = samp_means(perf, 10)
+dist_plot(sm, "Sample means (members, n = 10)", obs=perf.mean())
+pd.Series({"Mean group size": round(perf.mean(), 3),
+           "Largest groups": "Parliament-Funkadelic (16), The Grateful Dead (12)",
+           "Smallest sample mean": round(sm.min(), 2),
+           "Largest sample mean": round(sm.max(), 2),
+           "Standard error": round(sm.std(ddof=1), 3)}).to_string()
+```
+
+## Exercise B.41
+
+**Sampling Distributions vs Bootstrap Distributions.** For the same statistic,
+same sample size:
+
+- **(a) Shape: approximately the same.** Both show how the statistic varies
+  sample to sample, so both inherit the statistic's usual shape (skew,
+  bell-shape, …).
+- **(b) Center: approximately the same** — the sampling distribution is
+  centered at the population parameter and the bootstrap at the original
+  sample statistic; when the sample is representative these nearly coincide.
+- **(c) Spread: approximately the same** — both estimate the same standard
+  error of the statistic at that sample size.
+- **(d) Different — what one dot represents.** Sampling-distribution dot:
+  the statistic computed from one random sample *of that size drawn from the
+  population*. Bootstrap dot: the statistic from one resample (with
+  replacement) *of the original sample*.
+- **(e) Different — information needed.** A sampling distribution requires
+  access to the whole population; a bootstrap distribution needs only the one
+  observed sample — which is exactly why bootstrapping is practical.
+
+## Exercise B.42
+
+**Bootstrap Distributions for Intervals vs Randomization Distributions for
+Tests.**
+
+- A **bootstrap** distribution is centered at the **observed sample
+  statistic** — it answers "how far might the statistic be from the
+  (unknown) parameter?" and its percentiles give the confidence interval.
+- A **randomization** distribution is centered at the **null hypothesized
+  value** — it answers "how far might the statistic stray by chance *if
+  $H_0$ were true*?" and the observed statistic's position in it gives the
+  p-value.
+
+## Exercise B.43
+
+**Paul the Octopus.** 8-for-8 predicting 2010 World Cup winners.
+
+- **(a)** $H_0: p = 0.5$ (Paul is just guessing — a 50-50 choice between two
+  equal food containers) vs $H_a: p > 0.5$ (Paul has some real ability).
+- **(b)** Flipping a fair coin 8 times, five times (seeded simulation here):
+  heads counts of **2, 6, 5, 6, 1**. None comes close to 8 — nothing as
+  extreme as Paul.
+- **(c)** A coin flip gives a correct "prediction" with probability exactly
+  0.5 — precisely what "just guessing between two identical containers"
+  means. Simulating 8 coin flips and counting heads reproduces the
+  random-chance world where $H_0$ is true.
+
+## Exercise B.44
+
+**How Unlikely Is Paul the Octopus's Success?** Randomization distribution =
+10,000 repetitions of 8 fair coin flips, counting heads:
+
+- The observed 8 correct answers sits at the extreme right edge of the
+  distribution: **p-value $= (1/2)^8 = 1/256 \approx 0.004$** (the simulation
+  agrees, 0.005 at 10,000 reps).
+- If Paul were really not psychic, an 8-for-8 record would happen by chance
+  only about 4 times in 1,000 — **very unlikely**. So either Paul enjoyed an
+  extraordinary lucky streak, or something beyond chance was at work.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the number of correct predictions in eight coin flips
+rng = np.random.default_rng(2026)
+heads = rng.binomial(8, 0.5, 10000)
+dist_plot(heads, "Number correct in 8 random guesses", obs=8, tail="right", bins=9)
+pd.Series({"p-value P(X >= 8) simulated": round(float((heads >= 8).mean()), 4),
+           "p-value exact (1/256)": round(1/256, 4)}).to_string()
+```
+
+:::

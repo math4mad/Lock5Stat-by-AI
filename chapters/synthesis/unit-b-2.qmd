@@ -1,0 +1,855 @@
+---
+execute-dir: project
+title: "Unit B · Essential Synthesis (B.45–B.82)"
+subtitle: "Randomization tests & bootstrap CIs across all five worlds"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+The Unit B Essential Synthesis exercises mix everything from the unit: judging
+how the data were collected, choosing between a **randomization test** (a
+p-value for a claim) and a **bootstrap confidence interval** (a set of
+plausible parameter values), reading p-values off printed randomization
+distributions, and weighing Type I/Type II errors and significance levels.
+Exercises B.45–B.82 below are worked in order; wherever the exercise references
+a real Lock⁵ dataset we load it and re-run the simulation (10,000 replicates,
+seed 2026) so every p-value and interval is reproducible, and wherever the
+book prints a randomization or bootstrap display we read the relevant values
+off the figure. Conclusions match StatKey up to Monte Carlo wobble.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+sns.set_theme(style="whitegrid")
+
+def boot_stats(samples, stat_fn, reps=10000, seed=2026):
+    """Bootstrap: resample each array in `samples` with replacement, apply stat_fn."""
+    rng = np.random.default_rng(seed)
+    out = np.empty(reps)
+    for i in range(reps):
+        res = [s[rng.integers(0, len(s), len(s))] for s in samples]
+        out[i] = stat_fn(res)
+    return out
+
+def rand_corr(x, y, reps=10000, seed=2026):
+    """Randomization for correlation: permute y against fixed x."""
+    rng = np.random.default_rng(seed)
+    out = np.empty(reps)
+    for i in range(reps):
+        out[i] = np.corrcoef(x, rng.permutation(y))[0, 1]
+    return out
+
+def dist_plot(boots, xlabel, obs=None, tail="two", bins=30, figsize=(6, 3)):
+    """Histogram of simulated statistics, optionally marking the observed statistic."""
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.histplot(x=boots, bins=bins, ax=ax, color="#4c72b0")
+    if obs is not None:
+        lines = (-abs(obs), abs(obs)) if tail == "two" else ((obs,) if tail == "right" else (-abs(obs),))
+        for v in lines:
+            ax.axvline(v, color="#c44e52", ls="--", lw=1)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Simulated statistics")
+    plt.tight_layout()
+    plt.show()
+```
+
+::: {.panel-tabset}
+
+## Exercise B.45
+
+**Red or Pink Display of Fertility.** Of 10 women in their fertile window, 4
+wore red or pink; of 14 not in the fertile window, 1 did.
+
+- **(a)** $H_0: p_f = p_{nf}$ vs $H_a: p_f > p_{nf}$, where $p_f$ and $p_{nf}$
+  are the proportions of *all* women (like these) who would wear red or pink
+  during and outside the fertile window.
+- **(b)** $\hat p_f - \hat p_{nf} = \frac{4}{10} - \frac{1}{14} = 0.400 -
+  0.071 = 0.329$.
+- **(c)** The observed 0.329 appears in the table, so the one-tailed p-value is
+  $\frac{68 + 5}{1000} = 0.073$. A real label-reassignment test on the 24
+  women agrees: with only 5 red/pink shirts among 24 people there are just six
+  possible differences, and the exact hypergeometric tail
+  $P(X \ge 4) = 0.075$ matches the book's simulated 0.073. At the 5% level we
+  **do not reject $H_0$** — suggestive, but not convincing, evidence that red
+  or pink is more common near peak fertility.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in proportions wearing red or pink, fertile minus not fertile
+from math import comb
+tbl = pd.DataFrame({"Diff": [-0.357, -0.186, -0.014, 0.157, 0.329, 0.500],
+                    "Count": [39, 223, 401, 264, 68, 5]})
+fig, ax = plt.subplots(figsize=(6, 3))
+colors = ["#4c72b0"] * 4 + ["#c44e52"] * 2
+ax.bar(tbl.Diff, tbl.Count, width=0.12, color=colors)
+ax.axvline(0.329, color="#c44e52", ls="--", lw=1)
+ax.annotate("observed = 0.329", xy=(0.329, 130), xytext=(0.06, 190),
+            arrowprops=dict(arrowstyle="->", color="#c44e52"), fontsize=9)
+ax.set_xlabel("Randomization differences in proportions")
+ax.set_ylabel("Count in 1000 samples")
+plt.tight_layout()
+plt.show()
+p_table = (68 + 5) / 1000
+p_exact = (comb(10, 4) * comb(14, 1) + comb(10, 5)) / comb(24, 5)
+pd.Series({"p-value from Table B.9": p_table,
+           "Exact p-value from the 24 women": round(p_exact, 4)}).to_string()
+```
+
+## Exercise B.46
+
+**Exercise Hours: Males vs Females.** The 20 men averaged 12.4 h/week and the
+30 women 9.4 h/week; the book's SE-based 95% CI for $\mu_m - \mu_f$ is
+(−1.75, 7.75).
+
+A percentile bootstrap on `ExerciseHours` (10,000 resamples) gives the 90%
+interval below.
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the difference in mean exercise hours, males minus females
+eh = pd.read_csv("data/ch04/ExerciseHours.csv")
+mv = eh.loc[eh.Sex == "M", "Exercise"].to_numpy(float)
+fv = eh.loc[eh.Sex == "F", "Exercise"].to_numpy(float)
+boots = boot_stats([mv, fv], lambda r: r[0].mean() - r[1].mean())
+ci90 = np.percentile(boots, [5, 95])
+dist_plot(boots, "Bootstrap differences in means (hours, M - F)", obs=mv.mean() - fv.mean())
+pd.Series({"Observed difference (hours)": round(mv.mean() - fv.mean(), 2),
+           "Bootstrap SE": round(boots.std(ddof=1), 2),
+           "90% bootstrap CI": f"({ci90[0]:.2f}, {ci90[1]:.2f})"}).to_string()
+```
+
+We are 90% sure that the difference in mean weekly exercise between male and
+female college students ($\mu_m - \mu_f$) is between about −0.9 and 6.9 hours.
+As expected, the 90% interval is **narrower** than the 95% interval
+(−1.75, 7.75) — buying less confidence means not reaching as far into the
+tails. Both intervals contain 0, so neither would reject
+$H_0: \mu_m = \mu_f$.
+
+## Exercise B.47
+
+**What Proportion Watch the Super Bowl?** Random sample of $n = 7293$ American
+adults in January 2016; 95% CI (0.573, 0.597).
+
+- **(a)** Population: all American adults. Sample: the 7293 adults polled.
+- **(b)** We are 95% sure that between 57.3% and 59.7% of all American adults
+  planned to watch Super Bowl 50.
+- **(c)** Best estimate = midpoint $= (0.573 + 0.597)/2 = 0.585$; margin of
+  error $= (0.597 - 0.573)/2 = 0.012$ (about ±1.2 percentage points).
+
+## Exercise B.48
+
+**A Possible Fast-Acting Antidepressant.** $n = 10$ mice given ketamine,
+mean immobility 135 s, SE = 6.
+
+- **(a)** Write each of the 10 immobility times on its own slip of paper (10
+  slips). To form one bootstrap sample: draw a slip at random, record the
+  value, **put it back**, mix, and repeat until 10 values are recorded (some
+  slips are used several times, others not at all). Record the **mean** of the
+  10 recorded values — that is one bootstrap statistic.
+- **(b)** SE 6 gives $135 \pm 2(6)$: a 95% CI of **123 to 147 seconds**. We
+  are 95% sure that the mean time immobile in a forced-swim test for mice
+  receiving ketamine is between about 123 and 147 seconds.
+- **(c) No** — 160 lies *above* the entire interval. Ketamine-treated mice
+  appear to average roughly 13 to 37 seconds less immobility than the ~160
+  seconds typical of depressed mice, consistent with a real (fast) effect.
+
+## Exercise B.49
+
+**A Test for a Possible Fast-Acting Antidepressant.**
+
+- **(a)** $H_0: \mu = 160$ vs $H_a: \mu < 160$, where $\mu$ is the mean
+  forced-swim score for depressed mice after ketamine treatment.
+- **(b)** Randomization must create samples *with $\mu = 160$*. Take the 10
+  slips from Exercise B.48 and **add 25 seconds to every value**, so the
+  shifted data have mean exactly 160 (center moved, spread unchanged). To get
+  one randomization statistic: draw a slip, record, replace, and repeat 10
+  times; record the **mean** of the 10 drawn values. Many repeats build the
+  randomization distribution, and the p-value is the proportion of simulated
+  means at or below the observed 135.
+
+## Exercise B.50
+
+**Proportion of a Country's Population with Access to the Internet.**
+`AllCountries` records Internet access for all countries with data.
+
+```{python}
+#| echo: false
+ac = pd.read_csv("data/ch01/AllCountries.csv")
+inet = ac["Internet"].dropna().to_numpy(float)
+top = ac.loc[ac["Internet"].idxmax()]
+bot = ac.loc[ac["Internet"].idxmin()]
+rng = np.random.default_rng(2026)
+sims = np.array([inet[rng.integers(0, len(inet), 10)].mean() for _ in range(10000)])
+pd.Series({"n countries with data": len(inet),
+           "Population mean mu (%)": round(inet.mean(), 1),
+           "Population st.dev. sigma (%)": round(inet.std(ddof=0), 1),
+           "Highest": f"{top.Country} {top.Internet}%",
+           "Lowest": f"{bot.Country} {bot.Internet}%",
+           "United States (for part b)": f"{float(ac.loc[ac.Country == 'United States', 'Internet'].iloc[0])}%",
+           "SE for n = 10 (sigma over root 10)": round(inet.std(ddof=0) / np.sqrt(10), 2),
+           "SE simulated, 10000 samples of n = 10": round(sims.std(ddof=1), 2)}).to_string()
+```
+
+- **(a)** These are *all* countries, so the answers are parameters:
+  $\mu \approx 54.5\%$ with $\sigma \approx 28.3$ percentage points.
+- **(b)** Highest: **Andorra, 98.9%**; lowest: **Eritrea, 1.3%**. (The rate
+  for *your* country comes from the same dataset — for example the United
+  States sits at 75.2% and Canada at 92.7%.)
+- **(c)** A sampling distribution of means for samples of size $n = 10$ drawn
+  from this population is centered at $\mu \approx 54.5$ and roughly mirrors
+  the spread-out shape of the population; the standard error is
+  $\sigma/\sqrt{10} \approx 9.0$ percentage points (our simulated value,
+  8.8, agrees).
+
+## Exercise B.51
+
+**Cell Phones and Cancer.** The 10% heaviest users had a 40% higher risk, but
+the result was **not statistically significant** (an observational study).
+
+- **(a) Plausible.** "Not significant" means the data are compatible with no
+  effect, so no-effect remains a live possibility.
+- **(b) Plausible.** The sample actually showed 40% higher risk; failing to
+  reach significance does not rule out a real association — this is exactly
+  why Saracci and Samet say the question "remains open."
+- **(c) Not plausible.** The study is observational (people chose their own
+  phone use), so it cannot establish that heavy use *causes* cancer, however
+  large the observed association.
+
+## Exercise B.52
+
+**Infections in Childbirth.** CDC randomized trial in South Africa: treated
+(chlorohexidine) wipe vs sterile placebo wipe; response = whether the newborn
+develops an infection.
+
+- **(a)** Parameters $p_c$ and $p_w$, the proportions of infections among all
+  births with the treated wipe and with the placebo wipe:
+  $H_0: p_c = p_w$ vs $H_a: p_c < p_w$.
+- **(b)** The sample proportions of infections in the two groups (or,
+  equivalently, their difference $\hat p_c - \hat p_w$).
+- **(c)** Significance would give **causal** evidence that the treated wipe
+  reduces infections — the randomization rules out chance as the explanation,
+  so the CDC should recommend adopting the wipe.
+- **(d)** Non-significance means **insufficient evidence** that the wipe
+  helps — not proof that it does nothing; the effect may be real but too
+  small (or the study too small) to detect.
+
+## Exercise B.53
+
+**Mice and Pain.** Correlation between a "mouse grimace scale" score and the
+degree/duration of pain.
+
+- **(a)** Parameter $\rho$, the correlation between grimace-scale scores and
+  pain level for all mice (mammals); $H_0: \rho = 0$ vs $H_a: \rho > 0$.
+- **(b) Yes.** If the authors claim the scale works, the sample correlation
+  must have been large enough to be statistically significant — beyond what
+  chance pairings of scores with pain would produce.
+- **(c) No.** If the placebo truly causes no pain, grimace scores and placebo
+  response are unrelated, so a fresh sample should produce a correlation near
+  0 — not one as extreme as the original study's significant value.
+- **(d) It flips.** If the *original* study found no relationship between
+  grimaces and real pain, then its correlation was itself within chance
+  range — so an equally extreme correlation against a placebo would be no
+  surprise.
+
+## Exercise B.54
+
+**Measuring the Impact of Great Teachers (Project Star).**
+
+- **(a)** "Too big to be explained by randomness" → the p-value is
+  **relatively small**.
+- **(b)** "Do little better" — no detectable effect → the p-value is
+  **relatively large**.
+- **(c)** "Significantly more likely to go to college… earning more" → the
+  p-values are **relatively small**.
+
+## Exercise B.55
+
+**Smiles and Leniency.** $H_0: \mu_s = \mu_n$ vs $H_a: \mu_s > \mu_n$; the
+dotplot in Figure B.12 shows 1000 randomization differences in means, with
+$D = \bar x_s - \bar x_n = 0.79$ marked and 23 dots beyond it.
+
+- **(a)** $p = 23/1000 = \mathbf{0.023}$ — about 2% of random assignments
+  produce a difference at least as large as the observed 0.79. Re-running the
+  randomization on the `Smiles` data gives 0.022, matching the figure.
+- **(b)** The randomization distribution **itself does not change** — the
+  same 1000 deals of the leniency scores, still centered at 0. Only the
+  p-value changes: a two-tailed test counts differences as extreme in *either*
+  direction, roughly doubling the p-value to about $46/1000 = \mathbf{0.046}$
+  (our simulation: 0.050). Still significant at 5%, barely.
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in mean leniency scores, smiling minus neutral
+sm = pd.read_csv("data/ch04/Smiles.csv")
+sv = sm["Leniency"].to_numpy(float)
+sg = (sm["Group"] == "smile").to_numpy()
+s1, s0 = sv[sg], sv[~sg]
+obs55 = s1.mean() - s0.mean()
+rng = np.random.default_rng(2026)
+out55 = np.empty(10000)
+for i in range(10000):
+    p = rng.permutation(sv)
+    out55[i] = p[:len(s1)].mean() - p[len(s1):].mean()
+dist_plot(out55, "Randomization differences in means (smile - neutral)", obs=obs55)
+pd.Series({"Observed difference": round(obs55, 2),
+           "One-tail p-value": round(float((out55 >= obs55 - 1e-9).mean()), 4),
+           "Two-tail p-value": round(float((np.abs(out55) >= abs(obs55) - 1e-9).mean()), 4)}).to_string()
+```
+
+## Exercise B.56
+
+**Estimating the Proportion with Employer-Based Health Insurance.** Gallup:
+$\hat p = 0.45$, $n = 147{,}291$; Figure B.13 shows a bootstrap distribution
+with mean 0.450 and st.dev. 0.001.
+
+- The bootstrap standard error is about **SE = 0.001**, so a 95% CI is
+  $0.450 \pm 2(0.001)$, i.e. about **0.448 to 0.452**: we are 95% sure the
+  proportion of all American adults with employer-based health insurance is
+  between 44.8% and 45.2%.
+- With $n$ this enormous the sampling variability is tiny — the honest margin
+  of error (±0.2 points) is far smaller than the rounded "±1 percentage
+  point" Gallup quotes. (A caveat the book makes elsewhere: huge $n$ shrinks
+  *sampling* error but not non-sampling biases.)
+
+## Exercise B.57
+
+**False Positives in Lie Detection.** 48 truthful stressed readers; software
+called 57% deceptive; bootstrap SE = 0.07.
+
+- **(a)** Best estimate: $\hat p = 0.57$ — the proportion of all such
+  truthful people the software would label deceptive.
+- **(b)** $0.57 \pm 2(0.07)$ → **95% CI (0.43, 0.71)**.
+- **(c)** The best estimate says the detector errs on *more than half* of
+  truthful, stressed people, and even the low end of the interval (0.43) is
+  hardly better than a coin flip while the high end (0.71) is dreadful.
+  **No** — with error rates like these, results from this lie detector should
+  not hold up in court.
+
+## Exercise B.58
+
+**How Common are False Positives in Lie Detection?** 27 of 48 labeled
+deceptive. $H_0: p = 0.5$ vs $H_a: p > 0.5$, where $p$ is the proportion of
+truthful stressed readers this software would call deceptive.
+
+```{python}
+#| echo: false
+from math import comb
+p58 = sum(comb(48, i) for i in range(27, 49)) / 2**48
+pd.Series({"Observed proportion": round(27 / 48, 4),
+           "Exact one-tail p-value (Binomial n=48, p=0.5)": round(p58, 4)}).to_string()
+```
+
+The randomization test is 48 fair coin flips per simulated sample: the exact
+one-tailed **p-value ≈ 0.235** (simulation agrees), far above 0.05 → **do not
+reject $H_0$**. This sample does *not* provide evidence that the software is
+wrong more than half the time in such settings — nicely consistent with the
+95% interval (0.43, 0.71) of Exercise B.57, which contains 0.5.
+
+## Exercise B.59
+
+**Red Wine and Weight Loss.** Six lemurs, before/after resveratrol; p-values
+for paired tests.
+
+- **(a)** $p = 0.013 < 0.05$ → **reject $H_0$**: mean resting metabolic rate
+  is higher after treatment.
+- **(b)** $p = 0.007 < 0.05$ → **reject $H_0$**: mean body mass gain is lower
+  after treatment.
+- **(c)** $p = 0.035 < 0.05$ → **reject $H_0$**: mean food intake is affected
+  by the treatment.
+- **(d)** $p = 0.980 > 0.05$ → **do not reject $H_0$**: no evidence that mean
+  locomotor activity is affected.
+- **(e)** Strongest evidence: **body mass gain ($p = 0.007$)**; weakest:
+  **locomotor activity ($p = 0.980$)**.
+- **(f)** At a stricter 1% level only **(b)** stays significant; (a), (c) and
+  (d) all become non-significant ($0.013, 0.035, 0.980 > 0.01$).
+- **(g)** Informally: $p = 0.013$ — moderately strong evidence, would occur by
+  chance about 1 time in 77; $p = 0.007$ — strong evidence, about 1 in 143;
+  $p = 0.035$ — some evidence, about 1 in 29; $p = 0.980$ — no evidence at
+  all, the result is utterly ordinary under $H_0$.
+- **(h) No.** The six lemurs were not a random sample of all lemurs (they are
+  captive lab animals of one species), so generalizing to the whole population
+  is unwarranted — though the consistency of the metabolic and mass results
+  makes the finding biologically interesting.
+
+## Exercise B.60
+
+**Radiation from Cell Phones and Brain Activity.** 47 participants, phones on
+both ears, brain glucose metabolism measured with one phone "on" vs both
+"off."
+
+- **(a) Experiment** — the "on/off" condition was imposed by the researchers.
+  *Matched-pairs*: each participant is measured under **both** conditions, so
+  each person is their own control and comparisons are within-subject.
+- **(b)** Randomization likely determined which ear held the active phone
+  (and/or the order of the two conditions). Phones stayed on the ears during
+  the "off" condition so that the physical presence of the phones — weight,
+  heat, participant expectation — is held constant; only the radiofrequency
+  signal differs.
+- **(c)** $\mu_{on} - \mu_{off}$ = mean difference in glucose metabolism:
+  $H_0: \mu_{on} = \mu_{off}$ vs $H_a: \mu_{on} \ne \mu_{off}$.
+- **(d)** $p = 0.004 < 0.05$ → **reject $H_0$**: cell phone exposure changes
+  (here, increases) average brain glucose metabolism.
+- **(e)** A **scatterplot** of metabolism vs radiofrequency amplitude.
+- **(f)** $H_0: \rho = 0$ vs $H_a: \rho \ne 0$, where $\rho$ is the
+  correlation between brain glucose metabolism and the amplitude of the
+  radiofrequency waves.
+- **(g)** $p < 0.001$ → **reject $H_0$**: strong evidence that metabolism is
+  correlated with the signal amplitude — the bigger the dose, the bigger the
+  brain response.
+
+## Exercise B.61
+
+**Genetic Component of Autism.** 28 of 92 younger siblings of autistic
+children later diagnosed; find a 99% CI for the sibling recurrence risk.
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the proportion of autistic siblings later diagnosed
+aut = np.repeat([1.0, 0.0], [28, 64])
+bab = boot_stats([aut], lambda r: r[0].mean())
+ci99 = np.percentile(bab, [0.5, 99.5])
+dist_plot(bab, "Bootstrap proportions", obs=28 / 92, bins=24)
+pd.Series({"Observed proportion": round(28 / 92, 3),
+           "99% bootstrap CI": f"({ci99[0]:.3f}, {ci99[1]:.3f})"}).to_string()
+```
+
+We are 99% sure that the proportion of siblings of autistic children who will
+themselves be diagnosed with autism is between about **0.19 and 0.42** —
+dramatically above the 0.009 rate in the general population, and the entire
+interval sits far above it, strong evidence of a substantial familial/genetic
+component.
+
+## Exercise B.62
+
+**Commuting Distances in Atlanta.** `CommuteAtlanta`, $n = 500$, variable
+Distance (miles).
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of mean commute distance for 500 Atlanta commutes
+ca = pd.read_csv("data/ch03/CommuteAtlanta.csv")
+dist = ca["Distance"].to_numpy(float)
+bd = boot_stats([dist], lambda r: r[0].mean())
+ci95d = np.percentile(bd, [2.5, 97.5])
+dist_plot(bd, "Bootstrap sample means (miles)", obs=dist.mean(), bins=24)
+pd.Series({"Mean (a)": round(dist.mean(), 2),
+           "StDev (a)": round(dist.std(ddof=1), 2),
+           "Bootstrap center (b)": round(bd.mean(), 2),
+           "Bootstrap SE (c)": round(bd.std(ddof=1), 2),
+           "95% CI (d)": f"({ci95d[0]:.2f}, {ci95d[1]:.2f})"}).to_string()
+```
+
+- **(a)** $\bar x = 18.16$ miles, $s = 13.80$ miles.
+- **(b)** The bootstrap distribution of the 10,000 sample means above is
+  roughly bell-shaped (a slight right skew inherited from the data) and
+  centered at the observed mean of about 18.2 miles.
+- **(c)** SE $\approx$ 0.62 miles.
+- **(d)** $18.16 \pm 2(0.62)$: we are 95% sure that the mean commute distance
+  for all Atlanta metropolitan workers is between about 17 and 19.4 miles.
+
+## Exercise B.63
+
+**Mean of Atlanta Commuting Distances.** Using the same bootstrap
+distribution, the 90% percentile interval for the mean commute distance is
+about **(17.2, 19.2) miles** — slightly narrower than the 95% interval
+(16.97, 19.40) of Exercise B.62, as it must be: 90% confidence requires less
+tail area, so the interval is shorter. Interpretation: we are 90% sure that
+the mean commute distance in metropolitan Atlanta is between about 17.2 and
+19.2 miles.
+
+## Exercise B.64
+
+**Correlation between Distance and Time for Atlanta Commutes.**
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the correlation between distance and time for 500 Atlanta commutes
+tm = ca["Time"].to_numpy(float)
+r_obs = np.corrcoef(dist, tm)[0, 1]
+rng = np.random.default_rng(2026)
+bc = np.empty(5000)
+for i in range(5000):
+    idx = rng.integers(0, 500, 500)
+    bc[i] = np.corrcoef(dist[idx], tm[idx])[0, 1]
+ci95c = np.percentile(bc, [2.5, 97.5])
+dist_plot(bc, "Bootstrap correlations", obs=r_obs, bins=24)
+pd.Series({"Sample correlation (a)": round(r_obs, 3),
+           "Bootstrap center (b)": round(bc.mean(), 3),
+           "Bootstrap SE (c)": round(bc.std(ddof=1), 3),
+           "95% CI (c)": f"({ci95c[0]:.3f}, {ci95c[1]:.3f})"}).to_string()
+```
+
+- **(a)** $r = 0.807$ — strongly positive, as expected.
+- **(b)** The bootstrap distribution above is roughly bell-shaped (mild left
+  skew), centered at about 0.81.
+- **(c)** SE $\approx 0.036$, giving a 95% CI of about
+  $0.807 \pm 2(0.036) = (0.73, 0.88)$ — the percentile interval shown is
+  (0.725, 0.866): we are 95% sure the correlation between distance and time
+  for all Atlanta commutes is between about 0.73 and 0.87.
+- **(d)** The red dashed lines in the figure mark the interval on the
+  plot — the observed $r = 0.807$ sits in its center.
+
+## Exercise B.65
+
+**Confidence Intervals for Correlation using Atlanta Commutes.**
+
+- **(a)** One bootstrap value: sample 500 (Distance, Time) **pairs** with
+  replacement from the original 500 commutes, and compute the correlation of
+  that bootstrap sample.
+- **(b)–(c)** Reusing the 5000 bootstrap correlations above:
+
+```{python}
+#| echo: false
+rows = []
+for lev, q in [(99, [0.5, 99.5]), (95, [2.5, 97.5]), (90, [5, 95])]:
+    lo, hi = np.percentile(bc, q)
+    rows.append({"Level": f"{lev}%", "CI": f"({lo:.3f}, {hi:.3f})",
+                 "Width": round(hi - lo, 3)})
+pd.DataFrame(rows).set_index("Level").to_string()
+```
+
+- **(b)** 99% CI (0.693, 0.880): we are 99% sure that the correlation between
+  distance and time for all Atlanta commutes is between about 0.69 and 0.88.
+- **(c)** 95%: (0.725, 0.866); 90%: (0.740, 0.860).
+- **(d)** As the confidence level **decreases, the interval gets narrower** —
+  less confidence demands less allowance for sampling variability (total
+  width shrinks from 0.187 at 99% to 0.120 at 90%).
+
+## Exercise B.66
+
+**Classroom Games.** Randomly assigned Game 1 vs Game 2; testing
+$H_0: \mu_1 = \mu_2$ vs $H_a: \mu_1 > \mu_2$ on the Game 1 exam question;
+reported $p = 0.7619$.
+
+- **(a) No.** A p-value of 0.76 means the observed difference is entirely
+  ordinary if playing the game has no effect — there is no evidence that
+  playing Game 1 helped performance.
+- **(b)** About **762 of the 1000** repetitions would give results as extreme
+  as those observed — that is what $p = 0.7619$ means.
+- **(c)** Both p-values exceed 0.5, meaning the sample differences ran in the
+  direction *opposite* to each one-tailed alternative: students who played the
+  *other* game did (nonsignificantly) better on each question. Results this
+  ordinary are completely consistent with no effect of playing either game.
+
+## Exercise B.67
+
+**Classroom Games: Is One Question Harder?** Two-tailed test for a difference
+in mean performance on Questions 1 and 2; $p = 0.0012$.
+
+- **(a)** About **1 or 2 times in 1000** — that is the meaning of
+  $p = 0.0012$.
+- **(b) Yes.** A difference this extreme would almost never arise by chance
+  when the questions are equally difficult, so there is very strong evidence
+  that the two questions differ in average difficulty.
+- **(c) No.** A two-tailed p-value signals *that* the means differ, not
+  *which* is larger; to identify the easier question we would need the sample
+  means (or a one-tailed test with a stated direction).
+
+## Exercise B.68
+
+**Classroom Games (summary).** The two one-tailed tests give $p = 0.762$ and
+$p = 0.549$ — in both cases the sample difference favors the students who
+played the *opposite* game, and in both cases the result is utterly
+consistent with chance. **The study provides no evidence that actually
+playing a game helps students answer a theoretical question about it** — if
+anything the (non-significant) point estimates hint the reverse. Playing and
+discussing the game as done here cannot be credited with improving theoretical
+performance.
+
+## Exercise B.69
+
+**Mercury Levels in Fish and pH in Lake Water.** Randomization distribution
+of correlations (Figure B.14, 10,000 samples, $H_0: \rho = 0$) for the
+FloridaLakes data.
+
+- **(a)** $H_0: \rho = 0$ vs $H_a: \rho < 0$, where $\rho$ is the correlation
+  between pH and average mercury level for all Florida lakes.
+- **(b)** A p-value of 0.30 means 30% of the randomization correlations fall
+  *below* the statistic — the 30th percentile of the distribution. Reading
+  Figure B.14 (and confirmed by re-simulating the actual data): roughly
+  **$r \approx -0.07$** (any value around −0.05 to −0.10 is a fair read).
+- **(c)** A p-value of 0.01 means only 1% of the 10,000 correlations (about
+  100 of them) are smaller — far into the left tail: roughly
+  **$r \approx -0.33$** (about −0.3 to −0.4).
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of correlations between pH and mercury with the p-value 0.30 and 0.01 cutoffs marked
+fl = pd.read_csv("data/ch03/FloridaLakes.csv")
+ph = fl["pH"].to_numpy(float)
+hg = fl["AvgMercury"].to_numpy(float)
+rl = rand_corr(ph, hg)
+q30, q01 = np.percentile(rl, [30, 1])
+fig, ax = plt.subplots(figsize=(6, 3))
+sns.histplot(x=rl, bins=40, ax=ax, color="#4c72b0")
+for v, lab in [(q30, "p = 0.30"), (q01, "p = 0.01")]:
+    ax.axvline(v, color="#c44e52", ls="--", lw=1)
+    ax.annotate(lab, xy=(v, ax.get_ylim()[1] * 0.9), ha="right", fontsize=9, color="#c44e52")
+ax.set_xlabel("Randomization correlations (pH vs mercury)")
+plt.tight_layout()
+plt.show()
+pd.Series({"30th percentile (p = 0.30)": round(float(q30), 3),
+           "1st percentile (p = 0.01)": round(float(q01), 3)}).to_string()
+```
+
+## Exercise B.70
+
+**Arsenic in Chicken.** $H_0: \mu = 80$ vs $H_a: \mu > 80$.
+
+- **(a) Type I error:** conclude the mean arsenic level exceeds 80 ppb and
+  permanently cancel the supplier relationship when in fact the true mean is
+  (at most) 80 — dropping an innocent supplier.
+- **(b) Type II error:** fail to find significant evidence that the arsenic
+  level exceeds 80 and keep the supplier when in fact the chicken really does
+  average above 80 ppb — continuing to serve arsenic-tainted chicken.
+- **(c) No.** A Type I or II error is not a blunder in sampling, data entry,
+  or arithmetic — it is the unavoidable chance risk of any test: even a
+  perfectly run test uses a random sample, and random samples occasionally
+  mislead. The significance level simply bounds how often a *correctly
+  conducted* test commits a Type I error.
+
+## Exercise B.71
+
+**Medicinal Marijuana in HIV Treatment.** Table B.10: 14 of 27 cannabis
+patients reduced pain vs 7 of 28 placebo patients.
+
+- **(a)** $H_0: p_C = p_P$ vs $H_a: p_C > p_P$, where $p_C$ and $p_P$ are the
+  proportions of all such patients whose pain is reduced by cannabis and by
+  placebo.
+- **(b)** $\hat p_C = 14/27 = 0.519$ vs $\hat p_P = 7/28 = 0.250$ — yes, the
+  sample difference ($D = 0.269$) is squarely in the direction of the
+  alternative.
+- **(c) Relatively small.** With significant side effects at stake and a
+  skeptical regulator, the FDA would demand very strong evidence — a small
+  significance level such as 1%.
+- **(d)** Assumption: $H_0$ is true, so the cannabis/placebo labels are
+  arbitrary and the observed reduction outcomes would have been dealt out the
+  same way regardless. The randomization distribution of
+  $D = \hat p_1 - \hat p_2$ is then **centered at 0** and roughly
+  bell-shaped (see the figure in Exercise B.72).
+- **(e)** Observed statistic $D = 0.519 - 0.250 = 0.269$. With $p = 0.02$,
+  the statistic sits far out in the **right tail** — only 2% of random deals
+  produce a difference that large.
+- **(f)** $p = 0.02$: **strong evidence** against $H_0$ — a difference this
+  size would occur by chance only about 1 time in 50 if cannabis were no
+  better than placebo.
+- **(g)** If the FDA uses a small level such as $\alpha = 0.01$, then
+  $p = 0.02 > 0.01$ → the likely formal conclusion is **do not reject
+  $H_0$** — the evidence, while strong by ordinary standards, does not clear
+  the FDA's deliberately high bar.
+
+## Exercise B.72
+
+**Finding a P-value for Marijuana for HIV Patients.** Running the actual
+randomization test on Table B.10 (deal 21 "pain reduced" labels among 55
+patients, 27 to cannabis; one-tailed):
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of the difference in proportion of patients with reduced pain, cannabis minus placebo
+cards = np.repeat([1.0, 0.0], [21, 34])
+obs72 = 14 / 27 - 7 / 28
+rng = np.random.default_rng(2026)
+o72 = np.empty(10000)
+for i in range(10000):
+    p = rng.permutation(cards)
+    o72[i] = p[:27].mean() - p[27:].mean()
+dist_plot(o72, "Randomization differences in proportions (cannabis - placebo)", obs=obs72, tail="right")
+p_exact = sum(comb(21, x) * comb(34, 27 - x) for x in range(14, 28)) / comb(55, 27)
+pd.Series({"Observed D": round(obs72, 3),
+           "Simulated one-tail p (10000 deals)": round(float((o72 >= obs72 - 1e-9).mean()), 4),
+           "Exact p (hypergeometric)": round(p_exact, 4)}).to_string()
+```
+
+The simulated one-tailed **p-value ≈ 0.039** (exact 0.038) — the same
+ballpark as the 0.02 quoted in Exercise B.71(e), both well under 0.05. The
+evidence against $H_0$ is **fairly strong**: if cannabis were no better than
+a placebo, a gap of 26.9 percentage points or more would appear by chance in
+fewer than 1 deal in 25. Cannabis shows real promise for neuropathic pain
+relief in these patients — though (per B.71g) not conclusively enough for a
+regulator insisting on a 1% level.
+
+## Exercise B.73
+
+**Possible Errors in Testing Infections in Childbirth.**
+$H_0: p_c = p_w$ vs $H_a: p_c < p_w$, $n = 481$ randomized women.
+
+- **(a) Type I error:** conclude the chlorohexidine wipe reduces newborn
+  infections and adopt it when in truth it provides no protection.
+- **(b) Type II error:** fail to detect a genuine reduction in infections and
+  pass up a wipe that would actually help babies.
+- **(c) Smaller significance level for the new, potentially harmful drug.**
+  When the treatment itself carries risk, a Type I error (embracing a harmful
+  product) is costly, so we demand stronger evidence. If the drug is known to
+  be very safe, a larger $\alpha$ is reasonable because the downside of a
+  false positive is small.
+- **(d)** $p = 0.32$ → **do not reject $H_0$**: no evidence that the treated
+  wipe reduces infections.
+- **(e) No.** Failing to reject means the study did not provide convincing
+  evidence of a benefit — it does not demonstrate that the wipes do nothing.
+  Absence of evidence is not evidence of absence: the effect may exist but be
+  too small, or the sample too limited, to detect.
+
+## Exercise B.74
+
+**Mercury Levels in Fish (design).** $H_0: \rho = 0$ vs $H_a: \rho < 0$;
+$n = 53$, $r = -0.575$.
+
+- **(a)** Assumption: $H_0$ is true — pH and mercury are unrelated, so the
+  *pairing* of each lake's pH with its mercury value is arbitrary; any lake's
+  mercury value could equally have gone with any pH.
+- **(b)** The randomization distribution of the sample correlation is
+  **centered at 0**.
+- **(c)** Index cards: **106 cards** — write the 53 pH values on one set (one
+  per lake, kept in lake order) and the 53 mercury values on a second set.
+  **Shuffle the mercury pile** and deal one mercury card face-up next to each
+  pH card, creating 53 fresh (pH, mercury) pairs. From each simulated sample
+  compute the **sample correlation** $r$ — that is the statistic recorded in
+  the randomization distribution.
+
+## Exercise B.75
+
+**A Randomization Distribution for Mercury Levels in Fish.** Permuting the 53
+mercury values against the fixed pH values, 10,000 times:
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of correlations between pH and mercury for 53 Florida lakes
+r_lakes = np.corrcoef(ph, hg)[0, 1]
+dist_plot(rl, "Randomization correlations (pH vs mercury)", obs=r_lakes, tail="left", bins=40)
+pd.Series({"Observed correlation": round(r_lakes, 3),
+           "One-tail p-value (10000 permutations)": round(float((rl <= r_lakes).mean()), 5)}).to_string()
+```
+
+The observed $r = -0.575$ lies beyond **every one of the 10,000** simulated
+correlations — $p < 0.0001$. At $\alpha = 0.05$ we **reject $H_0$**: there is
+very strong evidence of a negative correlation between lake pH and mercury
+levels in fish — more acidic lakes tend to have higher mercury
+concentrations.
+
+## Exercise B.76
+
+**Heart Rates and Blood Pressure.** Eight 55-year-old ICU patients
+(Table B.11), testing for a positive correlation.
+
+- **(a)** Parameter $\rho$, the correlation between heart rate and systolic
+  blood pressure for all 55-year-old ICU patients:
+  $H_0: \rho = 0$ vs $H_a: \rho > 0$.
+- **(b)** Assumption: $H_0$ is true — heart rate and blood pressure are
+  unrelated, so the pairing of the eight rates with the eight pressures is
+  arbitrary.
+- **(c)** Statistic: the **sample correlation** $r$; for the observed sample
+  $r = 0.279$ (computed below).
+- **(d)** The randomization distribution is **centered at 0**.
+- **(e)** Write the eight systolic pressures on cards, shuffle, and deal one
+  next to each of the (fixed) eight heart rates — a fresh random pairing
+  consistent with $H_0$; compute the correlation of the re-paired data.
+- **(f)–(g)** Two such deals from the actual data:
+
+```{python}
+#| echo: false
+hr = np.array([86, 86, 92, 100, 112, 116, 136, 140], float)
+bp = np.array([110, 188, 128, 122, 132, 140, 190, 138], float)
+r76 = np.corrcoef(hr, bp)[0, 1]
+rng = np.random.default_rng(2026)
+perm1 = rng.permutation(bp)
+perm2 = rng.permutation(bp)
+pd.DataFrame({"HeartRate": hr.astype(int),
+              "Observed BP": bp.astype(int),
+              "Randomization 1": perm1.astype(int),
+              "Randomization 2": perm2.astype(int)}).to_string(index=False)
+```
+
+```{python}
+#| echo: false
+pd.Series({"Observed r (part c)": round(r76, 3),
+           "r for randomization sample 1 (part f)": round(np.corrcoef(hr, perm1)[0, 1], 3),
+           "r for randomization sample 2 (part g)": round(np.corrcoef(hr, perm2)[0, 1], 3)}).to_string()
+```
+
+The first random deal pairs the pressures (110, 122, 128, 132, 188, 140,
+138, 190) with the rates in order, giving $r = 0.687$; the second gives
+$r = 0.204$. Notice how wildly the shuffled correlations swing — with only
+$n = 8$ pairs, chance alone routinely manufactures correlations far larger
+than the observed 0.279.
+
+## Exercise B.77
+
+**Randomization Distribution for Heart Rate and Blood Pressure.** Permuting
+the eight pressures 10,000 times:
+
+```{python}
+#| echo: false
+#| fig-cap: Randomization distribution of correlations between heart rate and systolic blood pressure for eight patients
+rp = rand_corr(hr, bp)
+dist_plot(rp, "Randomization correlations (heart rate vs BP)", obs=r76, tail="right", bins=20)
+pd.Series({"Observed r": round(r76, 3),
+           "One-tail p-value": round(float((rp >= r76 - 1e-9).mean()), 4)}).to_string()
+```
+
+The one-tailed **p-value ≈ 0.24** — far from significant. A positive
+correlation of 0.28 (or larger) shows up in about a quarter of random
+re-pairings, so the data provide **no evidence** that heart rate and systolic
+blood pressure are correlated for 55-year-old ICU patients. (Exercise B.76's
+randomization samples, with $r = 0.687$ and $0.204$, already hinted how noisy
+$n = 8$ is.)
+
+## Exercise B.78
+
+**Randomization sample: proportion of smokers, males vs females.** Write each
+person's smoking status ("smoke" / "not") on a slip — one slip per person in
+the sample. Shuffle all the slips and deal them into two piles, one of size
+$n_M$ (the original number of males) and one of size $n_F$. Treat the first
+pile as "males" and the second as "females"; compute the difference in
+proportions $\hat p_M - \hat p_F$ for the deal. That difference is one
+randomization statistic; reshuffling and re-dealing builds the distribution.
+
+## Exercise B.79
+
+**Randomization sample: correlation between height and salary.** Write the
+salary of each person on a card and keep the heights in a fixed list (one
+height per person, in person order). Shuffle the salary cards thoroughly and
+deal one salary next to each height. Compute the correlation $r$ between the
+fixed heights and the freshly shuffled salaries — that $r$ is one
+randomization statistic. (Shuffling salaries is exactly the "no relationship"
+world of $H_0: \rho = 0$.)
+
+## Exercise B.80
+
+**Randomization sample: percentage watching the Home Shopping Network is less
+than 20%.** One proportion against $H_0: p = 0.20$. Build a null "population"
+that has exactly 20% watchers: e.g. ten slips with two marked "watch" and
+eight marked "not" (or a spinner with a 20% "watch" region). To draw one
+randomization sample of size $n$: draw a slip, record it, **put it back**,
+mix, and repeat $n$ times; record the proportion $\hat p$ of "watch" in the
+drawn sample. Each such $\hat p$ is one point in the randomization
+distribution, centered near 0.20.
+
+## Exercise B.81
+
+**Randomization sample: average sales higher when salespeople approach
+customers.** Write the total sales figure for each store on a slip of paper.
+Shuffle all the slips and deal them into two piles with the original group
+sizes: $n_1$ slips for "approached by salespeople" and $n_2$ for "not
+approached." Compute the difference in means $\bar x_1 - \bar x_2$ for the
+deal — one randomization statistic.
+
+## Exercise B.82
+
+**Randomization sample: mean study time, first-year students vs upperclass
+students.** Identical mechanics to B.81: write each student's weekly study
+time on a slip, shuffle, and deal the slips into a pile of $n_{FY}$ ("first
+year") and a pile of $n_{UC}$ ("upperclass") matching the original group
+sizes. Record the difference in means $\bar x_{FY} - \bar x_{UC}$ for that
+deal; reshuffling repeatedly generates the randomization distribution of the
+difference in means.
+
+:::
