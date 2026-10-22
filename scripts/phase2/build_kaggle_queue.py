@@ -14,13 +14,20 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 PH2 = REPO / "scripts" / "phase2"
 KAGGLE_SLUG = "math4amd"
-QUESTIONS = {
-    "q1": ("q1_handwashing.py", "lock5-phase2-q1-handwashing"),
-    "q2": ("q2_turnback.py", "lock5-phase2-q2-turnback"),
-    "q3": ("q3_spider.py", "lock5-phase2-q3-spider"),
-    "q4": ("q4_intergen.py", "lock5-phase2-q4-intergen"),
-    "q5": ("q5_aboveavg.py", "lock5-phase2-q5-aboveavg"),
-}
+def discover_questions():
+    """Auto-discover qN_<name>.py scripts and matching data CSVs."""
+    qs = {}
+    for f in sorted(PH2.glob("q*_*.py")):
+        q = f.stem.split("_")[0]
+        if q in qs:
+            continue
+        name = f.stem.split("_", 1)[1]  # strip "qN_" prefix
+        slug = "lock5-phase2-" + name.replace("_", "-")
+        qs[q] = (f.name, name, slug)
+    return qs
+
+
+QUESTIONS = discover_questions()
 
 
 def make_notebook(script_text: str) -> dict:
@@ -59,11 +66,11 @@ REPO = _os_cwd  # overridden for Kaggle (original assignment below is ignored)
 
 def main(push: bool):
     queue = []
-    for q, (script, slug) in QUESTIONS.items():
+    for q, (script, name, slug) in QUESTIONS.items():
         out = PH2 / "kaggle" / q
         out.mkdir(parents=True, exist_ok=True)
         text = (PH2 / script).read_text()
-        csv_name = f"{q}_" + script.split("_", 1)[1].replace(".py", ".csv")
+        csv_name = f"{q}_{name}.csv"
         ktext = make_kaggle_script(text, csv_name)
         (out / "runner.ipynb").write_text(json.dumps(make_notebook(ktext)))
         (out / script).write_text(ktext)
@@ -85,7 +92,7 @@ def main(push: bool):
     print("\n".join(queue))
 
     if push:
-        for q, (script, slug) in QUESTIONS.items():
+        for q, (script, name, slug) in QUESTIONS.items():
             pkg = PH2 / "kaggle" / q
             r = subprocess.run(["kaggle", "kernels", "push", "-p", str(pkg)],
                                capture_output=True, text=True)

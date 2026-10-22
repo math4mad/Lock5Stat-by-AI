@@ -1,0 +1,40 @@
+[{"stream_name":"stdout","time":5.085815461,"data":"================================================================\n"}
+,{"stream_name":"stdout","time":5.085987992,"data":"Q6: Does giving lots of high fives to teammates help teams win?\n"}
+,{"stream_name":"stdout","time":5.085997671,"data":"Kraus, Huang \u0026 Keltner (2010, Emotion) - NBA touch study\n"}
+,{"stream_name":"stdout","time":5.086001938,"data":"================================================================\n"}
+,{"stream_name":"stdout","time":5.086005585,"data":"n = 30 teams (2008-09 season); touch = reconstructed sec/player/game,\n"}
+,{"stream_name":"stdout","time":5.086008102,"data":"win% = actual final standings (touch column is NOT raw data - see CSV header)\n"}
+,{"stream_name":"stdout","time":5.086056109,"data":"\n"}
+,{"stream_name":"stdout","time":5.086074422,"data":"Touch: mean = 1.80 s, SD = 0.76 s\n"}
+,{"stream_name":"stdout","time":5.086079415,"data":"Win%:  mean = 0.500, SD = 0.172\n"}
+,{"stream_name":"stdout","time":5.086083458,"data":"\n"}
+,{"stream_name":"stdout","time":5.086086813,"data":"Pearson r = 0.750  (r^2 = 0.562)\n"}
+,{"stream_name":"stdout","time":5.086090382,"data":"Parametric t-test p = 1.86e-06\n"}
+,{"stream_name":"stdout","time":5.086093619,"data":"Randomization test (2-sided, 100,000 perms): p = 0.00000\n"}
+,{"stream_name":"stdout","time":5.086097002,"data":"95% CI (Fisher z):      (0.534, 0.874)\n"}
+,{"stream_name":"stdout","time":5.086100483,"data":"95% CI (bootstrap):     (0.553, 0.896)\n"}
+,{"stream_name":"stdout","time":5.086103768,"data":"\n"}
+,{"stream_name":"stdout","time":5.086107122,"data":"Top 3 touchiest teams:\n"}
+,{"stream_name":"stdout","time":5.086111012,"data":"  Boston Celtics               3.52 s/game, win% = 0.756\n"}
+,{"stream_name":"stdout","time":5.086114727,"data":"  Los Angeles Lakers           3.04 s/game, win% = 0.793\n"}
+,{"stream_name":"stdout","time":5.086118572,"data":"  Denver Nuggets               2.80 s/game, win% = 0.658\n"}
+,{"stream_name":"stdout","time":5.086122309,"data":"Bottom 3 touchiest teams:\n"}
+,{"stream_name":"stdout","time":5.086125778,"data":"  New Jersey Nets              0.60 s/game, win% = 0.415\n"}
+,{"stream_name":"stdout","time":5.086129474,"data":"  Oklahoma City Thunder        0.52 s/game, win% = 0.281\n"}
+,{"stream_name":"stdout","time":5.086133239,"data":"  Washington Wizards           0.01 s/game, win% = 0.232\n"}
+,{"stream_name":"stdout","time":5.086137097,"data":"\n"}
+,{"stream_name":"stdout","time":5.086140794,"data":"Interpretation: teams whose players shared more celebratory touch\n"}
+,{"stream_name":"stdout","time":5.086144537,"data":"(high fives among 12 coded types) early in the season had substantially\n"}
+,{"stream_name":"stdout","time":5.08614801,"data":"higher win percentages - an observational association (better teams may\n"}
+,{"stream_name":"stdout","time":5.086151552,"data":"simply have more to celebrate), though Kraus et al. found touch still\n"}
+,{"stream_name":"stdout","time":5.086154845,"data":"predicted performance after controlling for salary, expectations, and\n"}
+,{"stream_name":"stdout","time":5.086158274,"data":"early-season performance, with cooperation as the explanatory mechanism.\n"}
+,{"stream_name":"stdout","time":5.086163432,"data":"\n"}
+,{"stream_name":"stdout","time":5.086166843,"data":"Results JSON written to scripts/phase2/out/q6_results.json\n"}
+,{"stream_name":"stderr","time":8.270873702,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":8.270911905,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":8.686598638,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":8.686628495,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":10.756047349,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":12.285774125,"data":"[NbConvertApp] Writing 319282 bytes to __results__.html\n"}
+]

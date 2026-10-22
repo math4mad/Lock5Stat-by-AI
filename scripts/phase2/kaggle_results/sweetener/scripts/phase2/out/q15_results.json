@@ -1,0 +1,169 @@
+{
+  "question": "Do artificial sweeteners cause weight gain?",
+  "provenance": {
+    "study": "San Antonio Heart Study - prospective observational cohort",
+    "citation": "Fowler SP, Williams K, Resendez RG, Hunt KJ, Hazuda HP, Stern MP. Fueling the Obesity Epidemic? Artificially Sweetened Beverage Use and Long-term Weight Gain. Obesity (Silver Spring) 2008;16(8):1894-1900.",
+    "doi": "10.1038/oby.2008.284",
+    "pmid": "18535548",
+    "url": "https://onlinelibrary.wiley.com/doi/10.1038/oby.2008.284",
+    "design": "5,158 adults enrolled 1979-1988; 3,682 re-examined after 7-8 years; 3,371 with complete covariates for adjusted models (3,465 in the DBMI figure analysis)",
+    "data_source": "Reconstructed CSV: group n's from Figure 2a axis labels; adjusted group means and 95% CIs from the Results text; baseline counts back-calculated from Table 1 percentages. No Lock5 dataset exists for this study (3e data page checked Oct 2026).",
+    "related_study": "Suez et al. 2014 (Nature 514:181-186) covers glucose intolerance/gut microbiota, not weight gain, so Fowler et al. 2008 is the better match.",
+    "caution": "Observational study: association does not establish causation; reverse causation (heavier people choosing diet drinks) is plausible."
+  },
+  "published_headlines": {
+    "or_owob_incidence_22plus_vs_none": {
+      "or": 1.93,
+      "ci95": [
+        1.2,
+        3.11
+      ],
+      "p": 0.007,
+      "context": "1,250 baseline normal-weight participants; 428 (34.0%) became overweight/obese"
+    },
+    "or_obese_incidence_22plus_vs_none": {
+      "or": 2.03,
+      "ci95": [
+        1.36,
+        3.03
+      ],
+      "p": 0.0005,
+      "context": "2,571 with baseline BMI < 30; 390 (15.2%) became obese"
+    },
+    "adjusted_dbmi_users_vs_nonusers": {
+      "users": 1.48,
+      "nonusers": 1.01,
+      "percent_greater": 47,
+      "p": "<0.0001"
+    }
+  },
+  "methods": {
+    "n_bootstrap": 100000,
+    "n_randomization": 100000,
+    "seed": 2026,
+    "engine": "numpy/scipy/pandas"
+  },
+  "part_a_two_proportion": {
+    "endpoint": "overweight/obese (BMI >= 25) at baseline, by self-reported artificial-sweetener use",
+    "data": {
+      "nonuser": {
+        "n": 1767,
+        "ow_obese": 1064,
+        "proportion": 0.6021505376344086
+      },
+      "user": {
+        "n": 1604,
+        "ow_obese": 1084,
+        "proportion": 0.6758104738154613
+      }
+    },
+    "diff_in_proportions": 0.07365993618105271,
+    "z_test": {
+      "z": 4.442227580574087,
+      "p_two_sided": 8.903231817070242e-06,
+      "p_one_sided_user_greater": 4.451615908535121e-06
+    },
+    "fisher_exact": {
+      "p_two_sided": 1.0150425627140387e-05,
+      "odds_ratio": 1.3773351648351648
+    },
+    "randomization": {
+      "p_two_sided": 2e-05,
+      "p_one_sided_user_greater": 0.0
+    },
+    "risk_ratio": {
+      "estimate": 1.1223281083006769,
+      "ci95_bootstrap": [
+        1.066939691397444,
+        1.1810650240717648
+      ]
+    },
+    "odds_ratio": {
+      "estimate": 1.3773351648351646,
+      "ci95_bootstrap": [
+        1.1965912307871642,
+        1.5882889116709038
+      ]
+    }
+  },
+  "part_b_group_means": {
+    "endpoint": "change in BMI (kg/m2) over 7-8 years, by baseline ASB consumption (adjusted means)",
+    "groups": [
+      {
+        "group": "0 per week (none)",
+        "n": 1819,
+        "mean_dbmi": 1.01,
+        "ci95_published": [
+          0.88,
+          1.14
+        ],
+        "sd_reconstructed": 2.8288610162683745
+      },
+      {
+        "group": "<3 per week",
+        "n": 420,
+        "mean_dbmi": 1.11,
+        "ci95_published": [
+          0.85,
+          1.38
+        ],
+        "sd_reconstructed": 2.770910051815598
+      },
+      {
+        "group": "3-10 per week",
+        "n": 422,
+        "mean_dbmi": 1.46,
+        "ci95_published": [
+          1.2,
+          1.73
+        ],
+        "sd_reconstructed": 2.7774996212920957
+      },
+      {
+        "group": "11-21 per week",
+        "n": 401,
+        "mean_dbmi": 1.5,
+        "ci95_published": [
+          1.23,
+          1.78
+        ],
+        "sd_reconstructed": 2.8096795410146367
+      },
+      {
+        "group": "22+ per week",
+        "n": 403,
+        "mean_dbmi": 1.78,
+        "ci95_published": [
+          1.51,
+          2.06
+        ],
+        "sd_reconstructed": 2.8166775083695335
+      }
+    ],
+    "contrast": "22+ per week minus None",
+    "diff_in_means": 0.77,
+    "percent_greater_than_nonusers": 76.23762376237624,
+    "welch_t_test": {
+      "t": 4.961457428961299,
+      "df": 595.1740296667585,
+      "p_two_sided": 9.143964929501187e-07
+    },
+    "anova_omnibus": {
+      "F": 9.335395638552503,
+      "p": 1.6757906906819955e-07
+    },
+    "bootstrap": {
+      "ci95_mean_diff": [
+        0.46533117709807753,
+        1.078030455674534
+      ]
+    },
+    "randomization": {
+      "p_two_sided": 0.0
+    },
+    "linear_trend": {
+      "pearson_r": 0.10141708894586549,
+      "p": 2.1890542516810367e-09
+    }
+  }
+}

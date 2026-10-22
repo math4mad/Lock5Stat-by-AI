@@ -1,6 +1,6 @@
 ---
 title: "Phase 2 Results — Ford Mobile Lines"
-subtitle: "Q1–Q5 executed on Kaggle, retrieved & verified"
+subtitle: "Q1–Q17 executed on Kaggle, retrieved & verified"
 author: "Lock5Stat-by-AI"
 date: today
 jupyter: python3
@@ -23,10 +23,10 @@ q1, q2, q3, q4, q5 = (load(f"q{i}-{s}") for i, s in
 
 Phase 2 follows the 4-step workflow from `phase2-instruction.md`:
 
-1. **5 parallel sub-agents** — research paper / get dataset / create processing script
-2. **Code collection & queue** — `scripts/phase2/build_kaggle_queue.py` packages each script
-   (with a self-containment shim embedding its CSV) as a Kaggle kernel
-3. **Watched runs** — all 5 kernels status `COMPLETE` on Kaggle (GPU/CPU sessions)
+1. **17 parallelized sub-agent runs (3 batches)** — research paper / get dataset / create processing script
+2. **Code collection & queue** — `scripts/phase2/build_kaggle_queue.py` auto-discovers `q*_*.py`
+   and packages each script (with a self-containment shim embedding its CSV) as a Kaggle kernel
+3. **Watched runs** — all 17 kernels status `COMPLETE` on Kaggle (CPU sessions, waves of 5)
 4. **Retrieval** — outputs pulled via `kaggle kernels output`, verified against local smoke tests
 
 # Q1 — What proportion of people wash their hands?
@@ -71,6 +71,114 @@ effects are specific (β-cell dysfunction), not generalized growth effects.
 **Decision:** textbook **better-than-average effect** — statistically impossible
 for 94% to be above average; illusory superiority at scale.
 
+# Q6 — Do high fives help teams win?
+
+**Data:** Kraus, Huang & Keltner (2010, *Emotion*) NBA touch study; win% = real
+2008–09 standings, touch rates reconstructed (never published). **Result:**
+r = 0.75 (r² = 0.56), randomization p < 1e-5, bootstrap CI (0.55, 0.90).
+**Decision:** strong association between touch/high-five behavior and team
+performance — but the touch column is a documented reconstruction, so the
+result characterizes the method, not a replication of the paper's r.
+
+# Q7 — Short mild vs long intense warm-up?
+
+**Data:** Neiva et al. (2015, *J Strength Cond Res*), randomized crossover,
+11 swimmers, 600 m vs 1,800 m warm-up. **Result:** short mild better by
+0.80 s (59.38 vs 60.18 s); paired p = 0.28, CI (−2.13, +0.48).
+**Decision:** not statistically significant with n=11 — consistent with the
+paper's magnitude-based caution that a long intense warm-up *may* impair
+100-m swimming performance.
+
+# Q8 — City vs country mood & anxiety?
+
+**Data:** Peen et al. (2007), NEMESIS, 7,076 Dutch adults (counts from published
+Table 2). **Result:** mood disorder 10.4% vs 5.3%, OR = 2.06 (CI 1.52–2.86),
+p ≈ 4e-6; anxiety 14.4% vs 10.8%, OR = 1.39 (1.09–1.78), p = 0.008.
+**Decision:** reject H₀ — urbanicity is significantly associated with both
+mood and anxiety disorders, matching the Peen 2010 meta-analysis headline.
+
+# Q9 — "Beauty sleep"?
+
+**Data:** Axelsson et al. (2010, *BMJ*), 23 adults photographed after 8 h sleep
+vs 31 h awake, reconstructed paired ratings matching published means.
+**Result:** attractiveness −2.0 (p = 4e-4), health −5.0 (p = 9e-8), tiredness
++9.0 (p < 1e-13), all randomization p ≤ 1e-5.
+**Decision:** sleep-deprived faces are rated less healthy, more tired, and
+less attractive — the saying holds up experimentally.
+
+# Q10 — Moving back with parents?
+
+**Data:** Pew Research Center (Fry, Passel & Cohn, Sept 2020) / CPS counts.
+**Result:** 52% of 18–29-year-olds lived with parents (July 2020), vs 47% in
+Feb 2020 (p < 1e-15); men 55% vs women 49%; ages 18–24: 71% vs 25–29: 28%.
+**Decision:** the COVID "boomerang" spike put a majority of young adults back
+home for the first time since the Great Depression.
+
+# Q11 — Loud bar music → more beer?
+
+**Data:** Guéguen et al. (2008, *Alcoholism: Clin Exp Res*), field experiment,
+40 male beer patrons, 88 vs 72 dB (means reproduced exactly; split documented
+reconstruction). **Result:** +0.8 glasses (p_welch = 0.005, p_rand = 0.009);
+−3.06 min per glass (p < 1e-4).
+**Decision:** louder music → faster drinking; random assignment supports a
+causal reading, effect small but reliable.
+
+# Q12 — Is your nose getting bigger?
+
+**Data:** Sforza et al. (2011, *Forensic Sci Int*), 859 Italians, grouped means
+by age. **Result:** nasal height r = 0.78 with age (p_rand = 1.5e-4), width
+r = 0.92; adults-only: height plateaus, but **width keeps growing** (r = 0.99,
+p = 0.008).
+**Decision:** yes — the nose (especially its width) keeps enlarging throughout
+adulthood; cartilage growth and gravity win.
+
+# Q13 — Cat videos and mood?
+
+**Data:** Myrick (2015, *Computers in Human Behavior*), N = 6,795 retrospective
+pre/post ratings (Table 2 aggregates). **Result:** positive emotion +0.77
+(bootstrap CI 0.74–0.80), negative emotion −0.73; all 11 emotion scales move
+favorably, |t| ≥ 26.
+**Decision:** mood improves after cat videos — but it's a within-person
+retrospective association, not a causal experiment.
+
+# Q14 — Sleep deprivation and reading faces?
+
+**Data:** Killgore et al. (2017, *Neurobiol Sleep Circadian Rhythms*), n = 54
+within-subject, Ekman faces (means digitized from Fig. 3). **Result:**
+recognition of **happiness** (p = .007) and **sadness** (p = .008) impaired
+after 23.5 h awake; other emotions n.s.; overall average null (p = .86).
+**Decision:** the deficit is emotion-specific — averaging across emotions
+would have masked the effect entirely.
+
+# Q15 — Artificial sweeteners and weight?
+
+**Data:** Fowler et al. (2008, *Obesity*), San Antonio Heart Study (n = 3,682
+re-examined; reconstructed baseline counts). **Result:** OR overweight/obesity
+= 1.38 (CI 1.20–1.59), p ≈ 2e-5 vs non-users; ΔBMI +0.77 kg/m² more in users
+(p = 9e-7). Published incidence ORs: 1.93 (overweight), 2.03 (obesity).
+**Decision:** strong observational association — but causation unproven
+(reverse causality: overweight people choose diet soda — is a live alternative).
+
+# Q16 — Late-night eating and concentration?
+
+**Data:** Spaeth, Dinges & Goel (SLEEP 2015, UPenn), 44 participants in sleep
+restriction, eating vs fasting at night (reconstruction calibrated to published
+qualitative claims). **Result:** night-4 reaction time +28.9 ms worse in eaters
+(p = 0.026), lapses +2.1 (p = 0.011); eaters declined within-subject, fasters
+did not.
+**Decision:** consistent with the published claim that eating less during
+late-night hours staves off some effects of sleep deprivation.
+
+# Q17 — Organic food and health?
+
+**Data:** REAL Lock5 dataset `OrganicEffect` — IVL Swedish institute
+(Magnér et al. 2015) within-family study, 160 paired urinary pesticide
+measurements, conventional → organic diet. **Result:** 38.76 → 2.83 µg/g
+creatinine (mean diff +35.93, CI 22.4–52.1, p = 5e-6); **92.7% reduction**;
+children ~95% vs father 46%.
+**Decision:** switching to organic dramatically cuts pesticide exposure within
+days — the cleanest experimental evidence in this whole question set.
+
 # Reproducibility & caveats
 
 | Q | Data provenance |
@@ -80,6 +188,18 @@ for 94% to be above average; illusory superiority at scale.
 | Q3 | Calibrated simulation (raw per-male data never published) |
 | Q4 | Seeded rescale to published mean±sem; p-values approximate paper's |
 | Q5 | 94% headline published; n=250 assumed |
+| Q6 | Win% real; touch rates reconstructed (rho target documented) |
+| Q7 | Group means/SDs exact; pairing assumption r=0.50 documented |
+| Q8 | Published Table 2 counts (NEMESIS) — near-exact |
+| Q9 | Condition means exact; per-person ratings reconstructed |
+| Q10 | Published percentages; subgroup denominators documented constructions |
+| Q11 | Group means exact; 20/20 split + SDs assumed |
+| Q12 | Published Table 1 grouped means (519 men); women's table inaccessible |
+| Q13 | Published Table 2 aggregates; analytic paired t verified |
+| Q14 | Means digitized from Fig. 3; paired-SD calibration documented |
+| Q15 | Baseline 2×2 back-calculated; ΔBMI SDs from published CIs |
+| Q16 | Reconstruction calibrated to qualitative published claims (conference abstract) |
+| Q17 | REAL Lock5 dataset (OrganicEffect.csv) — exact |
 
 All reconstruction assumptions are documented in each script's docstring and
 results JSON. Analyses use numpy/scipy/pandas with fixed seeds; the Lock⁵-spirit

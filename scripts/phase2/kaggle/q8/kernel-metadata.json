@@ -1,0 +1,13 @@
+{
+  "id": "math4amd/lock5-phase2-urban",
+  "title": "Lock5 Phase2 Urban",
+  "code_file": "q8_urban.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": "true",
+  "enable_gpu": "false",
+  "enable_internet": "true",
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": []
+}

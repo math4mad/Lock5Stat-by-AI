@@ -1,0 +1,6 @@
+urbanization,address_density_addresses_per_km2,n,mood_cases,anxiety_cases,any_disorder_cases
+Very highly urbanized,>2500,1242,129,179,347
+Highly urbanized,1500-2500,1497,133,205,366
+Moderately urbanized,1000-1500,1541,112,178,373
+Not very urbanized,500-1000,1611,100,184,330
+Not urbanized,<500,1185,63,128,221

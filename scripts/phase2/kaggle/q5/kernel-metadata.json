@@ -1,6 +1,6 @@
 {
-  "id": "math4amd/lock5-phase2-q5-aboveavg",
-  "title": "Lock5 Phase2 Q5 Aboveavg",
+  "id": "math4amd/lock5-phase2-aboveavg",
+  "title": "Lock5 Phase2 Aboveavg",
   "code_file": "q5_aboveavg.py",
   "language": "python",
   "kernel_type": "script",

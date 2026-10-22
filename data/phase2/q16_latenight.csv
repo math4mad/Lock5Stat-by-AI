@@ -1,0 +1,117 @@
+# Phase 2, Q16: "Does late night eating impair concentration?"
+#
+# STUDY
+#   Spaeth AM, Dinges DF, Goel N (Unit for Experimental Psychiatry, Division
+#   of Sleep and Chronobiology, Perelman School of Medicine, University of
+#   Pennsylvania). Presented at SLEEP 2015, the 29th Annual Meeting of the
+#   Associated Professional Sleep Societies, Seattle WA, June 6-10, 2015.
+#   (The conference abstract PDF could not be retrieved - OUP Cloudflare
+#   block, Oct 2026.) Lock5 3e cites the press release (footnote 74 of
+#   exercise 1.110 "Late Night Eating", verified against the 3rd-edition
+#   textbook PDF, Oct 2026):
+#     University of Pennsylvania School of Medicine. "Eating less during late
+#     night hours may stave off some effects of sleep deprivation."
+#     ScienceDaily, June 4, 2015.
+#     https://www.sciencedaily.com/releases/2015/06/150604141905.htm
+#
+# DESIGN (facts from the press release)
+#   Randomized experiment. 44 healthy volunteers aged 21-50 had unlimited
+#   access to food and drink during the day but only 4 h of sleep per night
+#   (4:00-8:00 am) for three consecutive nights. On the fourth night (stay up
+#   to 4 am), participants were randomized: 20 kept unlimited food/drink
+#   access ("eat"), 24 received water only from 10 pm until 4 am ("fast").
+#   Every night at 2 am all subjects completed neurobehavioral tests measuring
+#   reaction time, attention lapses, working memory, sleepiness, stress, mood.
+#   Published findings:
+#     - Night 4: the fasting group performed significantly better on reaction
+#       time and had fewer attention lapses than the late-night-eating group.
+#     - Eaters were significantly slower and had more lapses on night 4 vs
+#       nights 1-3; fasters showed no such performance decline.
+#     - Sleep-restricted adults consume ~500 additional calories during
+#       late-night hours (Dinges quote).
+#
+# DATA SOURCE
+#   Lock5 distributes no dataset for this study (3rd-edition data page
+#   https://www.lock5stat.com/datapage3e.html checked Oct 2026; nearest
+#   matches LightatNight (mouse study), SleepCaffeine, SleepStudy,
+#   DietDepression - none is this experiment). Per-group means/SDs for the
+#   performance endpoints were not published anywhere retrievable (press
+#   release is qualitative), so this CSV is a documented reconstruction for
+#   method illustration only (same practice as q7_warmup.csv, q14_sleepfaces.csv).
+#
+# RECONSTRUCTION (seed 2026, numpy default_rng)
+#   - One row per participant (n = 44; group labels drawn by random shuffle,
+#     matching the published 20 eat / 24 fast split).
+#   - pvt_rt_n13_ms, pvt_rt_n4_ms: mean reaction time (ms) on the 2 a.m.
+#     psychomotor vigilance test, averaged over nights 1-3, and on night 4.
+#     Person-factor model: shared between-person vigilance factor across
+#     endpoints, night-to-night RT correlation 0.35 (between-person SD ~24 ms
+#     inside a total nightly SD ~40 ms). Columns affine-rescaled to the
+#     calibrated group moments below, then rounded to integer ms.
+#   - lapses_n13, lapses_n4: attention lapses (RT > 500 ms) per 10-min test.
+#     nights1-3 column = mean of three nightly integer counts (person latent +
+#     within-person nightly noise); night-4 column = one integer count.
+#   - Calibration anchors: published direction/significance of both findings
+#     plus PVT magnitudes typical of 4 h time-in-bed sleep restriction
+#     (Dinges et al. 1997, Sleep 20:267-277; Belenky et al. 2003, Sleep
+#     26:117-126): nights 1-3 both groups RT 330 +/- 40 ms, lapses ~4
+#     (randomized baseline); night 4 fast RT 333 +/- 40 ms / lapses ~4.1,
+#     eat RT 362 +/- 42 ms / lapses ~6.2.
+#   - Realized group stats (mean/SD): RT n13 eat 329.9/40.0, fast 330.1/40.1;
+#     RT n4 eat 361.9/42.0, fast 333.1/40.1; lapses n13 eat 4.13/1.94, fast
+#     4.51/2.95; lapses n4 eat 6.40/2.64, fast 4.33/2.43.
+#   - Realized analyses reproducing the published claims: Welch t on night 4
+#     (eat - fast): RT +28.9 ms, t(41.3)=2.32, p=.026; lapses +2.07, t(41.7)=
+#     2.68, p=.011. Paired night 4 vs nights 1-3, eaters: RT +32.0 ms, t(19)=
+#     3.08, p=.006; lapses +2.27, t(19)=3.66, p=.002. Fasters: n.s. (RT
+#     p=.68, lapses p=.74).
+#
+# CAVEAT: per-participant values are synthetic. Only the design facts and the
+#   direction/approximate magnitude of the effects are anchored to published
+#   material; analyses of this file illustrate the Lock5 inference pipeline
+#   and do not reproduce the study's exact (unpublished) statistics.
+subject,group,pvt_rt_n13_ms,pvt_rt_n4_ms,lapses_n13,lapses_n4
+1,eat,322,317,5.00,8
+2,fast,358,355,1.67,4
+3,eat,344,350,1.33,3
+4,fast,334,305,9.67,10
+5,eat,412,364,5.00,10
+6,eat,408,356,6.00,7
+7,eat,363,385,1.33,8
+8,fast,364,392,1.00,3
+9,eat,296,337,6.33,7
+10,eat,346,385,1.00,8
+11,eat,325,353,6.33,9
+12,fast,339,313,5.33,4
+13,eat,312,292,2.33,0
+14,fast,333,326,6.67,5
+15,eat,363,429,6.67,7
+16,fast,288,296,4.33,3
+17,fast,278,341,5.00,5
+18,eat,304,385,5.00,8
+19,fast,286,313,3.33,4
+20,fast,235,290,0.67,0
+21,eat,284,358,3.00,2
+22,fast,391,383,3.00,6
+23,eat,299,324,4.33,6
+24,eat,326,284,0.67,6
+25,eat,300,382,3.67,8
+26,fast,382,359,1.67,8
+27,eat,255,318,4.33,5
+28,fast,337,395,7.67,6
+29,fast,374,288,2.33,3
+30,fast,309,344,9.67,6
+31,fast,334,330,3.00,1
+32,eat,365,445,4.67,10
+33,fast,343,374,10.33,7
+34,fast,333,338,3.00,6
+35,fast,348,298,5.67,2
+36,fast,338,368,7.00,6
+37,fast,367,345,1.33,5
+38,eat,291,395,6.00,3
+39,eat,335,398,6.00,7
+40,fast,366,393,6.00,5
+41,fast,344,328,2.00,3
+42,fast,263,272,6.67,2
+43,fast,278,248,1.33,0
+44,eat,348,382,3.67,6

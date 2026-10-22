@@ -1,0 +1,302 @@
+{
+  "question": "Does watching cat videos improve mood?",
+  "outcome": "Change in self-reported emotions (1 = not at all to 7 = very much) from before to after the respondent's most recent viewing of online cat videos and/or photos; positive vs negative emotion composites plus 7 discrete emotions and 2 arousal measures.",
+  "citation": "Myrick, J. G. (2015). Emotion regulation, procrastination, and watching cat videos online: Who watches Internet cats, why, and to what effect? Computers in Human Behavior, 52, 168-176. https://doi.org/10.1016/j.chb.2015.06.001",
+  "design_note": "Cross-sectional online survey (Qualtrics, snowball via Facebook/Twitter and Lil BUB's channels), final N = 6,795 (11,083 began, 6,827 completed, 32 removed); 88.4% female; mean age 38.74. Retrospective within-subject pre/post comparison, not a randomized experiment.",
+  "dataset": {
+    "path": "data/phase2/q13_catvideos.csv",
+    "note": "Lock5 3e ships no dataset for this question (checked lock5stat.com/datapage3e.html). The CSV reconstructs the published aggregate summary statistics from paper Table 2 (p. 172) -- not raw respondent records; provenance in CSV header comments."
+  },
+  "methods": {
+    "analytic": "Paired t from published moments: d_bar = M_after - M_prior, s_d = sqrt(s1^2 + s2^2 - 2*r*s1*s2); verified against the published Table 2 t values (max |delta t| = 0.63).",
+    "simulation": "For the two composites, (prior, after) pairs reconstructed from the published moments via seeded bivariate normal, then scipy paired t + sign-flip randomization + percentile bootstrap CI for the mean change.",
+    "seed": 2026,
+    "replicates": 100000
+  },
+  "analytic_paired_t_all_scales": [
+    {
+      "variable": "depleted",
+      "label": "Depleted (arousal)",
+      "n": 6628,
+      "mean_prior": 3.43,
+      "mean_after": 2.05,
+      "mean_change": -1.38,
+      "sd_diff_reconstructed": 1.431,
+      "cohens_dz": -0.964,
+      "ci95_mean_change": [
+        -1.414,
+        -1.346
+      ],
+      "t_analytic_prior_minus_after": 78.49,
+      "t_published": 78.83,
+      "delta_t_vs_published": -0.34,
+      "df": 6627,
+      "p_two_sided": 0.0
+    },
+    {
+      "variable": "energetic",
+      "label": "Energetic (arousal)",
+      "n": 6616,
+      "mean_prior": 3.27,
+      "mean_after": 3.78,
+      "mean_change": 0.51,
+      "sd_diff_reconstructed": 1.358,
+      "cohens_dz": 0.376,
+      "ci95_mean_change": [
+        0.477,
+        0.543
+      ],
+      "t_analytic_prior_minus_after": -30.54,
+      "t_published": -30.93,
+      "delta_t_vs_published": 0.39,
+      "df": 6615,
+      "p_two_sided": 8.6e-192
+    },
+    {
+      "variable": "anxious",
+      "label": "Anxious",
+      "n": 6629,
+      "mean_prior": 2.28,
+      "mean_after": 1.52,
+      "mean_change": -0.76,
+      "sd_diff_reconstructed": 1.177,
+      "cohens_dz": -0.645,
+      "ci95_mean_change": [
+        -0.788,
+        -0.732
+      ],
+      "t_analytic_prior_minus_after": 52.55,
+      "t_published": 52.37,
+      "delta_t_vs_published": 0.18,
+      "df": 6628,
+      "p_two_sided": 0.0
+    },
+    {
+      "variable": "annoyed",
+      "label": "Annoyed",
+      "n": 6623,
+      "mean_prior": 2.34,
+      "mean_after": 1.43,
+      "mean_change": -0.91,
+      "sd_diff_reconstructed": 1.351,
+      "cohens_dz": -0.673,
+      "ci95_mean_change": [
+        -0.943,
+        -0.877
+      ],
+      "t_analytic_prior_minus_after": 54.81,
+      "t_published": 54.62,
+      "delta_t_vs_published": 0.19,
+      "df": 6622,
+      "p_two_sided": 0.0
+    },
+    {
+      "variable": "sad",
+      "label": "Sad",
+      "n": 6623,
+      "mean_prior": 2.52,
+      "mean_after": 1.57,
+      "mean_change": -0.95,
+      "sd_diff_reconstructed": 1.333,
+      "cohens_dz": -0.713,
+      "ci95_mean_change": [
+        -0.982,
+        -0.918
+      ],
+      "t_analytic_prior_minus_after": 57.99,
+      "t_published": 57.87,
+      "delta_t_vs_published": 0.12,
+      "df": 6622,
+      "p_two_sided": 0.0
+    },
+    {
+      "variable": "guilty",
+      "label": "Guilty",
+      "n": 6623,
+      "mean_prior": 1.62,
+      "mean_after": 1.34,
+      "mean_change": -0.28,
+      "sd_diff_reconstructed": 0.861,
+      "cohens_dz": -0.325,
+      "ci95_mean_change": [
+        -0.301,
+        -0.259
+      ],
+      "t_analytic_prior_minus_after": 26.48,
+      "t_published": 26.66,
+      "delta_t_vs_published": -0.18,
+      "df": 6622,
+      "p_two_sided": 6.29e-147
+    },
+    {
+      "variable": "negative_combined",
+      "label": "Negative emotions (composite)",
+      "n": 6594,
+      "mean_prior": 2.19,
+      "mean_after": 1.46,
+      "mean_change": -0.73,
+      "sd_diff_reconstructed": 0.995,
+      "cohens_dz": -0.734,
+      "ci95_mean_change": [
+        -0.754,
+        -0.706
+      ],
+      "t_analytic_prior_minus_after": 59.58,
+      "t_published": 58.95,
+      "delta_t_vs_published": 0.63,
+      "df": 6593,
+      "p_two_sided": 0.0
+    },
+    {
+      "variable": "hopeful",
+      "label": "Hopeful",
+      "n": 6629,
+      "mean_prior": 3.67,
+      "mean_after": 4.21,
+      "mean_change": 0.54,
+      "sd_diff_reconstructed": 1.362,
+      "cohens_dz": 0.397,
+      "ci95_mean_change": [
+        0.507,
+        0.573
+      ],
+      "t_analytic_prior_minus_after": -32.29,
+      "t_published": -32.39,
+      "delta_t_vs_published": 0.1,
+      "df": 6628,
+      "p_two_sided": 1.5e-212
+    },
+    {
+      "variable": "happy",
+      "label": "Happy",
+      "n": 6627,
+      "mean_prior": 4.08,
+      "mean_after": 5.22,
+      "mean_change": 1.14,
+      "sd_diff_reconstructed": 1.438,
+      "cohens_dz": 0.793,
+      "ci95_mean_change": [
+        1.105,
+        1.175
+      ],
+      "t_analytic_prior_minus_after": -64.56,
+      "t_published": -64.79,
+      "delta_t_vs_published": 0.23,
+      "df": 6626,
+      "p_two_sided": 0.0
+    },
+    {
+      "variable": "content",
+      "label": "Content",
+      "n": 6629,
+      "mean_prior": 4.23,
+      "mean_after": 4.85,
+      "mean_change": 0.62,
+      "sd_diff_reconstructed": 1.411,
+      "cohens_dz": 0.439,
+      "ci95_mean_change": [
+        0.586,
+        0.654
+      ],
+      "t_analytic_prior_minus_after": -35.77,
+      "t_published": -35.46,
+      "delta_t_vs_published": -0.31,
+      "df": 6628,
+      "p_two_sided": 2.44e-256
+    },
+    {
+      "variable": "positive_combined",
+      "label": "Positive emotions (composite)",
+      "n": 6605,
+      "mean_prior": 3.99,
+      "mean_after": 4.76,
+      "mean_change": 0.77,
+      "sd_diff_reconstructed": 1.215,
+      "cohens_dz": 0.634,
+      "ci95_mean_change": [
+        0.741,
+        0.799
+      ],
+      "t_analytic_prior_minus_after": -51.52,
+      "t_published": -51.27,
+      "delta_t_vs_published": -0.25,
+      "df": 6604,
+      "p_two_sided": 0.0
+    }
+  ],
+  "simulation_battery": {
+    "positive_emotions_composite": {
+      "n": 6605,
+      "mean_change": 0.773,
+      "paired_t_after_minus_prior": 51.08,
+      "p_paired_t": 0.0,
+      "t_published_prior_minus_after": -51.27,
+      "p_signflip_randomization": 0.0,
+      "randomization_replicates": 100000,
+      "bootstrap_ci95_mean_change": [
+        0.743,
+        0.802
+      ],
+      "bootstrap_replicates": 100000,
+      "reconstruction_fidelity_simulated_vs_published": {
+        "mean_prior": [
+          3.982,
+          3.99
+        ],
+        "mean_after": [
+          4.755,
+          4.76
+        ],
+        "sd_prior": [
+          1.329,
+          1.34
+        ],
+        "sd_after": [
+          1.316,
+          1.31
+        ],
+        "r_prior_after": [
+          0.568,
+          0.58
+        ]
+      }
+    },
+    "negative_emotions_composite": {
+      "n": 6594,
+      "mean_change": -0.743,
+      "paired_t_after_minus_prior": -60.11,
+      "p_paired_t": 0.0,
+      "t_published_prior_minus_after": 58.95,
+      "p_signflip_randomization": 0.0,
+      "randomization_replicates": 100000,
+      "bootstrap_ci95_mean_change": [
+        -0.767,
+        -0.719
+      ],
+      "bootstrap_replicates": 100000,
+      "reconstruction_fidelity_simulated_vs_published": {
+        "mean_prior": [
+          2.198,
+          2.19
+        ],
+        "mean_after": [
+          1.455,
+          1.46
+        ],
+        "sd_prior": [
+          1.234,
+          1.24
+        ],
+        "sd_after": [
+          0.799,
+          0.82
+        ],
+        "r_prior_after": [
+          0.585,
+          0.6
+        ]
+      }
+    }
+  },
+  "conclusion": "Mood improves after watching cat videos: positive-emotion composite 3.99 -> 4.76 (+0.77, t(6604) = 51.3, sign-flip p < 1e-5, bootstrap CI [+0.74, +0.80]) and negative-emotion composite 2.19 -> 1.46 (-0.73, t(6593) = 59.0, sign-flip p < 1e-5, bootstrap CI [-0.77, -0.72]). All 7 discrete emotions move in the mood-beneficial direction (|t| = 26.7-78.8, p < .001); energy rises (+0.51) and depletion falls (-1.38). Retrospective self-report, no control group, self-selected snowball sample (88.4% female): supported as a within-person association, not a causal effect."
+}

@@ -1,0 +1,48 @@
+# data/phase2/q10_boomerang.csv
+# Lock5 Phase 2, Q10: "What percent of young adults in the US move back in with their parents?"
+#
+# Citation: Fry, R., Passel, J. S., & Cohn, D. V. (September 4, 2020), "A majority of
+#   young adults in the U.S. live with their parents for the first time since the Great
+#   Depression", Pew Research Center (pewresearch.org). Underlying data: U.S. Census
+#   Bureau Current Population Survey monthly files (IPUMS); historical series from
+#   decennial censuses 1900-1990 and CPS annual averages 2000-2019.
+#
+# Headline: In July 2020, 52% of U.S. 18- to 29-year-olds (26.6 million) lived with a
+#   parent, up from 47% (24.0 million) in February 2020 before COVID-19 — an increase
+#   of 2.6 million young adults "moving back" / newly co-residing. The previous
+#   all-time high was 48% in the 1940 census (Great Depression era).
+# Subgroup shares (Pew report table, Feb 2020 -> July 2020):
+#   Ages 18-24: 63% -> 71%; Ages 25-29: 26% -> 28%;
+#   Men: 50% -> 55%; Women: 43% -> 49%.
+#
+# Lock5 3e ships no dataset for this question (checked lock5stat.com/datapage3e.html;
+#   no "boomerang"/living-with-parents dataset exists there).
+#
+# No public microdata is published for these CPS-derived shares. Counts below are
+# documented reconstructions from the published percentages, with documented
+# denominators:
+#   - Total 18-29 population N = 51,200,000, derived from Pew's 26.6 million living
+#     with a parent at 52% (26.6M / 0.52 = 51.2M); assumed constant Feb->July 2020.
+#   - Sex split 50/50 (men 25.6M, women 25.6M): the unique split reproducing the
+#     published overall share (0.50*55% + 0.50*49% = 52%).
+#   - Age split 28.6M (18-24) : 22.6M (25-29): chosen so the weighted subgroup share
+#     reproduces the published overall (0.71*28.6M + 0.28*22.6M = 26.63M ~= 26.6M).
+#   - Feb 2020 overall: 47% of 51.2M = 24.06M; implied Feb->July increase
+#     26.62M - 24.06M = 2.56M ~= Pew's published 2.6 million.
+#
+# Columns: group = population group; period = CPS reference month;
+#          response = with_parent (residing with at least one parent) / not_with_parent;
+#          count = number of 18- to 29-year-olds.
+group,period,response,count
+overall,feb_2020,with_parent,24060000
+overall,feb_2020,not_with_parent,27140000
+overall,jul_2020,with_parent,26624000
+overall,jul_2020,not_with_parent,24576000
+men,jul_2020,with_parent,14080000
+men,jul_2020,not_with_parent,11520000
+women,jul_2020,with_parent,12544000
+women,jul_2020,not_with_parent,13056000
+age_18_24,jul_2020,with_parent,20306000
+age_18_24,jul_2020,not_with_parent,8294000
+age_25_29,jul_2020,with_parent,6328000
+age_25_29,jul_2020,not_with_parent,16272000

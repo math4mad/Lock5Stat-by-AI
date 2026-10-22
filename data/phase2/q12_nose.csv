@@ -1,0 +1,57 @@
+# data/phase2/q12_nose.csv
+# Lock5 Phase 2, Q12: "Is your nose getting bigger?"
+#
+# Citation: Sforza, C., Grandi, G., De Menezes, M., Tartaglia, G. M., & Ferrario, V. F.
+#   (2011; online 21 Aug 2010), "Age- and sex-related changes in the normal human
+#   external nose", Forensic Science International 204(1-3):205.e1-205.e9,
+#   DOI 10.1016/j.forsciint.2010.07.027 (Functional Anatomy Research Center,
+#   Universita degli Studi di Milano). This is the study cited by Lock5 3e
+#   ("Lock" et al., Statistics: Unlocking the Power of Data), Ch. 4.3 exercise
+#   "Is Your Nose Getting Bigger?" (Ex. 98/100 depending on printing), which quotes
+#   the paper: "Age significantly influenced all analyzed measurements" and reports
+#   p < 0.001 for a positive linear relationship between age and nose size, n = 859.
+#
+# Study design: cross-sectional digital anthropometry. 3D coordinates of soft-tissue
+#   landmarks (nasion n, subnasale sn, pronasale prn, alare al, alar crest ac, ...)
+#   collected with a computerized electromagnetic digitizer (Polhemus 3Draw,
+#   accuracy 0.25 mm) in 859 healthy white Italians (519 men, 340 women) aged
+#   4-73 years (Table 1 spans 4-80 years), 11 non-overlapping age groups.
+#   Headline findings (paper): men larger than women (p<0.01); age influenced all
+#   measurements (p<0.001) - nasal volume, area and linear distances increased from
+#   childhood to old age; male increments generally larger than female.
+#
+# Lock5 3e ships no dataset for this question (checked lock5stat.com/datapage3e.html;
+#   no nose/ear anthropometry dataset exists there).
+#
+# Data provenance: grouped means transcribed from Table 1 of the paper ("Three-
+#   dimensional external nasal morphometry in 519 healthy men"), read from a publicly
+#   accessible copy of the article (jakedorman.net/s/Age-_and_sex-related_changes_i.pdf).
+#   Transcription cross-checked against in-paper ratios: nasal tip protrusion at
+#   51-64 y = 121% of the 18-30 y mean (23.15/19.17 = 120.8% - matches the paper's
+#   reported 121%). Group n's sum to 519, matching the paper's male sample size.
+#   Not reconstructed: Table 2 (340 women) and the nasal-volume row - the only
+#   publicly accessible copy of the article cannot be retrieved in full (no open-
+#   access copy exists per Unpaywall/Semantic Scholar) and its Table 2 / volume
+#   row could not be transcribed with confidence; see Table 1-2 of the paper for
+#   those values.
+#   age_mid = approximate midpoint of each published age span (used as the age
+#   variate in correlation analyses).
+#
+# Units: linear measurements in mm; external nasal surface area in mm^2.
+# Columns: sex; age_group = published age span (years); age_mid = span midpoint;
+#   n = subjects per group; *_mean_mm / *_sd_mm = Table 1 mean and SD;
+#   landmark definitions: height = nasion-subnasale (n-sn); width = alare-alare
+#   (al-al); alar base = alar crest-alar crest (ac-ac); bridge = nasion-pronasale
+#   (n-prn); tip protrusion = pronasale-subnasale (prn-sn).
+sex,age_group,age_mid,n,height_mean_mm,height_sd_mm,width_mean_mm,width_sd_mm,alar_base_mean_mm,alar_base_sd_mm,bridge_mean_mm,bridge_sd_mm,tip_protrusion_mean_mm,tip_protrusion_sd_mm,area_mean_mm2,area_sd_mm2
+men,4-5,4.5,11,34.50,3.20,23.75,4.85,24.88,5.53,27.58,2.77,14.16,0.92,735,164.40
+men,6-7,6.5,47,40.04,2.13,25.67,2.46,26.90,2.46,32.49,2.65,15.89,1.46,848,96.50
+men,8-9,8.5,55,43.03,3.08,26.65,3.42,27.45,2.90,34.79,3.44,16.95,1.74,973,162.40
+men,10-11,10.5,44,46.83,2.35,26.40,2.40,25.98,2.55,39.70,2.48,16.86,1.83,1194,181.70
+men,12-13,12.5,82,49.00,3.32,28.73,2.56,27.40,2.29,41.75,3.67,18.30,1.74,1327,180.50
+men,14-16,15.0,55,50.53,2.84,31.10,3.68,29.23,3.29,44.36,2.68,18.91,1.93,1522,189.10
+men,18-30,24.0,126,55.65,3.31,32.31,3.31,31.48,3.10,51.00,3.91,19.17,2.15,1643,185.80
+men,31-40,35.5,66,57.30,4.17,33.86,2.74,33.21,2.36,52.52,4.82,20.24,2.16,1822,182.80
+men,41-50,45.5,11,58.68,4.04,34.10,2.93,35.24,1.97,52.34,4.38,22.65,3.26,1873,132.70
+men,51-64,57.5,15,54.79,3.28,35.76,3.09,35.00,2.56,49.34,3.86,23.15,1.93,1866,162.70
+men,65-80,72.5,7,57.36,3.93,37.10,1.58,37.77,2.31,51.98,3.81,22.57,1.68,1874,188.80

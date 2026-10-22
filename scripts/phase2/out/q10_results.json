@@ -1,0 +1,127 @@
+{
+  "question": "What percent of young adults in the US move back in with their parents?",
+  "outcome": "Share of U.S. 18- to 29-year-olds residing with at least one parent (co-residence, incl. COVID-era 'boomerang' moves), CPS monthly files.",
+  "citation": "Fry, R., Passel, J. S., & Cohn, D. V. (September 4, 2020), 'A majority of young adults in the U.S. live with their parents for the first time since the Great Depression', Pew Research Center. Underlying data: U.S. Census Bureau Current Population Survey monthly files (IPUMS); historical series from decennial censuses 1900-1990 and CPS annual averages 2000-2019.",
+  "dataset": {
+    "path": "data/phase2/q10_boomerang.csv",
+    "note": "Lock5 3e ships no dataset for this question (checked lock5stat.com/datapage3e.html). Counts are documented reconstructions from the published percentages; provenance and denominator choices in CSV header comments."
+  },
+  "one_proportion": {
+    "overall_feb_2020_baseline": {
+      "phat": 0.4699,
+      "with_parent": 24060000,
+      "n": 51200000
+    },
+    "overall_jul_2020_vs_feb2020": {
+      "group": "overall",
+      "label": "All 18- to 29-year-olds",
+      "period": "jul_2020",
+      "with_parent": 26624000,
+      "n": 51200000,
+      "phat": 0.52,
+      "wald_ci95": [
+        0.5199,
+        0.5201
+      ],
+      "bootstrap_ci95": [
+        0.5199,
+        0.5201
+      ],
+      "test_h0": {
+        "p0": 0.47,
+        "null_label": "Feb 2020 pre-pandemic baseline",
+        "z": 716.833,
+        "p_normal": 0.0,
+        "p_randomization": 0.0
+      }
+    },
+    "overall_jul_2020_vs_1940": {
+      "group": "overall",
+      "label": "All 18- to 29-year-olds",
+      "period": "jul_2020",
+      "with_parent": 26624000,
+      "n": 51200000,
+      "phat": 0.52,
+      "wald_ci95": [
+        0.5199,
+        0.5201
+      ],
+      "bootstrap_ci95": [
+        0.5199,
+        0.5201
+      ],
+      "test_h0": {
+        "p0": 0.48,
+        "null_label": "1940 census, previous all-time high",
+        "z": 572.892,
+        "p_normal": 0.0,
+        "p_randomization": 0.0
+      }
+    }
+  },
+  "two_proportion": {
+    "men_vs_women_jul_2020": {
+      "group_a": {
+        "group": "men",
+        "label": "Men 18-29",
+        "with_parent": 14080000,
+        "n": 25600000,
+        "phat": 0.55
+      },
+      "group_b": {
+        "group": "women",
+        "label": "Women 18-29",
+        "with_parent": 12544000,
+        "n": 25600000,
+        "phat": 0.49
+      },
+      "diff_phat": 0.06,
+      "wald_ci95_diff": [
+        0.0597,
+        0.0603
+      ],
+      "bootstrap_ci95_diff": [
+        0.0597,
+        0.0603
+      ],
+      "test_equal_p": {
+        "z": 429.669,
+        "p_normal": 0.0,
+        "p_randomization": 0.0,
+        "p_fisher_exact": 0.0
+      }
+    },
+    "age_18_24_vs_25_29_jul_2020": {
+      "group_a": {
+        "group": "age_18_24",
+        "label": "Ages 18-24",
+        "with_parent": 20306000,
+        "n": 28600000,
+        "phat": 0.71
+      },
+      "group_b": {
+        "group": "age_25_29",
+        "label": "Ages 25-29",
+        "with_parent": 6328000,
+        "n": 22600000,
+        "phat": 0.28
+      },
+      "diff_phat": 0.43,
+      "wald_ci95_diff": [
+        0.4298,
+        0.4302
+      ],
+      "bootstrap_ci95_diff": [
+        0.4297,
+        0.4302
+      ],
+      "test_equal_p": {
+        "z": 3058.125,
+        "p_normal": 0.0,
+        "p_randomization": 0.0,
+        "p_fisher_exact": 0.0
+      }
+    }
+  },
+  "conclusion": "52% of U.S. 18- to 29-year-olds (26.6 million of ~51.2 million) lived with a parent in July 2020, up from 47% in February 2020 (+2.6 million) and above the 1940 census record of 48% -- first majority since the Great Depression. Both nulls rejected (p < 1e-15). Men > women (55% vs 49%) and ages 18-24 far above ages 25-29 (71% vs 28%), all p < 1e-15."
+}

@@ -1,0 +1,95 @@
+{
+  "question": "Is your nose getting bigger?",
+  "outcome": "External nose size with age: nasal height (nasion-subnasale, mm), nasal width (alare-alare, mm) and external nasal surface area (mm2), cross-sectional grouped means, 519 men, ages 4-80.",
+  "citation": "Sforza, C., Grandi, G., De Menezes, M., Tartaglia, G. M., & Ferrario, V. F. (2011; online 21 Aug 2010), 'Age- and sex-related changes in the normal human external nose', Forensic Science International 204(1-3):205.e1-205.e9, DOI 10.1016/j.forsciint.2010.07.027. Study cited by Lock5 3e, Ch. 4.3 exercise 'Is Your Nose Getting Bigger?' (n = 859: 519 men, 340 women, aged 4-73).",
+  "study_design": "Cross-sectional digital anthropometry; 3D coordinates of soft-tissue nasal landmarks via electromagnetic digitizer (Polhemus 3Draw, 0.25 mm accuracy); 11 non-overlapping age groups; factorial ANOVA. Headline: men larger than women (p<0.01); age influenced all measurements (p<0.001), volume/area/linear distances increased from childhood to old age.",
+  "dataset": {
+    "path": "data/phase2/q12_nose.csv",
+    "note": "Lock5 3e ships no dataset for this question (checked lock5stat.com/datapage3e.html). Documented reconstruction of Table 1 grouped means (519 men) transcribed from a publicly accessible copy of the article and cross-checked against in-paper ratios; women's Table 2 and the nasal-volume row not reliably retrievable and excluded. Provenance in CSV header comments."
+  },
+  "correlations": {
+    "full_span_men_4_to_80": {
+      "height_mean_mm": {
+        "n_groups": 11,
+        "pearson_r": 0.7762,
+        "p_pearson_exact": 0.00497,
+        "slope_per_year": 0.2686,
+        "p_randomization_one_sided": 0.00015,
+        "p_randomization_two_sided": 0.00547,
+        "bootstrap_ci95": [
+          0.6785,
+          0.9295
+        ],
+        "bootstrap_valid": 100000
+      },
+      "width_mean_mm": {
+        "n_groups": 11,
+        "pearson_r": 0.9232,
+        "p_pearson_exact": 5.04e-05,
+        "slope_per_year": 0.1803,
+        "p_randomization_one_sided": 0.0,
+        "p_randomization_two_sided": 0.0,
+        "bootstrap_ci95": [
+          0.8666,
+          0.9777
+        ],
+        "bootstrap_valid": 100000
+      },
+      "area_mean_mm2": {
+        "n_groups": 11,
+        "pearson_r": 0.8452,
+        "p_pearson_exact": 0.00105,
+        "slope_per_year": 15.9238,
+        "p_randomization_one_sided": 0.0,
+        "p_randomization_two_sided": 0.00129,
+        "bootstrap_ci95": [
+          0.7714,
+          0.9482
+        ],
+        "bootstrap_valid": 100000
+      }
+    },
+    "adults_only_men_18_to_80": {
+      "height_mean_mm": {
+        "n_groups": 5,
+        "pearson_r": 0.0953,
+        "p_pearson_exact": 0.879,
+        "slope_per_year": 0.0078,
+        "p_randomization_one_sided": 0.424,
+        "p_randomization_two_sided": 0.858,
+        "bootstrap_ci95": [
+          -1.0,
+          1.0
+        ],
+        "bootstrap_valid": 99861
+      },
+      "width_mean_mm": {
+        "n_groups": 5,
+        "pearson_r": 0.9894,
+        "p_pearson_exact": 0.00131,
+        "slope_per_year": 0.0968,
+        "p_randomization_one_sided": 0.00818,
+        "p_randomization_two_sided": 0.00818,
+        "bootstrap_ci95": [
+          0.9081,
+          1.0
+        ],
+        "bootstrap_valid": 99814
+      },
+      "area_mean_mm2": {
+        "n_groups": 5,
+        "pearson_r": 0.7813,
+        "p_pearson_exact": 0.119,
+        "slope_per_year": 4.093,
+        "p_randomization_one_sided": 0.0255,
+        "p_randomization_two_sided": 0.0933,
+        "bootstrap_ci95": [
+          -0.0467,
+          1.0
+        ],
+        "bootstrap_valid": 99854
+      }
+    }
+  },
+  "conclusion": "Across ages 4-80, mean nasal height grows from 34.5 mm to 57.4 mm (+22.9 mm) and width from 23.8 mm to 37.1 mm; age-nose correlations are strongly positive (height r = 0.78, one-sided randomization p = 1.5e-04; width r = 0.92; area r = 0.85; both p < 0.001), matching the paper's p < 0.001 quoted by Lock5. Among adult age-group means only (18-80 y, 5 groups) nasal height is flat (r = 0.10, one-sided p = 0.42), but width keeps widening significantly (r = 0.99, one-sided p = 8.2e-03) and area trends positive (r = 0.78, one-sided p = 0.03): grouped means lack the power of the study's individual-level test (p < 0.001), and most of the size gain occurs up to ~18 y with continued enlargement most evident in width."
+}

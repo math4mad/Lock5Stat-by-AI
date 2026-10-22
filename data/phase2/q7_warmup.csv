@@ -1,0 +1,41 @@
+# Phase 2, Q7: "Which is better for peak performance: a short mild warm-up
+# or a long intense warm-up?"
+#
+# Study: Neiva, H. P., Marques, M. C., Barbosa, T. M., Izquierdo, M., Viana,
+#   J. L., Teixeira, A. M., & Marinho, D. A. (2015). "The effects of different
+#   warm-up volumes on the 100-m swimming performance: a randomized crossover
+#   study." Journal of Strength and Conditioning Research, 29(11), 3026-3036.
+#   DOI: 10.1519/JSC.0000000000000577 (PMID 26506059)
+#
+# Design: randomized crossover (PAIRED). Eleven national-level male swimmers
+#   completed three 100-m freestyle time trials, each preceded by a different
+#   warm-up volume at identical intensities: standard 1,200 m (WU), short
+#   600 m (SWU), long 1,800 m (LWU), in randomized order, 48 h apart.
+# Published 100-m results (mean +/- SD, JSCR Table 3; SDs also recoverable
+#   from the abstract's 95% confidence limits via t(10)*SD/sqrt(11)):
+#   SWU 59.38 +/- 2.18 s   LWU 60.18 +/- 2.46 s   (standard WU 59.29 +/- 1.95 s)
+#   "The swimmers were faster after the WU ... and after the SWU ... compared
+#    with the LWU." Authors' inference: "an LWU could impair 100-m freestyle
+#    performance."
+#
+# PROVENANCE: There is no warm-up dataset on lock5stat.com/datapage3e.html
+#   (checked 2026-10-21; nearest matches are GolfRound/MastersGolf). The
+#   per-swimmer times below are therefore a RECONSTRUCTION matched exactly to
+#   the published group means and SDs (sample mean/SD of each column equal
+#   59.38/2.18 and 60.18/2.46 to rounding). The pairing between a swimmer's
+#   SWU and LWU values is synthetic: the paper does not publish individual
+#   times, so a within-swimmer correlation r = 0.50 was assumed (documented
+#   reconstruction assumption; see scripts/phase2/q7_warmup.py, which also
+#   reports sensitivity to r). Column unit: seconds.
+swimmer,swu_100m_s,lwu_100m_s
+1,62.74,60.12
+2,56.74,60.29
+3,58.91,57.36
+4,58.34,56.89
+5,58.20,58.89
+6,61.88,61.38
+7,58.68,63.45
+8,56.81,57.10
+9,62.12,64.22
+10,57.67,60.73
+11,61.08,61.54

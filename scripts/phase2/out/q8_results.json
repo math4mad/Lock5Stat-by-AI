@@ -1,0 +1,150 @@
+{
+  "question": "Are city dwellers more likely than country dwellers to have mood and anxiety disorders?",
+  "provenance": {
+    "lock5_question": "Lock5 3rd ed., phase-2 task Q8",
+    "data_source": "Peen J, Dekker J, Schoevers RA, ten Have M, de Graaf R, Beekman ATF (2007). Is the prevalence of psychiatric disorders associated with urbanization? Social Psychiatry and Psychiatric Epidemiology, 42(12), 984-989. doi:10.1007/s00127-007-0256-2 (NEMESIS, CIDI, DSM-III-R)",
+    "headline_context": "Peen J, Schoevers RA, Beekman AT, Dekker J (2010). The current status of urban-rural differences in psychiatric disorders. Acta Psychiatrica Scandinavica, 121(2), 84-93. Pooled unadjusted urban-vs-rural OR: mood 1.39 (1.23-1.58), anxiety 1.21 (1.02-1.42)",
+    "design": "Cross-sectional population survey (NEMESIS, 1996): representative multi-stage stratified random sample of 7,076 Dutch adults 18-64; 12-month DSM-III-R disorders by municipal address-density (Statistics Netherlands 5-level urbanization)",
+    "data_reconstruction": "No Lock5 dataset distributed for this study (3e/4e data pages checked Oct 2026); CSV reconstructed from exact published Table 2 counts (n and n of cases per urbanization category). Raw proportions from the counts reproduce the published weighted percentages to within rounding.",
+    "contrast": "Most extreme dichotomy per Peen et al. 2010: 'Very highly urbanized' (city) vs 'Not urbanized' (country)"
+  },
+  "data": {
+    "n_total": 7076,
+    "source_csv": "data/phase2/q8_urban.csv"
+  },
+  "comparisons": {
+    "mood_disorders": {
+      "outcome": "mood_disorders",
+      "city": {
+        "n": 1242,
+        "cases": 129,
+        "proportion": 0.10386473429951691
+      },
+      "country": {
+        "n": 1185,
+        "cases": 63,
+        "proportion": 0.053164556962025315
+      },
+      "diff_in_proportions": 0.050700177337491596,
+      "ci_95_wald_diff": [
+        0.029461862334979105,
+        0.07193849234000409
+      ],
+      "odds_ratio": 2.064176614041843,
+      "ci_95_bootstrap_or": [
+        1.5247653706186552,
+        2.8551895903222526
+      ],
+      "z_pooled": 4.625673355505409,
+      "p_z_two_sided": 3.7338335387054637e-06,
+      "p_z_greater": 1.8669167693527319e-06,
+      "p_fisher_two_sided": 3.8014556739406474e-06,
+      "p_fisher_greater": 2.1623791059593014e-06,
+      "p_randomization_two_sided": 0.0,
+      "p_randomization_greater": 0.0
+    },
+    "anxiety_disorders": {
+      "outcome": "anxiety_disorders",
+      "city": {
+        "n": 1242,
+        "cases": 179,
+        "proportion": 0.14412238325281804
+      },
+      "country": {
+        "n": 1185,
+        "cases": 128,
+        "proportion": 0.1080168776371308
+      },
+      "diff_in_proportions": 0.03610550561568723,
+      "ci_95_wald_diff": [
+        0.009764297545141128,
+        0.062446713686233335
+      ],
+      "odds_ratio": 1.3905441556914393,
+      "ci_95_bootstrap_or": [
+        1.091164992642825,
+        1.7804837913444134
+      ],
+      "z_pooled": 2.674799135848131,
+      "p_z_two_sided": 0.007477403543078142,
+      "p_z_greater": 0.003738701771539071,
+      "p_fisher_two_sided": 0.00854797676540935,
+      "p_fisher_greater": 0.00440918542028119,
+      "p_randomization_two_sided": 0.00835,
+      "p_randomization_greater": 0.00418
+    },
+    "any_disorder": {
+      "outcome": "any_disorder",
+      "city": {
+        "n": 1242,
+        "cases": 347,
+        "proportion": 0.27938808373590984
+      },
+      "country": {
+        "n": 1185,
+        "cases": 221,
+        "proportion": 0.18649789029535865
+      },
+      "diff_in_proportions": 0.09289019344055119,
+      "ci_95_wald_diff": [
+        0.05950558558869501,
+        0.12627480129240737
+      ],
+      "odds_ratio": 1.69118531813241,
+      "ci_95_bootstrap_or": [
+        1.4002273518153348,
+        2.054096846549677
+      ],
+      "z_pooled": 5.402700161787298,
+      "p_z_two_sided": 6.564513983575622e-08,
+      "p_z_greater": 3.282256991787811e-08,
+      "p_fisher_two_sided": 7.278483286727807e-08,
+      "p_fisher_greater": 3.8561429947637404e-08,
+      "p_randomization_two_sided": 0.0,
+      "p_randomization_greater": 0.0
+    }
+  },
+  "methods": {
+    "n_randomization": 100000,
+    "n_bootstrap": 100000,
+    "seed": 2026,
+    "engine": "numpy/scipy/pandas"
+  },
+  "breakdown_by_urbanization": {
+    "Very highly urbanized": {
+      "level_rank_from_rural": 5,
+      "n": 1242,
+      "mood": 0.10386473429951691,
+      "anxiety": 0.14412238325281804,
+      "any": 0.27938808373590984
+    },
+    "Highly urbanized": {
+      "level_rank_from_rural": 4,
+      "n": 1497,
+      "mood": 0.08884435537742151,
+      "anxiety": 0.13694054776219106,
+      "any": 0.24448897795591182
+    },
+    "Moderately urbanized": {
+      "level_rank_from_rural": 3,
+      "n": 1541,
+      "mood": 0.07268007787151201,
+      "anxiety": 0.11550940947436729,
+      "any": 0.24205061648280338
+    },
+    "Not very urbanized": {
+      "level_rank_from_rural": 2,
+      "n": 1611,
+      "mood": 0.06207324643078833,
+      "anxiety": 0.11421477343265053,
+      "any": 0.2048417132216015
+    },
+    "Not urbanized": {
+      "level_rank_from_rural": 1,
+      "n": 1185,
+      "mood": 0.053164556962025315,
+      "anxiety": 0.1080168776371308,
+      "any": 0.18649789029535865
+    }
+  }
+}

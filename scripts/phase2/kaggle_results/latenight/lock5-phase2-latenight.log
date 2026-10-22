@@ -1,0 +1,41 @@
+[{"stream_name":"stdout","time":6.50628734,"data":"================================================================\n"}
+,{"stream_name":"stdout","time":6.506342388,"data":"Q16: Does late night eating impair concentration?\n"}
+,{"stream_name":"stdout","time":6.506349578,"data":"Spaeth, Dinges \u0026 Goel, SLEEP 2015 (UPenn) - randomized experiment, n=44\n"}
+,{"stream_name":"stdout","time":6.506354227,"data":"================================================================\n"}
+,{"stream_name":"stdout","time":6.50635825,"data":"\n"}
+,{"stream_name":"stdout","time":6.506361741,"data":"Groups: eat n=20, fast n=24 (night-4 randomization)\n"}
+,{"stream_name":"stdout","time":6.506365187,"data":"\n"}
+,{"stream_name":"stdout","time":6.506368735,"data":"Part A (night 4, eat - fast) - mean reaction time night 4 (ms)\n"}
+,{"stream_name":"stdout","time":6.506372645,"data":"  eat : n=20  mean=361.95  sd=41.96\n"}
+,{"stream_name":"stdout","time":6.50637666,"data":"  fast: n=24  mean=333.08  sd=40.07\n"}
+,{"stream_name":"stdout","time":6.506380522,"data":"  diff = +28.87\n"}
+,{"stream_name":"stdout","time":6.506384109,"data":"  Welch t = 2.32, df = 39.8, p(two) = 0.0256\n"}
+,{"stream_name":"stdout","time":6.506388022,"data":"  randomization p(two) = 0.02481, p(one, eat worse) = 0.01241\n"}
+,{"stream_name":"stdout","time":6.506391917,"data":"  bootstrap 95% CI for diff: (+5.11, +52.68)\n"}
+,{"stream_name":"stdout","time":6.506396284,"data":"\n"}
+,{"stream_name":"stdout","time":6.5064000360000005,"data":"Part A (night 4, eat - fast) - attention lapses night 4 (count)\n"}
+,{"stream_name":"stdout","time":6.506403477,"data":"  eat : n=20  mean=6.40  sd=2.64\n"}
+,{"stream_name":"stdout","time":6.506407681,"data":"  fast: n=24  mean=4.33  sd=2.43\n"}
+,{"stream_name":"stdout","time":6.506411421,"data":"  diff = +2.07\n"}
+,{"stream_name":"stdout","time":6.50641485,"data":"  Welch t = 2.68, df = 39.1, p(two) = 0.0107\n"}
+,{"stream_name":"stdout","time":6.50641884,"data":"  randomization p(two) = 0.01027, p(one, eat worse) = 0.00573\n"}
+,{"stream_name":"stdout","time":6.506422141,"data":"  bootstrap 95% CI for diff: (+0.55, +3.53)\n"}
+,{"stream_name":"stdout","time":6.506425667,"data":"\n"}
+,{"stream_name":"stdout","time":6.506429417,"data":"Part B (night 4 vs nights 1-3, paired)\n"}
+,{"stream_name":"stdout","time":6.506433558,"data":"  eaters  mean reaction time night 4 (ms)      change +32.05, t(19) = 3.08, p = 0.0062 (significant)\n"}
+,{"stream_name":"stdout","time":6.506437277,"data":"  eaters  attention lapses night 4 (count)     change +2.27, t(19) = 3.66, p = 0.0017 (significant)\n"}
+,{"stream_name":"stdout","time":6.506440729,"data":"  fasters mean reaction time night 4 (ms)      change +3.00, t(23) = 0.41, p = 0.6846 (n.s.)\n"}
+,{"stream_name":"stdout","time":6.506444432,"data":"  fasters attention lapses night 4 (count)     change -0.18, t(23) = -0.34, p = 0.7395 (n.s.)\n"}
+,{"stream_name":"stdout","time":6.506448046,"data":"  diff-in-diff (lapses, eat - fast) = +2.45; randomization p(two) = 0.00484\n"}
+,{"stream_name":"stdout","time":6.506451561,"data":"\n"}
+,{"stream_name":"stdout","time":6.506465399,"data":"Decision: yes - late-night eating worsened vigilant attention under\n"}
+,{"stream_name":"stdout","time":6.506469242,"data":"sleep restriction (randomized comparison; eaters declined, fasters did not).\n"}
+,{"stream_name":"stdout","time":6.506475293,"data":"\n"}
+,{"stream_name":"stdout","time":6.506479161,"data":"Results JSON written to scripts/phase2/out/q16_results.json\n"}
+,{"stream_name":"stderr","time":9.928898797,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":9.928958176,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":10.473323142,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":10.473360599,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":13.052812782,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":14.6748571,"data":"[NbConvertApp] Writing 333509 bytes to __results__.html\n"}
+]

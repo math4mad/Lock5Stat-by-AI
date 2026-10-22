@@ -1,0 +1,200 @@
+{
+  "question": "Does sleep deprivation hurt one's ability to interpret facial expressions?",
+  "provenance": {
+    "citation": "Killgore WDS, Balkin TJ, Yarnell AM, Capaldi VF II. Sleep deprivation impairs recognition of specific emotions. Neurobiology of Sleep and Circadian Rhythms 2017;3:10-16. doi:10.1016/j.nbscr.2017.01.001 (PMID 31236499, PMCID PMC6575584).",
+    "citation_note": "Some secondary sources list a 2017 NeuroReport venue; the correct journal is Neurobiology of Sleep and Circadian Rhythms (verified against the published PDF, Oct 2026).",
+    "design": "Within-subject experiment: 54 healthy young adults (29 M, 25 F) classified 120 morphed facial expressions (20 per basic emotion) on the Ekman Hexagon Test after a normal night of sleep, after one night of total sleep deprivation (23.5 h awake), and after 12 h recovery sleep",
+    "data_source": "Reconstructed CSV (data/phase2/q14_sleepfaces.csv): condition means digitized programmatically from Fig. 3 of the paper; paired-difference SDs calibrated to the published planned-contrast p-values. No Lock5 dataset exists for this study (3e data page checked Oct 2026). Generation algorithm documented in the CSV header."
+  },
+  "data": {
+    "n_participants": 54,
+    "n_trials_per_emotion": 20,
+    "scale": "percent correct out of 20 morphed faces (5-point steps)",
+    "source_csv": "data/phase2/q14_sleepfaces.csv"
+  },
+  "methods": {
+    "paired_test": "scipy.stats.ttest_rel (paired t, df = 53)",
+    "randomization": "sign-flip test on differences, two-sided",
+    "bootstrap": "percentile CI of mean difference, resampling participants (whole pairs)",
+    "n_replicates": 100000,
+    "seed": 2026,
+    "engine": "numpy/scipy/pandas"
+  },
+  "outcomes": {
+    "happiness": {
+      "published": {
+        "mean_rested": 99.91,
+        "mean_deprived": 98.63,
+        "p_paper": 0.004
+      },
+      "reconstructed": {
+        "mean_rested": 99.9074074074074,
+        "mean_deprived": 98.61111111111111,
+        "sd_rested": 0.6804138174397717,
+        "sd_deprived": 3.2818348909676014
+      },
+      "mean_difference_deprived_minus_rested": -1.2962962962962963,
+      "sd_difference": 3.390495203045245,
+      "paired_t": {
+        "t": -2.8095581541012096,
+        "df": 53,
+        "p_two_sided": 0.0069337676785875425
+      },
+      "p_signflip_randomization": 0.005019949800501995,
+      "ci_95_bootstrap_percentile": [
+        -2.2222222222222223,
+        -0.46296296296296297
+      ]
+    },
+    "sadness": {
+      "published": {
+        "mean_rested": 98.75,
+        "mean_deprived": 96.09,
+        "p_paper": 0.023
+      },
+      "reconstructed": {
+        "mean_rested": 98.70370370370371,
+        "mean_deprived": 96.11111111111111,
+        "sd_rested": 4.363785917433802,
+        "sd_deprived": 9.696657013254848
+      },
+      "mean_difference_deprived_minus_rested": -2.5925925925925926,
+      "sd_difference": 6.918715440045317,
+      "paired_t": {
+        "t": -2.753630649129403,
+        "df": 53,
+        "p_two_sided": 0.008055740691873784
+      },
+      "p_signflip_randomization": 0.004699953000469995,
+      "ci_95_bootstrap_percentile": [
+        -4.537037037037037,
+        -0.9259259259259259
+      ]
+    },
+    "surprise": {
+      "published": {
+        "mean_rested": 88.46,
+        "mean_deprived": 87.96,
+        "p_paper": 0.39
+      },
+      "reconstructed": {
+        "mean_rested": 88.42592592592592,
+        "mean_deprived": 87.96296296296296,
+        "sd_rested": 16.70566715711231,
+        "sd_deprived": 19.941388610988238
+      },
+      "mean_difference_deprived_minus_rested": -0.46296296296296297,
+      "sd_difference": 9.529919049653149,
+      "paired_t": {
+        "t": -0.35698824611974855,
+        "df": 53,
+        "p_two_sided": 0.7225180988907798
+      },
+      "p_signflip_randomization": 0.7795322046779533,
+      "ci_95_bootstrap_percentile": [
+        -3.0555555555555554,
+        1.9444444444444444
+      ]
+    },
+    "fear": {
+      "published": {
+        "mean_rested": 91.62,
+        "mean_deprived": 90.18,
+        "p_paper": 0.39
+      },
+      "reconstructed": {
+        "mean_rested": 91.57407407407408,
+        "mean_deprived": 90.18518518518519,
+        "sd_rested": 13.240307030373595,
+        "sd_deprived": 12.81077682247443
+      },
+      "mean_difference_deprived_minus_rested": -1.3888888888888888,
+      "sd_difference": 15.643935067703257,
+      "paired_t": {
+        "t": -0.6524066494412384,
+        "df": 53,
+        "p_two_sided": 0.5169586230257402
+      },
+      "p_signflip_randomization": 0.5544544554554455,
+      "ci_95_bootstrap_percentile": [
+        -5.462962962962963,
+        2.8703703703703702
+      ]
+    },
+    "disgust": {
+      "published": {
+        "mean_rested": 84.58,
+        "mean_deprived": 87.77,
+        "p_paper": null
+      },
+      "reconstructed": {
+        "mean_rested": 84.53703703703704,
+        "mean_deprived": 87.77777777777777,
+        "sd_rested": 25.958394114765078,
+        "sd_deprived": 23.565778407463768
+      },
+      "mean_difference_deprived_minus_rested": 3.240740740740741,
+      "sd_difference": 12.669879874912942,
+      "paired_t": {
+        "t": 1.87961400151441,
+        "df": 53,
+        "p_two_sided": 0.06566291135530598
+      },
+      "p_signflip_randomization": 0.07241927580724193,
+      "ci_95_bootstrap_percentile": [
+        0.09259259259259259,
+        6.7592592592592595
+      ]
+    },
+    "anger": {
+      "published": {
+        "mean_rested": 83.56,
+        "mean_deprived": 85.34,
+        "p_paper": null
+      },
+      "reconstructed": {
+        "mean_rested": 83.51851851851852,
+        "mean_deprived": 85.37037037037037,
+        "sd_rested": 25.8374751531976,
+        "sd_deprived": 23.38867351768461
+      },
+      "mean_difference_deprived_minus_rested": 1.8518518518518519,
+      "sd_difference": 7.967877507695386,
+      "paired_t": {
+        "t": 1.707892263109284,
+        "df": 53,
+        "p_two_sided": 0.09350817668037364
+      },
+      "p_signflip_randomization": 0.1101588984110159,
+      "ci_95_bootstrap_percentile": [
+        -0.18518518518518517,
+        3.9814814814814814
+      ]
+    },
+    "overall": {
+      "published": {
+        "mean_rested": 91.14666666666666,
+        "mean_deprived": 90.995,
+        "p_paper": null
+      },
+      "reconstructed": {
+        "mean_rested": 91.11111111111114,
+        "mean_deprived": 91.00308641975309,
+        "sd_rested": 10.271472370312257,
+        "sd_deprived": 9.885852221822855
+      },
+      "mean_difference_deprived_minus_rested": -0.1080246913580254,
+      "sd_difference": 4.442287430798178,
+      "paired_t": {
+        "t": -0.17869535294877906,
+        "df": 53,
+        "p_two_sided": 0.8588582554904899
+      },
+      "p_signflip_randomization": 0.8531714682853171,
+      "ci_95_bootstrap_percentile": [
+        -1.296296296296298,
+        1.0493827160493812
+      ]
+    }
+  }
+}

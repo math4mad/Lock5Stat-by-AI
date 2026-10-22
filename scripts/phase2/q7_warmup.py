@@ -1,0 +1,137 @@
+# Q7 (Phase 2): Which is better for peak performance: a short mild warm-up
+# or a long intense warm-up?
+#
+# Study: Neiva, H. P., Marques, M. C., Barbosa, T. M., Izquierdo, M., Viana,
+#   J. L., Teixeira, A. M., & Marinho, D. A. (2015). "The effects of different
+#   warm-up volumes on the 100-m swimming performance: a randomized crossover
+#   study." Journal of Strength and Conditioning Research, 29(11), 3026-3036.
+#   DOI: 10.1519/JSC.0000000000000577 (PMID 26506059).
+#
+# Design: randomized crossover (PAIRED). n = 11 national-level male swimmers;
+#   each swam a 100-m freestyle time trial after each of three warm-up volumes
+#   at identical intensities, in randomized order: short (SWU, 600 m), standard
+#   (1,200 m), and long (LWU, 1,800 m), 48 h apart. Published outcome
+#   (mean +/- SD): SWU 59.38 +/- 2.18 s vs LWU 60.18 +/- 2.46 s; "the swimmers
+#   were faster ... after the SWU ... compared with the LWU" and "an LWU could
+#   impair 100-m freestyle performance" (magnitude-based inference).
+#
+# Data: data/phase2/q7_warmup.csv — no warm-up dataset exists on
+#   lock5stat.com/datapage3e.html, so the CSV is a documented reconstruction:
+#   11 paired values matching the published group means/SDs exactly, with a
+#   synthetic within-swimmer correlation r = 0.50 (individual times are not
+#   published). See the CSV header for provenance.
+#
+# Analysis (paired, matching the crossover design): paired t-test, sign-flip
+#   randomization test, and bootstrap percentile CI for the mean difference
+#   (SWU - LWU); a pairing-agnostic Welch t is reported as a conservative
+#   sensitivity check, plus the paired t's sensitivity to the assumed r.
+import json
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+REPO = Path(__file__).resolve().parents[2]
+rng = np.random.default_rng(2026)
+N_REP = 100_000
+R_ASSUMED = 0.50
+
+df = pd.read_csv(REPO / "data/phase2/q7_warmup.csv", comment="#")
+swu = df["swu_100m_s"].to_numpy(dtype=float)   # short, mild warm-up (600 m)
+lwu = df["lwu_100m_s"].to_numpy(dtype=float)   # long, intense warm-up (1,800 m)
+n = len(swu)
+diff = swu - lwu                               # negative => short warm-up faster
+d_bar = diff.mean()
+
+s1, s2 = swu.std(ddof=1), lwu.std(ddof=1)
+m1, m2 = swu.mean(), lwu.mean()
+r_obs = np.corrcoef(swu, lwu)[0, 1]
+
+print("Q7: short mild warm-up vs long intense warm-up (100-m freestyle, s)")
+print(f"Data (reconstructed, Neiva et al. 2015): n={n} paired trials")
+print(f"SWU (600 m):  mean={m1:.2f}  SD={s1:.2f}")
+print(f"LWU (1800 m): mean={m2:.2f}  SD={s2:.2f}")
+print(f"Reconstruction check: r(swu,lwu)={r_obs:.2f} (target {R_ASSUMED:.2f})")
+print(f"Mean difference SWU - LWU: {d_bar:+.2f} s\n")
+
+# 1) Paired t-test (crossover design): H0: mean difference = 0
+t_pair, p_pair = stats.ttest_rel(swu, lwu)
+print(f"Paired t-test: t({n - 1})={t_pair:.3f}, two-sided p={p_pair:.4f}")
+
+# 2) Randomization (sign-flip) test on the paired differences, 100k reps
+flips = rng.choice(np.array([-1.0, 1.0]), size=(N_REP, n))
+rand_means = (flips * diff).mean(axis=1)
+p_rand = (np.sum(np.abs(rand_means) >= abs(d_bar)) + 1) / (N_REP + 1)
+print(f"Randomization sign-flip test ({N_REP:,} reps): p={p_rand:.4f}")
+
+# 3) Bootstrap percentile 95% CI for the mean difference, 100k reps
+boot_means = rng.choice(diff, size=(N_REP, n), replace=True).mean(axis=1)
+ci_boot = np.percentile(boot_means, [2.5, 97.5])
+print(f"Bootstrap 95% CI for mean difference: ({ci_boot[0]:+.2f}, {ci_boot[1]:+.2f}) s")
+
+# 4) Conservative pairing-agnostic comparison: Welch t on the two conditions
+t_w, p_w = stats.ttest_ind(swu, lwu, equal_var=False)
+print(f"Welch t-test (ignores pairing): t={t_w:.3f}, two-sided p={p_w:.4f}")
+
+# 5) Sensitivity of the paired test to the assumed within-swimmer correlation
+sens = {}
+for r in (0.3, 0.5, 0.7, 0.9):
+    s_d = np.sqrt(s1**2 + s2**2 - 2 * r * s1 * s2)
+    t_r = d_bar / (s_d / np.sqrt(n))
+    sens[f"r={r}"] = {"sd_diff": float(s_d), "t": float(t_r),
+                      "p_two_sided": float(2 * stats.t.sf(abs(t_r), n - 1))}
+print("Sensitivity of paired t to assumed r:")
+for k, v in sens.items():
+    print(f"  {k}: SD(diff)={v['sd_diff']:.2f}, t={v['t']:.3f}, p={v['p_two_sided']:.4f}")
+
+print(
+    "\nConclusion: the long intense (1,800 m) warm-up was, on average, "
+    f"{-d_bar:.2f} s slower than the short mild (600 m) warm-up "
+    f"({m2:.2f} vs {m1:.2f} s), i.e. the SHORT MILD warm-up was better for peak "
+    "performance, consistent with the published conclusion that a long warm-up "
+    "could impair 100-m freestyle performance (Neiva et al. 2015, magnitude-based "
+    "inference). With only n=11 and reconstructed pairing (r=0.5 assumed), the "
+    "conventional NHSTs do not reach p<0.05; significance would require a strong "
+    "within-swimmer correlation (r>=0.7)."
+)
+
+results = {
+    "question": "Which is better for peak performance: a short mild warm-up or a long intense warm-up?",
+    "citation": 'Neiva, H. P., Marques, M. C., Barbosa, T. M., Izquierdo, M., Viana, J. L., Teixeira, A. M., & Marinho, D. A. (2015). "The effects of different warm-up volumes on the 100-m swimming performance: a randomized crossover study." Journal of Strength and Conditioning Research, 29(11), 3026-3036. DOI 10.1519/JSC.0000000000000577 (PMID 26506059)',
+    "data": {
+        "file": "data/phase2/q7_warmup.csv",
+        "provenance": (
+            "Reconstruction: no warm-up dataset on lock5stat.com/datapage3e.html. "
+            "11 paired 100-m freestyle times matching published group means/SDs "
+            "(SWU 59.38+/-2.18 s, LWU 60.18+/-2.46 s; standard WU 59.29+/-1.95 s) "
+            "exactly; within-swimmer pairing is synthetic with assumed r=0.50 "
+            "(individual times unpublished). Documented in CSV header."
+        ),
+        "n_swimmers": n,
+        "design": "randomized crossover (paired), three warm-up volumes, 48 h apart",
+        "swu_mean_s": float(m1), "swu_sd_s": float(s1),
+        "lwu_mean_s": float(m2), "lwu_sd_s": float(s2),
+        "assumed_within_swimmer_r": R_ASSUMED,
+    },
+    "mean_diff_swu_minus_lwu_s": float(d_bar),
+    "paired_t": {"t": float(t_pair), "df": n - 1, "p_two_sided": float(p_pair)},
+    "randomization_sign_flip_p_two_sided": float(p_rand),
+    "bootstrap_ci_95_mean_diff_s": [float(ci_boot[0]), float(ci_boot[1])],
+    "welch_t": {"t": float(t_w), "p_two_sided": float(p_w)},
+    "sensitivity_paired_t_to_r": sens,
+    "conclusion": (
+        "Short mild warm-up (600 m) beat the long intense warm-up (1,800 m): "
+        f"swimmers averaged {m1:.2f} vs {m2:.2f} s, a {-d_bar:.2f} s advantage "
+        "for the short warm-up, matching the paper's published inference that a "
+        "long warm-up could impair performance. With n=11 and reconstructed "
+        "pairing (assumed r=0.5) the conventional tests do not reach p<0.05 "
+        "(paired p~0.28, Welch p~0.43); reaching significance needs r>=0.7."
+    ),
+}
+
+out_dir = REPO / "scripts/phase2/out"
+out_dir.mkdir(parents=True, exist_ok=True)
+with open(out_dir / "q7_results.json", "w") as f:
+    json.dump(results, f, indent=2)
+print(f"saved {out_dir / 'q7_results.json'}")

@@ -1,0 +1,125 @@
+{
+  "question": "Does late night eating impair concentration?",
+  "provenance": {
+    "study": "SLEEP 2015 conference presentation - Perelman School of Medicine, University of Pennsylvania",
+    "citation": "Spaeth AM, Dinges DF, Goel N. Presented at SLEEP 2015 (29th Annual Meeting of the Associated Professional Sleep Societies), Seattle WA, June 6-10, 2015. Lock5 3e cites: University of Pennsylvania School of Medicine. 'Eating less during late night hours may stave off some effects of sleep deprivation.' ScienceDaily, June 4, 2015.",
+    "url": "https://www.sciencedaily.com/releases/2015/06/150604141905.htm",
+    "lock5_location": "3rd-edition exercise 1.110 'Late Night Eating' (footnote 74)",
+    "design": "Randomized experiment: 44 adults aged 21-50, 4 h sleep/night for 3 nights, night-4 randomization to continued food access (n=20) vs water-only from 10 pm (n=24); 2 a.m. testing nightly.",
+    "data_source": "No Lock5 dataset (3e data page checked Oct 2026). data/phase2/q16_latenight.csv is a documented reconstruction (seed 2026) calibrated to the published direction of effects and PVT magnitudes typical of 4 h time in bed; per-participant values are synthetic.",
+    "caution": "Published findings are qualitative (no group means/SDs released); the numeric results here illustrate the analysis pipeline for this design."
+  },
+  "methods": {
+    "n_bootstrap": 100000,
+    "n_randomization": 100000,
+    "seed": 2026,
+    "engine": "numpy/scipy/pandas"
+  },
+  "part_a_night4_between_groups": {
+    "mean reaction time night 4 (ms)": {
+      "endpoint": "mean reaction time night 4 (ms)",
+      "data": {
+        "eat": {
+          "n": 20,
+          "mean": 361.95,
+          "sd": 41.95545883810341
+        },
+        "fast": {
+          "n": 24,
+          "mean": 333.0833333333333,
+          "sd": 40.068329319959844
+        }
+      },
+      "diff_in_means_eat_minus_fast": 28.866666666666674,
+      "welch_t": {
+        "t": 2.3193174835048507,
+        "df": 39.84388266982597,
+        "p_two_sided": 0.02558928273411596,
+        "p_one_sided_eat_worse": 0.012794641367057985
+      },
+      "randomization": {
+        "p_two_sided": 0.02481,
+        "p_one_sided_eat_worse": 0.01241
+      },
+      "bootstrap": {
+        "ci95_mean_diff": [
+          5.108333333333292,
+          52.67500000000001
+        ]
+      }
+    },
+    "attention lapses night 4 (count)": {
+      "endpoint": "attention lapses night 4 (count)",
+      "data": {
+        "eat": {
+          "n": 20,
+          "mean": 6.4,
+          "sd": 2.643761275949575
+        },
+        "fast": {
+          "n": 24,
+          "mean": 4.333333333333333,
+          "sd": 2.4257077258017903
+        }
+      },
+      "diff_in_means_eat_minus_fast": 2.0666666666666673,
+      "welch_t": {
+        "t": 2.6800467184045313,
+        "df": 39.10908290398613,
+        "p_two_sided": 0.010717574557809476,
+        "p_one_sided_eat_worse": 0.005358787278904738
+      },
+      "randomization": {
+        "p_two_sided": 0.01027,
+        "p_one_sided_eat_worse": 0.00573
+      },
+      "bootstrap": {
+        "ci95_mean_diff": [
+          0.5499999999999998,
+          3.5250000000000004
+        ]
+      }
+    }
+  },
+  "part_b_within_subject_change": {
+    "paired_eaters": {
+      "mean reaction time night 4 (ms)": {
+        "mean_change": 32.05,
+        "t": 3.0776095372165253,
+        "df": 19,
+        "p_two_sided": 0.0061965737260392915
+      },
+      "attention lapses night 4 (count)": {
+        "mean_change": 2.267,
+        "t": 3.6593459736807006,
+        "df": 19,
+        "p_two_sided": 0.0016672613650461885
+      }
+    },
+    "paired_fasters": {
+      "mean reaction time night 4 (ms)": {
+        "mean_change": 3.0,
+        "t": 0.4113511994200396,
+        "df": 23,
+        "p_two_sided": 0.6846228980219642
+      },
+      "attention lapses night 4 (count)": {
+        "mean_change": -0.18083333333333332,
+        "t": -0.33655934914579716,
+        "df": 23,
+        "p_two_sided": 0.7395006087659342
+      }
+    },
+    "diff_in_diff_lapses": {
+      "did_eat_minus_fast": 2.447833333333333,
+      "randomization_p_two_sided": 0.00484,
+      "randomization_p_one_sided_eat_worse": 0.00245
+    }
+  },
+  "decision": {
+    "question": "Does late night eating impair concentration?",
+    "verdict": "Yes - in this randomized experiment, the group kept awake with late-night food access had significantly slower reaction times and more attention lapses on night 4 than the group fasted from 10 pm; the eaters also declined significantly from their nights 1-3 level, while the fasting group did not decline.",
+    "causality": "Randomization of the night-4 condition supports a causal conclusion: late-night eating (vs fasting) worsens some effects of sleep restriction on vigilant attention.",
+    "scope": "Conclusions are about vigilance under acute sleep restriction (4 h/night); per-participant values in the CSV are a documented reconstruction, so numeric p-values illustrate the pipeline rather than replicate the unpublished study statistics."
+  }
+}

@@ -1,0 +1,80 @@
+# data/phase2/q11_barmusic.csv
+# Lock5 Phase 2, Q11: "Does turning up the music in a bar cause people to drink more beer?"
+#
+# Citation: Gueguen, N., Jacob, C., Le Guellec, H., Morineau, T., & Lourel, M. (2008),
+#   "Sound level of environmental music and drinking behavior: A field experiment with
+#   beer drinkers", Alcoholism: Clinical and Experimental Research, 32(10), 1795-1798.
+#   DOI 10.1111/j.1530-0277.2008.00764.x.
+#
+# Design (naturalistic field experiment): 40 male beer drinkers (aged 18-25) observed
+#   in 2 bars in western France over 3 Saturday nights; the bars' usual top-40 music
+#   was randomly set to the normal level (72 dB) or a high level (88 dB). Outcomes
+#   observed per patron: number of beer glasses ordered and time spent drinking a glass.
+#
+# Published headline results (paper abstract; Reuters / HealthDay / Daily Star
+#   coverage of the July 2008 study): loud music increased the mean number of drinks
+#   ordered, 2.6 -> 3.4 glasses, and cut the mean time to drink a glass,
+#   14.51 -> 11.45 minutes (about 3 minutes faster). Both differences significant.
+#
+# Lock5 3e ships no dataset for this question (checked lock5stat.com/datapage3e.html;
+#   the only "beer" match there is PumpkinBeer, unrelated to this study).
+#
+# No public microdata exists for this study. Rows below are a documented
+#   reconstruction from the published group means:
+#   - n = 20 patrons per condition: the 40 patrons were randomly assigned to the two
+#     sound levels; the exact split is not published, so a balanced 20/20 split is
+#     assumed (documented assumption).
+#   - glasses (integer counts) and time_per_glass_min (minutes) are reconstructed to
+#     reproduce the published condition means exactly (normal: 2.6 glasses and
+#     14.51 min; high: 3.4 glasses and 11.45 min).
+#   - Per-patron spread is NOT published. The reconstructed SDs (glasses ~0.82 vs
+#     ~0.88; time ~2.3 vs ~1.5 min) are documented assumptions chosen to be plausible
+#     for bar patrons. Test statistics below therefore illustrate the Lock5 method on
+#     the published means rather than exactly reproducing the paper's inferential
+#     statistics (the paper reports significant differences in both outcomes).
+#
+# Columns: condition = sound-level condition (normal_72db / high_88db);
+#          patron = patron index within condition;
+#          glasses = number of beer glasses ordered during the observation;
+#          time_per_glass_min = average minutes the patron took to drink one glass.
+condition,patron,glasses,time_per_glass_min
+normal_72db,1,2,11.25
+normal_72db,2,3,12.40
+normal_72db,3,2,13.10
+normal_72db,4,4,14.85
+normal_72db,5,1,16.20
+normal_72db,6,3,10.75
+normal_72db,7,2,12.95
+normal_72db,8,2,14.50
+normal_72db,9,3,15.75
+normal_72db,10,3,17.30
+normal_72db,11,2,13.60
+normal_72db,12,2,11.90
+normal_72db,13,3,15.10
+normal_72db,14,4,16.85
+normal_72db,15,2,12.55
+normal_72db,16,3,14.20
+normal_72db,17,2,18.40
+normal_72db,18,3,13.35
+normal_72db,19,2,15.95
+normal_72db,20,4,19.25
+high_88db,1,3,8.90
+high_88db,2,4,10.25
+high_88db,3,3,11.80
+high_88db,4,5,12.45
+high_88db,5,2,9.60
+high_88db,6,4,11.15
+high_88db,7,3,12.90
+high_88db,8,3,10.50
+high_88db,9,4,13.25
+high_88db,10,4,11.70
+high_88db,11,3,9.85
+high_88db,12,3,12.10
+high_88db,13,4,10.85
+high_88db,14,5,13.70
+high_88db,15,2,11.40
+high_88db,16,3,9.30
+high_88db,17,3,12.65
+high_88db,18,4,10.15
+high_88db,19,2,12.35
+high_88db,20,4,14.15

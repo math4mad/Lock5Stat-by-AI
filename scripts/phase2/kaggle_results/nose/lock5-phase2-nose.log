@@ -1,0 +1,67 @@
+[{"stream_name":"stdout","time":3.908344056,"data":"Question: Is your nose getting bigger?\n"}
+,{"stream_name":"stdout","time":3.908490806,"data":"Data: Sforza et al. (2011) Table 1 grouped means, 519 men, 11 age groups (data/phase2/q12_nose.csv)\n"}
+,{"stream_name":"stdout","time":3.908497865,"data":"\n"}
+,{"stream_name":"stdout","time":3.933190282,"data":"age_group  age_mid   n  height_mean_mm  width_mean_mm  area_mean_mm2\n"}
+,{"stream_name":"stdout","time":3.933228544,"data":"      4-5      4.5  11           34.50          23.75            735\n"}
+,{"stream_name":"stdout","time":3.933234106,"data":"      6-7      6.5  47           40.04          25.67            848\n"}
+,{"stream_name":"stdout","time":3.933237703,"data":"      8-9      8.5  55           43.03          26.65            973\n"}
+,{"stream_name":"stdout","time":3.933241716,"data":"    10-11     10.5  44           46.83          26.40           1194\n"}
+,{"stream_name":"stdout","time":3.933245504,"data":"    12-13     12.5  82           49.00          28.73           1327\n"}
+,{"stream_name":"stdout","time":3.933249312,"data":"    14-16     15.0  55           50.53          31.10           1522\n"}
+,{"stream_name":"stdout","time":3.9332531040000003,"data":"    18-30     24.0 126           55.65          32.31           1643\n"}
+,{"stream_name":"stdout","time":3.933256654,"data":"    31-40     35.5  66           57.30          33.86           1822\n"}
+,{"stream_name":"stdout","time":3.933260222,"data":"    41-50     45.5  11           58.68          34.10           1873\n"}
+,{"stream_name":"stdout","time":3.933263904,"data":"    51-64     57.5  15           54.79          35.76           1866\n"}
+,{"stream_name":"stdout","time":3.9332673700000003,"data":"    65-80     72.5   7           57.36          37.10           1874 \n"}
+,{"stream_name":"stdout","time":3.933271327,"data":"\n"}
+,{"stream_name":"stdout","time":3.93327469,"data":"--- Correlations over the full age span (group means)\n"}
+,{"stream_name":"stdout","time":4.065988013,"data":"--- Age vs nasal height (n-sn), men, full span 4-80 y (n groups = 11)\n"}
+,{"stream_name":"stdout","time":4.06602037,"data":"    r = 0.7762 (Pearson exact p = 4.97e-03); slope = 0.2686 mm/yr\n"}
+,{"stream_name":"stdout","time":4.066025329,"data":"    randomization p (positive, one-sided) = 1.50e-04; (two-sided) = 5.47e-03  [100000 permutations]\n"}
+,{"stream_name":"stdout","time":4.066029624,"data":"    bootstrap 95% CI for r = (0.6785, 0.9295) [100000 resamples, 100000 valid]\n"}
+,{"stream_name":"stdout","time":4.066033933,"data":"\n"}
+,{"stream_name":"stdout","time":4.167491553,"data":"--- Age vs nasal width (al-al), men, full span 4-80 y (n groups = 11)\n"}
+,{"stream_name":"stdout","time":4.167523703,"data":"    r = 0.9232 (Pearson exact p = 5.04e-05); slope = 0.1803 mm/yr\n"}
+,{"stream_name":"stdout","time":4.167528619,"data":"    randomization p (positive, one-sided) = 0.00e+00; (two-sided) = 0.00e+00  [100000 permutations]\n"}
+,{"stream_name":"stdout","time":4.167533035,"data":"    bootstrap 95% CI for r = (0.8666, 0.9777) [100000 resamples, 100000 valid]\n"}
+,{"stream_name":"stdout","time":4.167537234,"data":"\n"}
+,{"stream_name":"stdout","time":4.268812522,"data":"--- Age vs external nasal surface area, men, full span 4-80 y (n groups = 11)\n"}
+,{"stream_name":"stdout","time":4.2688469829999995,"data":"    r = 0.8452 (Pearson exact p = 1.05e-03); slope = 15.9238 mm2/yr\n"}
+,{"stream_name":"stdout","time":4.268876453,"data":"    randomization p (positive, one-sided) = 0.00e+00; (two-sided) = 1.29e-03  [100000 permutations]\n"}
+,{"stream_name":"stdout","time":4.268880769,"data":"    bootstrap 95% CI for r = (0.7714, 0.9482) [100000 resamples, 100000 valid]\n"}
+,{"stream_name":"stdout","time":4.268901672,"data":"\n"}
+,{"stream_name":"stdout","time":4.273193827,"data":"--- Adults only (age_mid \u003e= 18; does growth continue after maturity?)\n"}
+,{"stream_name":"stdout","time":4.349085467,"data":"--- Age vs nasal height, men, adults 18-80 y (n groups = 5)\n"}
+,{"stream_name":"stdout","time":4.349119441,"data":"    r = 0.0953 (Pearson exact p = 8.79e-01); slope = 0.0078 mm/yr\n"}
+,{"stream_name":"stdout","time":4.349124305,"data":"    randomization p (positive, one-sided) = 4.24e-01; (two-sided) = 8.58e-01  [100000 permutations]\n"}
+,{"stream_name":"stdout","time":4.34912857,"data":"    bootstrap 95% CI for r = (-1.0000, 1.0000) [100000 resamples, 99861 valid]\n"}
+,{"stream_name":"stdout","time":4.349132679,"data":"\n"}
+,{"stream_name":"stdout","time":4.423710612,"data":"--- Age vs nasal width, men, adults 18-80 y (n groups = 5)\n"}
+,{"stream_name":"stdout","time":4.423742724,"data":"    r = 0.9894 (Pearson exact p = 1.31e-03); slope = 0.0968 mm/yr\n"}
+,{"stream_name":"stdout","time":4.423747616,"data":"    randomization p (positive, one-sided) = 8.18e-03; (two-sided) = 8.18e-03  [100000 permutations]\n"}
+,{"stream_name":"stdout","time":4.423751935,"data":"    bootstrap 95% CI for r = (0.9081, 1.0000) [100000 resamples, 99814 valid]\n"}
+,{"stream_name":"stdout","time":4.423755692,"data":"\n"}
+,{"stream_name":"stdout","time":4.498462661,"data":"--- Age vs external nasal area, men, adults 18-80 y (n groups = 5)\n"}
+,{"stream_name":"stdout","time":4.498497457,"data":"    r = 0.7813 (Pearson exact p = 1.19e-01); slope = 4.0930 mm2/yr\n"}
+,{"stream_name":"stdout","time":4.498503407,"data":"    randomization p (positive, one-sided) = 2.55e-02; (two-sided) = 9.33e-02  [100000 permutations]\n"}
+,{"stream_name":"stdout","time":4.498507658,"data":"    bootstrap 95% CI for r = (-0.0467, 1.0000) [100000 resamples, 99854 valid]\n"}
+,{"stream_name":"stdout","time":4.49851211,"data":"\n"}
+,{"stream_name":"stdout","time":4.500553635,"data":"Conclusion:\n"}
+,{"stream_name":"stdout","time":4.500578683,"data":"  Nose size rises steadily across the lifespan: mean nasal height grows from\n"}
+,{"stream_name":"stdout","time":4.5005836299999995,"data":"  34.5 mm (age 4-5) to 57.4 mm (age 65-80), +22.9 mm, and nasal width grows\n"}
+,{"stream_name":"stdout","time":4.500587523,"data":"  23.8 -\u003e 37.1 mm. Over ages 4-80 the age-nose correlation is strong and positive\n"}
+,{"stream_name":"stdout","time":4.500592214,"data":"  (height r = 0.78, one-sided randomization p = 1.5e-04; width r = 0.92; area r = 0.85),\n"}
+,{"stream_name":"stdout","time":4.50059673,"data":"  matching the paper's ANOVA (age p \u003c 0.001) and Lock5's quoted p \u003c 0.001. Among\n"}
+,{"stream_name":"stdout","time":4.500600706,"data":"  adult age-group means alone (18-80 y, 5 groups) nasal height is flat (r = 0.10,\n"}
+,{"stream_name":"stdout","time":4.500604812,"data":"  one-sided randomization p = 0.42), but nasal width keeps widening significantly\n"}
+,{"stream_name":"stdout","time":4.50060863,"data":"  (r = 0.99, one-sided p = 8.2e-03) and area trends positive (r = 0.78,\n"}
+,{"stream_name":"stdout","time":4.500612613,"data":"  one-sided p = 0.03) - grouped means have far less power than the study's\n"}
+,{"stream_name":"stdout","time":4.500616148,"data":"  individual-level test (p \u003c 0.001), and most of the size gain occurs up to ~18 y.\n"}
+,{"stream_name":"stdout","time":4.501096415,"data":"Saved results to /kaggle/working/scripts/phase2/out/q12_results.json\n"}
+,{"stream_name":"stderr","time":7.478467848,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":7.478517998,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":7.853460127,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":7.853490815,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":9.574466091,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":10.849352922,"data":"[NbConvertApp] Writing 324797 bytes to __results__.html\n"}
+]

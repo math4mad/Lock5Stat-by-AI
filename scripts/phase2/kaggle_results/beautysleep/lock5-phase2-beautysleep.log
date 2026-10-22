@@ -1,0 +1,39 @@
+[{"stream_name":"stdout","time":5.392935297,"data":"================================================================\n"}
+,{"stream_name":"stdout","time":5.392995389,"data":"Q9: Is there truth to the saying \"beauty sleep\"?\n"}
+,{"stream_name":"stdout","time":5.393003127,"data":"Axelsson et al., BMJ 2010;341:c6614 - 23 faces x 2 conditions,\n"}
+,{"stream_name":"stdout","time":5.393008008,"data":"rated by 65 observers (0-100 mm VAS); reconstructed paired data\n"}
+,{"stream_name":"stdout","time":5.393011937,"data":"================================================================\n"}
+,{"stream_name":"stdout","time":5.393015577,"data":"\n"}
+,{"stream_name":"stdout","time":5.393019595,"data":"Health:\n"}
+,{"stream_name":"stdout","time":5.393023545,"data":"  normal sleep mean = 68.0, sleep-deprived mean = 63.0 (published: 68 vs 63)\n"}
+,{"stream_name":"stdout","time":5.393027208,"data":"  mean difference (deprived - normal) = -5.00 points (rated less when sleep deprived)\n"}
+,{"stream_name":"stdout","time":5.393031032,"data":"  paired t(22) = -7.78, p = 9.39e-08\n"}
+,{"stream_name":"stdout","time":5.393034884,"data":"  sign-flip randomization p = 0.00001\n"}
+,{"stream_name":"stdout","time":5.393038481,"data":"  bootstrap 95% CI of mean difference: (-6.23, -3.78)\n"}
+,{"stream_name":"stdout","time":5.393042415,"data":"\n"}
+,{"stream_name":"stdout","time":5.393045716,"data":"Tiredness:\n"}
+,{"stream_name":"stdout","time":5.393049712,"data":"  normal sleep mean = 44.0, sleep-deprived mean = 53.0 (published: 44 vs 53)\n"}
+,{"stream_name":"stdout","time":5.393053773,"data":"  mean difference (deprived - normal) = +9.00 points (rated more when sleep deprived)\n"}
+,{"stream_name":"stdout","time":5.39305761,"data":"  paired t(22) = 17.23, p = 2.94e-14\n"}
+,{"stream_name":"stdout","time":5.3930611729999995,"data":"  sign-flip randomization p = 0.00001\n"}
+,{"stream_name":"stdout","time":5.393064532,"data":"  bootstrap 95% CI of mean difference: (+8.00, +9.99)\n"}
+,{"stream_name":"stdout","time":5.393068652,"data":"\n"}
+,{"stream_name":"stdout","time":5.393071977,"data":"Attractiveness:\n"}
+,{"stream_name":"stdout","time":5.393075758,"data":"  normal sleep mean = 40.0, sleep-deprived mean = 38.0 (published: 40 vs 38)\n"}
+,{"stream_name":"stdout","time":5.393080956,"data":"  mean difference (deprived - normal) = -2.03 points (rated less when sleep deprived)\n"}
+,{"stream_name":"stdout","time":5.393084779,"data":"  paired t(22) = -4.16, p = 4.07e-04\n"}
+,{"stream_name":"stdout","time":5.393088456,"data":"  sign-flip randomization p = 0.00037\n"}
+,{"stream_name":"stdout","time":5.393091512,"data":"  bootstrap 95% CI of mean difference: (-2.97, -1.11)\n"}
+,{"stream_name":"stdout","time":5.393093795,"data":"\n"}
+,{"stream_name":"stdout","time":5.393096185,"data":"Conclusion: sleep-deprived faces are rated significantly (all p \u003c 0.001) less healthy, less attractive, and\n"}
+,{"stream_name":"stdout","time":5.39309909,"data":"more tired than the same faces after a normal night's sleep -\n"}
+,{"stream_name":"stdout","time":5.393101442,"data":"the saying \"beauty sleep\" holds up in this experiment.\n"}
+,{"stream_name":"stdout","time":5.393105514,"data":"\n"}
+,{"stream_name":"stdout","time":5.393107703,"data":"Results JSON written to scripts/phase2/out/q9_results.json\n"}
+,{"stream_name":"stderr","time":8.438766275,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":8.438828888,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":8.881998707,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":8.882040476,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":10.971777303,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":12.396933843,"data":"[NbConvertApp] Writing 313903 bytes to __results__.html\n"}
+]

@@ -1,0 +1,10 @@
+table,group,n,metric,value,ci95_low,ci95_high
+delta_bmi,0 per week (none),1819,mean_dbmi_kg_m2,1.01,0.88,1.14
+delta_bmi,<3 per week,420,mean_dbmi_kg_m2,1.11,0.85,1.38
+delta_bmi,3-10 per week,422,mean_dbmi_kg_m2,1.46,1.20,1.73
+delta_bmi,11-21 per week,401,mean_dbmi_kg_m2,1.50,1.23,1.78
+delta_bmi,22+ per week,403,mean_dbmi_kg_m2,1.78,1.51,2.06
+baseline_status,nonuser,1767,ow_or_obese,1064,,
+baseline_status,nonuser,1767,obese,408,,
+baseline_status,user,1604,ow_or_obese,1084,,
+baseline_status,user,1604,obese,446,,

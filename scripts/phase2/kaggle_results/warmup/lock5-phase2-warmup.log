@@ -1,0 +1,26 @@
+[{"stream_name":"stdout","time":3.996997326,"data":"Q7: short mild warm-up vs long intense warm-up (100-m freestyle, s)\n"}
+,{"stream_name":"stdout","time":3.997048226,"data":"Data (reconstructed, Neiva et al. 2015): n=11 paired trials\n"}
+,{"stream_name":"stdout","time":3.997054946,"data":"SWU (600 m):  mean=59.38  SD=2.18\n"}
+,{"stream_name":"stdout","time":3.997059528,"data":"LWU (1800 m): mean=60.18  SD=2.46\n"}
+,{"stream_name":"stdout","time":3.997063872,"data":"Reconstruction check: r(swu,lwu)=0.50 (target 0.50)\n"}
+,{"stream_name":"stdout","time":3.997068292,"data":"Mean difference SWU - LWU: -0.80 s\n"}
+,{"stream_name":"stdout","time":3.997072447,"data":"\n"}
+,{"stream_name":"stdout","time":4.000491994,"data":"Paired t-test: t(10)=-1.137, two-sided p=0.2821\n"}
+,{"stream_name":"stdout","time":4.023785771,"data":"Randomization sign-flip test (100,000 reps): p=0.2822\n"}
+,{"stream_name":"stdout","time":4.043805762,"data":"Bootstrap 95% CI for mean difference: (-2.13, +0.48) s\n"}
+,{"stream_name":"stdout","time":4.046334604,"data":"Welch t-test (ignores pairing): t=-0.807, two-sided p=0.4294\n"}
+,{"stream_name":"stdout","time":4.047168512,"data":"Sensitivity of paired t to assumed r:\n"}
+,{"stream_name":"stdout","time":4.047195554,"data":"  r=0.3: SD(diff)=2.76, t=-0.963, p=0.3584\n"}
+,{"stream_name":"stdout","time":4.047201696,"data":"  r=0.5: SD(diff)=2.33, t=-1.137, p=0.2821\n"}
+,{"stream_name":"stdout","time":4.047206379,"data":"  r=0.7: SD(diff)=1.82, t=-1.461, p=0.1748\n"}
+,{"stream_name":"stdout","time":4.047211026,"data":"  r=0.9: SD(diff)=1.07, t=-2.473, p=0.0330\n"}
+,{"stream_name":"stdout","time":4.047215832,"data":"\n"}
+,{"stream_name":"stdout","time":4.047221115,"data":"Conclusion: the long intense (1,800 m) warm-up was, on average, 0.80 s slower than the short mild (600 m) warm-up (60.18 vs 59.38 s), i.e. the SHORT MILD warm-up was better for peak performance, consistent with the published conclusion that a long warm-up could impair 100-m freestyle performance (Neiva et al. 2015, magnitude-based inference). With only n=11 and reconstructed pairing (r=0.5 assumed), the conventional NHSTs do not reach p\u003c0.05; significance would require a strong within-swimmer correlation (r\u003e=0.7).\n"}
+,{"stream_name":"stdout","time":4.047750695,"data":"saved /kaggle/working/scripts/phase2/out/q7_results.json\n"}
+,{"stream_name":"stderr","time":7.130476053,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":7.130513001,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":7.514427265,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":7.514458418,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":9.259151447,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":10.5813639,"data":"[NbConvertApp] Writing 306641 bytes to __results__.html\n"}
+]

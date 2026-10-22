@@ -1,6 +1,6 @@
 {
-  "id": "math4amd/lock5-phase2-q1-handwashing",
-  "title": "Lock5 Phase2 Q1 Handwashing",
+  "id": "math4amd/lock5-phase2-handwashing",
+  "title": "Lock5 Phase2 Handwashing",
   "code_file": "q1_handwashing.py",
   "language": "python",
   "kernel_type": "script",

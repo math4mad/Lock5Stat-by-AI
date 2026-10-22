@@ -1,0 +1,137 @@
+# Q14 (Phase 2): Does sleep deprivation hurt one's ability to interpret facial
+# expressions?
+#
+# STUDY
+#   Killgore WDS, Balkin TJ, Yarnell AM, Capaldi VF II. "Sleep deprivation
+#   impairs recognition of specific emotions." Neurobiology of Sleep and
+#   Circadian Rhythms 2017;3:10-16. doi:10.1016/j.nbscr.2017.01.001 (open
+#   access, CC BY-NC-ND; PMID 31236499, PMCID PMC6575584). NOTE: some
+#   secondary sources list a 2017 NeuroReport venue; the correct journal is
+#   Neurobiology of Sleep and Circadian Rhythms (verified against the
+#   published PDF, Oct 2026).
+#   ScienceDaily's coverage (21 Mar 2017) headlines this study as "Sleep
+#   deprivation impairs ability to interpret facial expressions", matching the
+#   Q14 question.
+#
+# DESIGN
+#   Within-subject experiment (Walter Reed Army Institute of Research). 54
+#   healthy young adults (29 male, 25 female; mean age 23.5, SD 4.0) took the
+#   Ekman Hexagon Test (EHT): 120 computer-morphed facial blends (20 per basic
+#   emotion; happiness, sadness, surprise, fear, disgust, anger; 50:50 blends
+#   excluded) classified under the 6 emotion labels. Tested after a normal
+#   night of sleep (baseline, ~5.5 h awake), after one night of total sleep
+#   deprivation (23.5 h awake; a 46.7-h post-stimulant session reported
+#   elsewhere is excluded), and after 12 h recovery sleep. Within-subject:
+#   every participant completed every session.
+#
+# PUBLISHED RESULTS (repeated-measures ANOVA + planned contrasts)
+#   Session x emotion interaction F(10,43)=3.69, p=.001.
+#   Happiness: decline baseline->SD p=.004 (quadratic F(1,52)=7.12, p=.01)
+#   Sadness:   decline baseline->SD p=.023 (quadratic F(1,52)=5.85, p=.019)
+#   Surprise:  no decline (p=.39); Fear: no baseline->SD decline (p=.39)
+#   Disgust / Anger: no significant effects (quadratic p=.33 / p=.41)
+#   Recovery sleep returned accuracy to baseline. Numeric per-condition means
+#   appear only in Fig. 3 (bar-free line plots); no table is published.
+#
+# DATA SOURCE
+#   Lock5 distributes no dataset for this study (3rd-edition data page checked
+#   Oct 2026 - only SleepCaffeine and SleepStudy exist, neither is this
+#   experiment). data/phase2/q14_sleepfaces.csv is a documented
+#   reconstruction, for method illustration only (true per-participant values
+#   are unpublished).
+#
+# DIGITIZED MEANS (percent correct; read programmatically off Fig. 3 at 600 dpi
+#   by calibrating the y-axis tick-label text positions and locating the plotted
+#   marker centroids; reading tolerance ~+/-0.15 point):
+#                 rested(baseline)  sleep-dep   recovery(not included)
+#   Happiness          99.91          98.63        99.75
+#   Sadness            98.75          96.09        98.75
+#   Surprise           88.46          87.96        92.98
+#   Fear               91.62          90.18        96.38
+#   Disgust            84.58          87.77        87.21
+#   Anger              83.56          85.34        91.06
+#   (happiness rested: digitized 99.95 is unattainable on the 5-point grid of
+#   correct/20 trials; 99.91 = one person at 95, everyone else 100, is the
+#   nearest attainable value and matches the paper's stated ceiling effect.)
+#
+# RECONSTRUCTION
+#   - Unit: one row per participant (n = 54). Each cell = that participant's
+#     percent correct (out of 20 morphed faces per emotion; hence 5-point
+#     steps) for the rested baseline and the sleep-deprived session.
+#   - Condition means: exactly the digitized values above (integer error-count
+#     adjustment after generation).
+#   - Paired-difference SDs calibrated so the paired t (df=53) approximately
+#     reproduces the published planned-contrast p: happiness .004 -> SD 3.1;
+#     sadness .023 -> 8.4; surprise .39 -> (model floor) 8.9; fear .39 -> 12.2;
+#     disgust/anger (no simple-effect p published) -> 14.0/8.0 so their small
+#     improvements remain non-significant, consistent with the paper.
+#   - Generation model (seed 2026, numpy default_rng): per person and emotion,
+#     errors ~ Binomial(20, q) with rested q = expit(a + g*z) and deprived
+#     q = expit(a + D + g*z + l*u); z = face-recognition ability factor
+#     (cross-emotion corr 0.5), u = sleep-loss vulnerability factor (corr 0.3),
+#     independent person factors, rank-matched to N(0,1) quantiles. Calibrated
+#     parameters (a, g, D, l) per emotion:
+#       happiness (-7.013, 0.050, 2.245, 1.018); sadness (-8.226, 3.203, 1.725, 0.417)
+#       surprise  (-2.927, 1.707, 0.064, 0.000); fear    (-3.028, 1.319, -0.065, 0.960)
+#       disgust   (-3.356, 2.783, -0.702, 1.130); anger  (-3.043, 2.573, -0.235, 0.000)
+#   - Realized paired results of this CSV: happiness t(53)=-2.81, p=.007;
+#     sadness t=-2.75, p=.008; surprise/fear/disgust/anger n.s. (p=.72/.52/.07/.09);
+#     overall (mean of 6 emotions) t=-0.18, p=.86 - averaging across emotions
+#     masks the emotion-specific effect.
+#   - Recovery-session data are not included (analysis contrasts rested vs
+#     sleep-deprived only).
+participant,happiness_rested,happiness_deprived,sadness_rested,sadness_deprived,surprise_rested,surprise_deprived,fear_rested,fear_deprived,disgust_rested,disgust_deprived,anger_rested,anger_deprived
+1,100.0,100.0,100.0,100.0,100.0,100.0,95.0,90.0,100.0,95.0,100.0,100.0
+2,100.0,100.0,100.0,100.0,95.0,95.0,95.0,95.0,100.0,100.0,70.0,80.0
+3,100.0,95.0,95.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0
+4,100.0,100.0,100.0,100.0,50.0,50.0,90.0,90.0,85.0,100.0,85.0,100.0
+5,100.0,100.0,100.0,95.0,90.0,60.0,100.0,100.0,95.0,95.0,85.0,90.0
+6,100.0,100.0,100.0,95.0,100.0,100.0,100.0,85.0,100.0,100.0,100.0,90.0
+7,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,70.0,75.0
+8,100.0,100.0,100.0,100.0,100.0,100.0,95.0,95.0,100.0,100.0,100.0,100.0
+9,100.0,95.0,95.0,100.0,80.0,95.0,100.0,95.0,100.0,100.0,100.0,95.0
+10,100.0,100.0,100.0,95.0,100.0,100.0,95.0,100.0,100.0,100.0,100.0,100.0
+11,100.0,100.0,95.0,95.0,100.0,95.0,95.0,95.0,45.0,95.0,90.0,95.0
+12,100.0,100.0,100.0,100.0,95.0,100.0,90.0,90.0,90.0,95.0,65.0,50.0
+13,100.0,100.0,95.0,100.0,100.0,90.0,100.0,95.0,100.0,100.0,100.0,100.0
+14,100.0,100.0,100.0,100.0,95.0,100.0,75.0,95.0,100.0,100.0,80.0,85.0
+15,100.0,100.0,100.0,100.0,65.0,70.0,95.0,100.0,100.0,100.0,100.0,95.0
+16,100.0,95.0,100.0,100.0,95.0,95.0,95.0,85.0,100.0,100.0,100.0,100.0
+17,100.0,100.0,100.0,100.0,95.0,100.0,100.0,95.0,100.0,100.0,100.0,100.0
+18,100.0,100.0,100.0,100.0,95.0,90.0,80.0,80.0,85.0,90.0,10.0,15.0
+19,100.0,100.0,100.0,100.0,50.0,25.0,90.0,100.0,95.0,95.0,100.0,95.0
+20,100.0,100.0,95.0,100.0,100.0,100.0,100.0,95.0,100.0,100.0,100.0,100.0
+21,95.0,100.0,100.0,100.0,95.0,95.0,95.0,95.0,100.0,100.0,90.0,90.0
+22,100.0,100.0,100.0,95.0,75.0,60.0,85.0,95.0,65.0,100.0,75.0,70.0
+23,100.0,95.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0
+24,100.0,100.0,100.0,95.0,80.0,95.0,100.0,100.0,100.0,100.0,100.0,100.0
+25,100.0,100.0,100.0,90.0,90.0,100.0,90.0,90.0,90.0,85.0,100.0,95.0
+26,100.0,100.0,95.0,80.0,90.0,95.0,70.0,55.0,20.0,40.0,60.0,50.0
+27,100.0,95.0,100.0,100.0,95.0,95.0,100.0,100.0,100.0,90.0,100.0,100.0
+28,100.0,100.0,100.0,100.0,100.0,100.0,100.0,95.0,100.0,95.0,95.0,100.0
+29,100.0,100.0,100.0,100.0,100.0,100.0,95.0,100.0,100.0,100.0,100.0,100.0
+30,100.0,100.0,100.0,100.0,90.0,100.0,75.0,60.0,60.0,65.0,70.0,95.0
+31,100.0,100.0,100.0,100.0,95.0,95.0,100.0,95.0,100.0,95.0,85.0,95.0
+32,100.0,100.0,100.0,95.0,85.0,55.0,90.0,100.0,100.0,100.0,50.0,45.0
+33,100.0,100.0,100.0,100.0,100.0,100.0,85.0,100.0,55.0,80.0,95.0,100.0
+34,100.0,100.0,100.0,100.0,80.0,85.0,95.0,95.0,25.0,60.0,10.0,25.0
+35,100.0,95.0,100.0,100.0,100.0,100.0,100.0,95.0,100.0,100.0,95.0,100.0
+36,100.0,100.0,100.0,100.0,95.0,100.0,100.0,90.0,90.0,95.0,95.0,90.0
+37,100.0,100.0,100.0,95.0,100.0,100.0,95.0,100.0,100.0,95.0,100.0,100.0
+38,100.0,100.0,100.0,95.0,100.0,100.0,95.0,95.0,90.0,100.0,100.0,100.0
+39,100.0,100.0,100.0,100.0,30.0,10.0,85.0,60.0,95.0,100.0,100.0,100.0
+40,100.0,100.0,100.0,100.0,80.0,85.0,95.0,100.0,50.0,50.0,95.0,100.0
+41,100.0,100.0,100.0,100.0,95.0,100.0,40.0,85.0,85.0,80.0,100.0,95.0
+42,100.0,100.0,100.0,100.0,95.0,95.0,90.0,90.0,100.0,100.0,75.0,90.0
+43,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,95.0
+44,100.0,100.0,100.0,100.0,70.0,85.0,95.0,80.0,100.0,100.0,90.0,80.0
+45,100.0,100.0,100.0,100.0,90.0,90.0,95.0,70.0,90.0,95.0,100.0,95.0
+46,100.0,100.0,100.0,100.0,100.0,95.0,100.0,90.0,95.0,100.0,35.0,55.0
+47,100.0,95.0,100.0,90.0,35.0,45.0,90.0,85.0,90.0,90.0,60.0,60.0
+48,100.0,100.0,100.0,100.0,95.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0
+49,100.0,100.0,95.0,65.0,60.0,75.0,85.0,85.0,25.0,10.0,35.0,50.0
+50,100.0,100.0,70.0,45.0,75.0,70.0,30.0,90.0,5.0,40.0,0.0,5.0
+51,100.0,95.0,95.0,90.0,95.0,95.0,95.0,60.0,30.0,30.0,100.0,100.0
+52,100.0,85.0,100.0,100.0,95.0,90.0,95.0,45.0,30.0,0.0,100.0,100.0
+53,100.0,95.0,100.0,100.0,100.0,100.0,95.0,95.0,100.0,100.0,100.0,100.0
+54,100.0,85.0,100.0,75.0,85.0,75.0,95.0,95.0,80.0,80.0,45.0,65.0

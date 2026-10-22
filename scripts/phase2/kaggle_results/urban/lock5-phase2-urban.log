@@ -1,0 +1,47 @@
+[{"stream_name":"stdout","time":6.491524415,"data":"================================================================\n"}
+,{"stream_name":"stdout","time":6.491572066,"data":"Q8: Are city dwellers more likely than country dwellers to have\n"}
+,{"stream_name":"stdout","time":6.491579478,"data":"    mood and anxiety disorders?\n"}
+,{"stream_name":"stdout","time":6.491583634,"data":"NEMESIS (Peen et al. 2007), n=7,076 Dutch adults 18-64, 12-month\n"}
+,{"stream_name":"stdout","time":6.491587646,"data":"DSM-III-R prevalence; city = very highly urbanized (n=1,242),\n"}
+,{"stream_name":"stdout","time":6.491591894,"data":"country = not urbanized (n=1,185)\n"}
+,{"stream_name":"stdout","time":6.49159569,"data":"================================================================\n"}
+,{"stream_name":"stdout","time":6.491599324,"data":"\n"}
+,{"stream_name":"stdout","time":6.491602876,"data":"Mood disorders:\n"}
+,{"stream_name":"stdout","time":6.491606627,"data":"  city     129/1,242 = 10.4%   country   63/1,185 = 5.3%\n"}
+,{"stream_name":"stdout","time":6.491610312,"data":"  diff = +0.0507  95% Wald CI (+0.0295, +0.0719)\n"}
+,{"stream_name":"stdout","time":6.491614263,"data":"  OR = 2.06  95% bootstrap CI (1.52, 2.86)\n"}
+,{"stream_name":"stdout","time":6.491618097,"data":"  z = 4.63  p(two-sided) = 3.73e-06  p(city\u003ecountry) = 1.87e-06\n"}
+,{"stream_name":"stdout","time":6.491622406,"data":"  Fisher exact: p(two-sided) = 3.80e-06  p(city\u003ecountry) = 2.16e-06\n"}
+,{"stream_name":"stdout","time":6.491626474,"data":"  Randomization (100,000 perms): p(two-sided) = 0.00000  p(city\u003ecountry) = 0.00000\n"}
+,{"stream_name":"stdout","time":6.4916305770000005,"data":"\n"}
+,{"stream_name":"stdout","time":6.491634649,"data":"Anxiety disorders:\n"}
+,{"stream_name":"stdout","time":6.491638654,"data":"  city     179/1,242 = 14.4%   country  128/1,185 = 10.8%\n"}
+,{"stream_name":"stdout","time":6.491642816,"data":"  diff = +0.0361  95% Wald CI (+0.0098, +0.0624)\n"}
+,{"stream_name":"stdout","time":6.491679156,"data":"  OR = 1.39  95% bootstrap CI (1.09, 1.79)\n"}
+,{"stream_name":"stdout","time":6.491683143,"data":"  z = 2.67  p(two-sided) = 7.48e-03  p(city\u003ecountry) = 3.74e-03\n"}
+,{"stream_name":"stdout","time":6.491687194,"data":"  Fisher exact: p(two-sided) = 8.55e-03  p(city\u003ecountry) = 4.41e-03\n"}
+,{"stream_name":"stdout","time":6.491690883,"data":"  Randomization (100,000 perms): p(two-sided) = 0.00835  p(city\u003ecountry) = 0.00418\n"}
+,{"stream_name":"stdout","time":6.491694848,"data":"\n"}
+,{"stream_name":"stdout","time":6.491698423,"data":"Any disorder:\n"}
+,{"stream_name":"stdout","time":6.491702252,"data":"  city     347/1,242 = 27.9%   country  221/1,185 = 18.6%\n"}
+,{"stream_name":"stdout","time":6.491706331,"data":"  diff = +0.0929  95% Wald CI (+0.0595, +0.1263)\n"}
+,{"stream_name":"stdout","time":6.491710306,"data":"  OR = 1.69  95% bootstrap CI (1.40, 2.05)\n"}
+,{"stream_name":"stdout","time":6.491714008,"data":"  z = 5.40  p(two-sided) = 6.56e-08  p(city\u003ecountry) = 3.28e-08\n"}
+,{"stream_name":"stdout","time":6.491718101,"data":"  Fisher exact: p(two-sided) = 7.28e-08  p(city\u003ecountry) = 3.86e-08\n"}
+,{"stream_name":"stdout","time":6.491722467,"data":"  Randomization (100,000 perms): p(two-sided) = 0.00000  p(city\u003ecountry) = 0.00000\n"}
+,{"stream_name":"stdout","time":6.491726451,"data":"\n"}
+,{"stream_name":"stdout","time":6.491730021,"data":"By urbanization level (proportion with disorder):\n"}
+,{"stream_name":"stdout","time":6.491754223,"data":"  Very highly urbanized    n=1,242  mood=10.4%  anxiety=14.4%  any=27.9%\n"}
+,{"stream_name":"stdout","time":6.491759039,"data":"  Highly urbanized         n=1,497  mood=8.9%  anxiety=13.7%  any=24.4%\n"}
+,{"stream_name":"stdout","time":6.491770804,"data":"  Moderately urbanized     n=1,541  mood=7.3%  anxiety=11.6%  any=24.2%\n"}
+,{"stream_name":"stdout","time":6.49177494,"data":"  Not very urbanized       n=1,611  mood=6.2%  anxiety=11.4%  any=20.5%\n"}
+,{"stream_name":"stdout","time":6.491778968,"data":"  Not urbanized            n=1,185  mood=5.3%  anxiety=10.8%  any=18.6%\n"}
+,{"stream_name":"stdout","time":6.491783323,"data":"\n"}
+,{"stream_name":"stdout","time":6.491787363,"data":"Results JSON written to scripts/phase2/out/q8_results.json\n"}
+,{"stream_name":"stderr","time":10.149899289,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":10.149938374,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":10.771825429,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":10.771859597,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":13.391192451,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":15.095550568,"data":"[NbConvertApp] Writing 319336 bytes to __results__.html\n"}
+]

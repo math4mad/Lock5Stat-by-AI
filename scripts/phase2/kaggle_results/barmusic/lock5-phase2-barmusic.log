@@ -1,0 +1,44 @@
+[{"stream_name":"stdout","time":4.709024167,"data":"Question: Does turning up the music in a bar cause people to drink more beer?\n"}
+,{"stream_name":"stdout","time":4.709086164,"data":"Outcome: beer glasses ordered and time to drink a glass, by music volume\n"}
+,{"stream_name":"stdout","time":4.709092783,"data":"\n"}
+,{"stream_name":"stdout","time":4.709096865,"data":"Reconstructed per-patron data (data/phase2/q11_barmusic.csv):\n"}
+,{"stream_name":"stdout","time":4.750766486,"data":"            glasses                time_per_glass_min                 \n"}
+,{"stream_name":"stdout","time":4.75080343,"data":"              count mean       std              count   mean       std\n"}
+,{"stream_name":"stdout","time":4.750808754,"data":"condition                                                             \n"}
+,{"stream_name":"stdout","time":4.750813002,"data":"high_88db        20  3.4  0.882580                 20  11.45  1.506914\n"}
+,{"stream_name":"stdout","time":4.750816861,"data":"normal_72db      20  2.6  0.820783                 20  14.51  2.343558 \n"}
+,{"stream_name":"stdout","time":4.750820572,"data":"\n"}
+,{"stream_name":"stdout","time":4.751484063,"data":"--- Two-mean comparisons (high 88 dB minus normal 72 dB)\n"}
+,{"stream_name":"stdout","time":4.973428724,"data":"--- glasses: High-volume music (88 dB) (mean 3.40, SD 0.88) vs Normal music (72 dB) (mean 2.60, SD 0.82)\n"}
+,{"stream_name":"stdout","time":4.973478482,"data":"    diff (high - normal) = +0.80; SE = 0.270\n"}
+,{"stream_name":"stdout","time":4.973483602,"data":"    Welch t=2.97 (df=37.8), p=5.17e-03; z=2.97, normal p=2.99e-03\n"}
+,{"stream_name":"stdout","time":4.973487477,"data":"    randomization p=9.12e-03 (100000 label permutations)\n"}
+,{"stream_name":"stdout","time":4.973491482,"data":"    95% bootstrap CI for diff: (0.30, 1.30)\n"}
+,{"stream_name":"stdout","time":4.973495052,"data":"\n"}
+,{"stream_name":"stdout","time":5.152209585,"data":"--- time_per_glass_min: High-volume music (88 dB) (mean 11.45, SD 1.51) vs Normal music (72 dB) (mean 14.51, SD 2.34)\n"}
+,{"stream_name":"stdout","time":5.152246188,"data":"    diff (high - normal) = -3.06; SE = 0.623\n"}
+,{"stream_name":"stdout","time":5.152251252,"data":"    Welch t=-4.91 (df=32.4), p=2.49e-05; z=-4.91, normal p=9.04e-07\n"}
+,{"stream_name":"stdout","time":5.152255016,"data":"    randomization p=2.00e-05 (100000 label permutations)\n"}
+,{"stream_name":"stdout","time":5.152259004,"data":"    95% bootstrap CI for diff: (-4.26, -1.88)\n"}
+,{"stream_name":"stdout","time":5.15226264,"data":"\n"}
+,{"stream_name":"stdout","time":5.153505493,"data":"Conclusion:\n"}
+,{"stream_name":"stdout","time":5.153534384,"data":"  Because patrons were randomly assigned to sound levels, this field experiment\n"}
+,{"stream_name":"stdout","time":5.153538908,"data":"  supports a causal claim: turning up the music made young male beer drinkers\n"}
+,{"stream_name":"stdout","time":5.15354254,"data":"  drink MORE -- 2.6 -\u003e 3.4 glasses on average (+0.8, 95% bootstrap CI +0.30 to +1.30,\n"}
+,{"stream_name":"stdout","time":5.153547246,"data":"  Welch t=2.97, randomization p=0.009;\n"}
+,{"stream_name":"stdout","time":5.153550765,"data":"  note exact randomization p is 1/100000 at best) -- and FASTER: time per glass fell\n"}
+,{"stream_name":"stdout","time":5.153554488,"data":"  from 14.51 to 11.45 min (-3.06 min, 95% bootstrap CI -4.26 to -1.89,\n"}
+,{"stream_name":"stdout","time":5.153557973,"data":"  Welch t=-4.91, randomization p=0.000).\n"}
+,{"stream_name":"stdout","time":5.15356181,"data":"  Caveats: young men (18-25) in 2 French bars only; per-patron spread in the\n"}
+,{"stream_name":"stdout","time":5.153565273,"data":"  reconstruction is a documented assumption (published group means reproduced\n"}
+,{"stream_name":"stdout","time":5.153605451,"data":"  exactly), so test statistics illustrate the method rather than replicate the\n"}
+,{"stream_name":"stdout","time":5.153610331,"data":"  paper's own inferential statistics, which also found both differences significant.\n"}
+,{"stream_name":"stdout","time":5.154314784,"data":"\n"}
+,{"stream_name":"stdout","time":5.15434215,"data":"Saved results to /kaggle/working/scripts/phase2/out/q11_results.json\n"}
+,{"stream_name":"stderr","time":8.351228454,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":8.351265386,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":8.81146603,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":8.811492743,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":10.751515861,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":12.189616646,"data":"[NbConvertApp] Writing 324804 bytes to __results__.html\n"}
+]

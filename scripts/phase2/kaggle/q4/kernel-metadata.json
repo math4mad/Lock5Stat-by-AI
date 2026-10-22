@@ -1,6 +1,6 @@
 {
-  "id": "math4amd/lock5-phase2-q4-intergen",
-  "title": "Lock5 Phase2 Q4 Intergen",
+  "id": "math4amd/lock5-phase2-intergen",
+  "title": "Lock5 Phase2 Intergen",
   "code_file": "q4_intergen.py",
   "language": "python",
   "kernel_type": "script",

@@ -1,0 +1,90 @@
+{
+  "question": "Does giving lots of high fives to teammates help sports teams win?",
+  "provenance": {
+    "citation": "Kraus, M. W., Huang, C., & Keltner, D. (2010). Tactile communication, cooperation, and performance: An ethological study of the NBA. Emotion, 10(5), 745-749. doi:10.1037/a0019382 (PMID 21038960)",
+    "design": "Ethological observation: two independent coder teams (>80% agreement) coded celebratory teammate touch (12 types incl. high fives, fist bumps, chest bumps, hugs, huddles) for 294 players from all 30 NBA teams, one game per team in the first 2 months of the 2008-09 season; touch predicted individual and team performance later in the season after controlling for salary, preseason expectations, and early-season performance, with coded cooperation explaining the link",
+    "published_summary_stats": {
+      "touch_seconds_per_player_mean": 1.8,
+      "touch_seconds_per_player_sd": 2.05,
+      "touchiest_teams": [
+        "Boston Celtics",
+        "Los Angeles Lakers"
+      ]
+    },
+    "data_source": "data/phase2/q6_highfives.csv: win_pct = actual 2008-09 final standings (public record); touch_sec_per_player = documented reconstruction (numpy seed 2026, calibrated to the published 1.80 s mean and strong positive association, anchored so Boston/LAL are the two touchiest teams) - per-team touch rates were never published and no Lock5 dataset exists for this study (3e/4e data pages checked, Oct 2026)",
+    "caveat": "Touch values are reconstructed, not raw observations; results characterize the documented reconstruction of the study's design, not a replication of the paper's exact statistics"
+  },
+  "data": {
+    "n_teams": 30,
+    "source_csv": "data/phase2/q6_highfives.csv",
+    "touch_mean_sec": 1.7980333333333334,
+    "touch_sd_sec": 0.7600935733381022,
+    "win_pct_mean": 0.4999966666666667,
+    "win_pct_sd": 0.17208068172513877
+  },
+  "correlation": {
+    "pearson_r": 0.7496814005374904,
+    "r_squared": 0.5620222023118532,
+    "p_parametric_t": 1.8589484756100334e-06
+  },
+  "ci_95_fisher_z": [
+    0.533505020681046,
+    0.8739169087113107
+  ],
+  "ci_95_bootstrap_percentile": [
+    0.552950040964118,
+    0.896200716730432
+  ],
+  "randomization_test": {
+    "null": "no association between touch rate and win% (permutation of win% across teams)",
+    "alternative": "two-sided",
+    "n_reps": 100000,
+    "p_randomization": 0.0
+  },
+  "bootstrap": {
+    "n_reps": 100000,
+    "undefined_replicates_dropped": 0
+  },
+  "descriptives": {
+    "top3_touchiest": [
+      {
+        "team": "Boston Celtics",
+        "touch_sec": 3.515,
+        "win_pct": 0.7561
+      },
+      {
+        "team": "Los Angeles Lakers",
+        "touch_sec": 3.044,
+        "win_pct": 0.7927
+      },
+      {
+        "team": "Denver Nuggets",
+        "touch_sec": 2.801,
+        "win_pct": 0.6585
+      }
+    ],
+    "bottom3_touchiest": [
+      {
+        "team": "New Jersey Nets",
+        "touch_sec": 0.599,
+        "win_pct": 0.4146
+      },
+      {
+        "team": "Oklahoma City Thunder",
+        "touch_sec": 0.524,
+        "win_pct": 0.2805
+      },
+      {
+        "team": "Washington Wizards",
+        "touch_sec": 0.01,
+        "win_pct": 0.2317
+      }
+    ]
+  },
+  "methods": {
+    "seed": 2026,
+    "n_bootstrap": 100000,
+    "n_randomization": 100000,
+    "engine": "numpy/scipy/pandas"
+  }
+}

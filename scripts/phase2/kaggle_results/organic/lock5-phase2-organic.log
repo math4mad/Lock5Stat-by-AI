@@ -1,0 +1,49 @@
+[{"stream_name":"stdout","time":6.503425407,"data":"================================================================\n"}
+,{"stream_name":"stdout","time":6.503489317,"data":"Q17: Does eating organic food improve your health?\n"}
+,{"stream_name":"stdout","time":6.503497587,"data":"Lock5 OrganicEffect - Magner et al. 2015, IVL Report U 5080 (Coop)\n"}
+,{"stream_name":"stdout","time":6.503503351,"data":"================================================================\n"}
+,{"stream_name":"stdout","time":6.503508283,"data":"\n"}
+,{"stream_name":"stdout","time":6.5035132319999995,"data":"Published headline (IVL report):\n"}
+,{"stream_name":"stdout","time":6.503517485,"data":"  urinary pesticide concentrations decreased on average by a\n"}
+,{"stream_name":"stdout","time":6.503521309,"data":"  factor of 6.7 on the organic diet; levels below the ADI\n"}
+,{"stream_name":"stdout","time":6.503527096,"data":"\n"}
+,{"stream_name":"stdout","time":6.503536342,"data":"Matched-pairs analysis (n = 160 pairs: 5 persons x 8 pesticides x 4 days)\n"}
+,{"stream_name":"stdout","time":6.503539833,"data":"  mean NonOrganic = 38.76   mean Organic = 2.83 (micrograms/g creatinine)\n"}
+,{"stream_name":"stdout","time":6.503542496,"data":"  mean diff = +35.93  (median +6.50, SD 96.44)\n"}
+,{"stream_name":"stdout","time":6.503545103,"data":"  percent reduction = 92.7%  (factor 13.7 lower; IVL headline: factor 6.7)\n"}
+,{"stream_name":"stdout","time":6.503547823,"data":"  Cohen's d = 0.373\n"}
+,{"stream_name":"stdout","time":6.503550461,"data":"  paired t = 4.71, df = 159, p(two-sided) = 5.29e-06, p(one-sided) = 2.65e-06\n"}
+,{"stream_name":"stdout","time":6.503553155,"data":"  theory 95% CI for mean diff: (20.88, 50.99)\n"}
+,{"stream_name":"stdout","time":6.503555824,"data":"  Wilcoxon signed-rank p(two-sided) = 3.66e-22\n"}
+,{"stream_name":"stdout","time":6.503558479,"data":"  randomization p(two) = 0.00000, p(one, organic lower) = 0.00000\n"}
+,{"stream_name":"stdout","time":6.503561392,"data":"  bootstrap 95% CI mean diff: (22.41, 52.09)\n"}
+,{"stream_name":"stdout","time":6.503564057,"data":"  bootstrap 95% CI percent reduction: (88.5%, 95.1%)\n"}
+,{"stream_name":"stdout","time":6.503566831,"data":"  bootstrap 95% CI Cohen's d: (0.322, 0.455)\n"}
+,{"stream_name":"stdout","time":6.503569602,"data":"\n"}
+,{"stream_name":"stdout","time":6.503572096,"data":"By person:\n"}
+,{"stream_name":"stdout","time":6.503574668,"data":"  Father Non =    6.47  Org =   3.50  reduction =  45.9%\n"}
+,{"stream_name":"stdout","time":6.503577364,"data":"  Mother Non =   50.89  Org =   3.28  reduction =  93.6%\n"}
+,{"stream_name":"stdout","time":6.503579956,"data":"  GirlA  Non =   43.01  Org =   1.93  reduction =  95.5%\n"}
+,{"stream_name":"stdout","time":6.503582564,"data":"  GirlB  Non =    8.18  Org =   1.55  reduction =  81.0%\n"}
+,{"stream_name":"stdout","time":6.503585141,"data":"  Boy    Non =   85.26  Org =   3.87  reduction =  95.5%\n"}
+,{"stream_name":"stdout","time":6.503587845,"data":"By pesticide:\n"}
+,{"stream_name":"stdout","time":6.503590377,"data":"  24D         Non =    6.46  Org =   0.94  reduction =  85.4%\n"}
+,{"stream_name":"stdout","time":6.503593096,"data":"  3-PBA       Non =   27.05  Org =   2.54  reduction =  90.6%\n"}
+,{"stream_name":"stdout","time":6.503632583,"data":"  35DC        Non =   19.12  Org =   0.97  reduction =  94.9%\n"}
+,{"stream_name":"stdout","time":6.503638324,"data":"  CCC         Non =  179.43  Org =   3.67  reduction =  98.0%\n"}
+,{"stream_name":"stdout","time":6.503642703,"data":"  ETU         Non =    2.90  Org =   1.20  reduction =  58.7%\n"}
+,{"stream_name":"stdout","time":6.503647669,"data":"  Mepiquat    Non =   34.20  Org =   5.58  reduction =  83.7%\n"}
+,{"stream_name":"stdout","time":6.503659922,"data":"  Propamocarb Non =    2.10  Org =   0.24  reduction =  88.6%\n"}
+,{"stream_name":"stdout","time":6.503664357,"data":"  TCP         Non =   38.83  Org =   7.48  reduction =  80.7%\n"}
+,{"stream_name":"stdout","time":6.503668622,"data":"\n"}
+,{"stream_name":"stdout","time":6.503674241,"data":"  Caution: single family, diet order not randomized; exposure\n"}
+,{"stream_name":"stdout","time":6.50367864,"data":"  biomarker, not a clinical health outcome; levels below the ADI.\n"}
+,{"stream_name":"stdout","time":6.503764744,"data":"\n"}
+,{"stream_name":"stdout","time":6.50377335,"data":"Results JSON written to scripts/phase2/out/q17_results.json\n"}
+,{"stream_name":"stderr","time":9.771425454,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":9.771471433,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":10.237398938,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":10.237432569,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":12.514465484,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":14.092432656,"data":"[NbConvertApp] Writing 338587 bytes to __results__.html\n"}
+]

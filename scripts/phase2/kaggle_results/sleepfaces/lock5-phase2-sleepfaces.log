@@ -1,0 +1,71 @@
+[{"stream_name":"stdout","time":7.340928412,"data":"================================================================\n"}
+,{"stream_name":"stdout","time":7.340978429,"data":"Q14: Does sleep deprivation hurt one's ability to interpret\n"}
+,{"stream_name":"stdout","time":7.340985768,"data":"facial expressions?\n"}
+,{"stream_name":"stdout","time":7.340990325,"data":"Killgore et al., Neurobiol Sleep Circadian Rhythms 2017;3:10-16 -\n"}
+,{"stream_name":"stdout","time":7.340995452,"data":"54 adults, Ekman Hexagon Test, rested vs sleep-deprived (paired);\n"}
+,{"stream_name":"stdout","time":7.340999491,"data":"reconstructed participant-level data (means digitized from Fig. 3)\n"}
+,{"stream_name":"stdout","time":7.341003602,"data":"================================================================\n"}
+,{"stream_name":"stdout","time":7.341007896,"data":"\n"}
+,{"stream_name":"stdout","time":7.341012059,"data":"Happiness:\n"}
+,{"stream_name":"stdout","time":7.3410165450000004,"data":"  rested = 99.91%, sleep-deprived = 98.61% (digitized from Fig. 3: 99.91 vs 98.63)\n"}
+,{"stream_name":"stdout","time":7.341021381,"data":"  mean difference (deprived - rested) = -1.30 points\n"}
+,{"stream_name":"stdout","time":7.341026358,"data":"  paired t(53) = -2.81, p = 0.0069\n"}
+,{"stream_name":"stdout","time":7.341031167,"data":"  sign-flip randomization p = 0.0050\n"}
+,{"stream_name":"stdout","time":7.341036188,"data":"  bootstrap 95% CI of mean difference: (-2.22, -0.46)\n"}
+,{"stream_name":"stdout","time":7.341041053,"data":"\n"}
+,{"stream_name":"stdout","time":7.341045656,"data":"Sadness:\n"}
+,{"stream_name":"stdout","time":7.341050257,"data":"  rested = 98.70%, sleep-deprived = 96.11% (digitized from Fig. 3: 98.75 vs 96.09)\n"}
+,{"stream_name":"stdout","time":7.341054453,"data":"  mean difference (deprived - rested) = -2.59 points\n"}
+,{"stream_name":"stdout","time":7.341058439,"data":"  paired t(53) = -2.75, p = 0.0081\n"}
+,{"stream_name":"stdout","time":7.341062989,"data":"  sign-flip randomization p = 0.0047\n"}
+,{"stream_name":"stdout","time":7.341066588,"data":"  bootstrap 95% CI of mean difference: (-4.54, -0.93)\n"}
+,{"stream_name":"stdout","time":7.341070457,"data":"\n"}
+,{"stream_name":"stdout","time":7.34107516,"data":"Surprise:\n"}
+,{"stream_name":"stdout","time":7.341079117,"data":"  rested = 88.43%, sleep-deprived = 87.96% (digitized from Fig. 3: 88.46 vs 87.96)\n"}
+,{"stream_name":"stdout","time":7.341083128,"data":"  mean difference (deprived - rested) = -0.46 points\n"}
+,{"stream_name":"stdout","time":7.341087321,"data":"  paired t(53) = -0.36, p = 0.7225\n"}
+,{"stream_name":"stdout","time":7.341090891,"data":"  sign-flip randomization p = 0.7795\n"}
+,{"stream_name":"stdout","time":7.341094735,"data":"  bootstrap 95% CI of mean difference: (-3.06, +1.94)\n"}
+,{"stream_name":"stdout","time":7.341098496,"data":"\n"}
+,{"stream_name":"stdout","time":7.341102028,"data":"Fear:\n"}
+,{"stream_name":"stdout","time":7.341105754,"data":"  rested = 91.57%, sleep-deprived = 90.19% (digitized from Fig. 3: 91.62 vs 90.18)\n"}
+,{"stream_name":"stdout","time":7.341109985,"data":"  mean difference (deprived - rested) = -1.39 points\n"}
+,{"stream_name":"stdout","time":7.341114306,"data":"  paired t(53) = -0.65, p = 0.5170\n"}
+,{"stream_name":"stdout","time":7.341118356,"data":"  sign-flip randomization p = 0.5545\n"}
+,{"stream_name":"stdout","time":7.341122373,"data":"  bootstrap 95% CI of mean difference: (-5.46, +2.87)\n"}
+,{"stream_name":"stdout","time":7.341126668,"data":"\n"}
+,{"stream_name":"stdout","time":7.341130588,"data":"Disgust:\n"}
+,{"stream_name":"stdout","time":7.341135034,"data":"  rested = 84.54%, sleep-deprived = 87.78% (digitized from Fig. 3: 84.58 vs 87.77)\n"}
+,{"stream_name":"stdout","time":7.341145594,"data":"  mean difference (deprived - rested) = +3.24 points\n"}
+,{"stream_name":"stdout","time":7.34115027,"data":"  paired t(53) = 1.88, p = 0.0657\n"}
+,{"stream_name":"stdout","time":7.341154133,"data":"  sign-flip randomization p = 0.0724\n"}
+,{"stream_name":"stdout","time":7.341158085,"data":"  bootstrap 95% CI of mean difference: (+0.09, +6.76)\n"}
+,{"stream_name":"stdout","time":7.341162112,"data":"\n"}
+,{"stream_name":"stdout","time":7.341165827,"data":"Anger:\n"}
+,{"stream_name":"stdout","time":7.34117562,"data":"  rested = 83.52%, sleep-deprived = 85.37% (digitized from Fig. 3: 83.56 vs 85.34)\n"}
+,{"stream_name":"stdout","time":7.341180208,"data":"  mean difference (deprived - rested) = +1.85 points\n"}
+,{"stream_name":"stdout","time":7.341184038,"data":"  paired t(53) = 1.71, p = 0.0935\n"}
+,{"stream_name":"stdout","time":7.341188413,"data":"  sign-flip randomization p = 0.1102\n"}
+,{"stream_name":"stdout","time":7.341192716,"data":"  bootstrap 95% CI of mean difference: (-0.19, +3.98)\n"}
+,{"stream_name":"stdout","time":7.341196673,"data":"\n"}
+,{"stream_name":"stdout","time":7.341200671,"data":"Overall (mean of 6 emotions):\n"}
+,{"stream_name":"stdout","time":7.341204941,"data":"  rested = 91.11%, sleep-deprived = 91.00% (digitized from Fig. 3: 91.15 vs 91.00)\n"}
+,{"stream_name":"stdout","time":7.341237555,"data":"  mean difference (deprived - rested) = -0.11 points\n"}
+,{"stream_name":"stdout","time":7.341242485,"data":"  paired t(53) = -0.18, p = 0.8589\n"}
+,{"stream_name":"stdout","time":7.341246752,"data":"  sign-flip randomization p = 0.8532\n"}
+,{"stream_name":"stdout","time":7.341250646,"data":"  bootstrap 95% CI of mean difference: (-1.30, +1.05)\n"}
+,{"stream_name":"stdout","time":7.341517396,"data":"\n"}
+,{"stream_name":"stdout","time":7.341534915,"data":"Conclusion: sleep deprivation significantly impaired recognition of happiness, sadness - the prosocial emotions - while recognition of\n"}
+,{"stream_name":"stdout","time":7.3415409050000004,"data":"surprise, fear, disgust and anger (threat-relevant expressions) was\n"}
+,{"stream_name":"stdout","time":7.341546148,"data":"unaffected. Overall accuracy across all six emotions was unchanged,\n"}
+,{"stream_name":"stdout","time":7.341550393,"data":"so averaging across emotions masks the emotion-specific deficit;\n"}
+,{"stream_name":"stdout","time":7.341555451,"data":"accuracy returned to baseline after recovery sleep (per the paper).\n"}
+,{"stream_name":"stdout","time":7.341560896,"data":"\n"}
+,{"stream_name":"stdout","time":7.341565526,"data":"Results JSON written to scripts/phase2/out/q14_results.json\n"}
+,{"stream_name":"stderr","time":10.90887167,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":10.908911888,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":11.532883959,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":11.532920147,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":14.2406927,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":15.898420418,"data":"[NbConvertApp] Writing 327232 bytes to __results__.html\n"}
+]

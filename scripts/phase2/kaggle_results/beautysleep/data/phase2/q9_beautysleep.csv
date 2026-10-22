@@ -1,0 +1,76 @@
+# Q9 (Phase 2): Is there truth to the saying "beauty sleep"?
+#
+# STUDY
+#   Axelsson J, Sundelin T, Ingre M, Van Someren EJW, Olsson A, Lekander M.
+#   "Beauty sleep: experimental study on the perceived health and attractiveness
+#   of sleep deprived people." BMJ 2010;341:c6614. doi:10.1136/bmj.c6614
+#   (published 14 Dec 2010; PMID 21156746, PMCID PMC3001961).
+#   NOTE: some secondary sources cite this as 341:c6611; the correct eLocator
+#   is c6614 (verified against PubMed and bmj.com citation records, Oct 2026).
+#
+# DESIGN
+#   Within-participant experiment in a Stockholm sleep laboratory. 23 healthy
+#   adults (age 18-31) were photographed after a normal night's sleep (8 hours)
+#   and again after sleep deprivation (31 hours of wakefulness after a night of
+#   reduced sleep). The 46 photographs were presented in randomised,
+#   counterbalanced order to 65 untrained observers (age 18-61), who rated each
+#   face on 100-mm visual analogue scales (0-100) for perceived health,
+#   tiredness, and attractiveness.
+#
+# PUBLISHED RESULTS (mixed model; abstract of the paper)
+#   Health:         63 (SE 2) sleep deprived vs 68 (SE 2) normal sleep, P<0.001
+#   Tiredness:      53 (SE 3) sleep deprived vs 44 (SE 3) normal sleep, P<0.001
+#   Attractiveness: 38 (SE 2) sleep deprived vs 40 (SE 2) normal sleep, P<0.001
+#
+# RECONSTRUCTION (Lock5 distributes no dataset for this study; 3e data page
+#   checked Oct 2026 - only SleepCaffeine and SleepStudy exist, neither is this
+#   experiment. So each cell below is a reconstructed participant-level mean
+#   observer rating that exactly reproduces the published condition means, with
+#   documented assumptions for the unpublished dispersion):
+#   - Unit: one row per participant; each value is that participant's mean
+#     rating (over the ~65 observers, cf. Fig 1 of the paper) for the
+#     corresponding photograph, on the 0-100 mm VAS.
+#   - Condition means: exactly the published values (68/63 health, 44/53
+#     tiredness, 40/38 attractiveness).
+#   - Condition SDs: published SE interpreted as the SE of the condition mean
+#     across the 23 participants, so SD = SE*sqrt(23) = 9.59 (health,
+#     attractiveness) and 14.39 (tiredness); sample SDs match exactly.
+#   - Within-participant correlation between the two condition ratings:
+#     rho = 0.97, the value implied by the paper's own precision (P<0.001 for
+#     the 2-point attractiveness difference with n=23 requires an SD of paired
+#     differences of about 2.5). Same face, same observer pool, so base
+#     attractiveness dominates and near-identical cross-condition ratings are
+#     expected; realized sample r = 0.95/0.99/0.97.
+#   - Generation algorithm (reproducible, seed 2026, numpy default_rng):
+#       for outcome in (health, tiredness, attractiveness):   # in this order
+#           a = rng.standard_normal(23); b = rng.standard_normal(23)
+#           d_raw = 0.97*a + sqrt(1-0.97^2)*b
+#           normal   = m_normal    + SD*(a - mean(a))/sd(a, ddof=1)
+#           deprived = m_deprived + SD*(d_raw - mean(d_raw))/sd(d_raw, ddof=1)
+#     values rounded to one decimal (VAS readings were reported to the mm).
+#   - The true per-participant values are not published; use these data for
+#     method illustration only, not to re-estimate the study's effect sizes.
+participant,health_normal,health_deprived,tired_normal,tired_deprived,attract_normal,attract_deprived
+1,58.5,52.0,65.9,73.8,25.7,27.6
+2,72.4,68.8,32.8,38.2,30.3,26.2
+3,43.6,43.6,70.0,75.5,42.8,41.5
+4,88.0,80.0,76.6,89.1,59.8,57.5
+5,77.8,76.7,59.7,66.1,38.3,36.8
+6,65.2,55.1,50.9,62.4,44.0,43.3
+7,65.0,59.7,34.5,45.4,32.3,29.4
+8,73.3,63.5,52.8,60.8,32.4,29.0
+9,65.6,64.3,36.9,44.8,24.3,25.1
+10,66.1,63.1,41.6,54.1,41.5,40.2
+11,78.9,77.1,38.6,47.6,50.2,49.6
+12,76.1,67.3,44.9,57.9,38.6,36.5
+13,68.3,64.8,56.0,62.4,54.2,53.7
+14,68.0,60.4,35.7,45.5,43.5,40.0
+15,71.3,64.0,30.9,42.2,41.4,36.5
+16,60.9,56.7,30.8,41.7,46.3,39.0
+17,63.7,60.8,31.1,38.0,46.1,40.7
+18,76.6,71.5,26.0,34.7,51.9,50.0
+19,67.4,59.4,31.7,41.2,34.6,29.4
+20,50.6,41.7,56.1,62.1,21.4,19.3
+21,62.7,61.7,35.3,46.7,42.8,44.2
+22,78.0,74.3,44.7,55.2,36.3,35.7
+23,66.0,62.6,28.4,33.6,41.5,42.4

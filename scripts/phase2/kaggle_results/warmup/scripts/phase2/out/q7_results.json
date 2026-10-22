@@ -1,0 +1,53 @@
+{
+  "question": "Which is better for peak performance: a short mild warm-up or a long intense warm-up?",
+  "citation": "Neiva, H. P., Marques, M. C., Barbosa, T. M., Izquierdo, M., Viana, J. L., Teixeira, A. M., & Marinho, D. A. (2015). \"The effects of different warm-up volumes on the 100-m swimming performance: a randomized crossover study.\" Journal of Strength and Conditioning Research, 29(11), 3026-3036. DOI 10.1519/JSC.0000000000000577 (PMID 26506059)",
+  "data": {
+    "file": "data/phase2/q7_warmup.csv",
+    "provenance": "Reconstruction: no warm-up dataset on lock5stat.com/datapage3e.html. 11 paired 100-m freestyle times matching published group means/SDs (SWU 59.38+/-2.18 s, LWU 60.18+/-2.46 s; standard WU 59.29+/-1.95 s) exactly; within-swimmer pairing is synthetic with assumed r=0.50 (individual times unpublished). Documented in CSV header.",
+    "n_swimmers": 11,
+    "design": "randomized crossover (paired), three warm-up volumes, 48 h apart",
+    "swu_mean_s": 59.37909090909091,
+    "swu_sd_s": 2.182216554540151,
+    "lwu_mean_s": 60.17909090909091,
+    "lwu_sd_s": 2.460676551460815,
+    "assumed_within_swimmer_r": 0.5
+  },
+  "mean_diff_swu_minus_lwu_s": -0.799999999999999,
+  "paired_t": {
+    "t": -1.1367552874978155,
+    "df": 10,
+    "p_two_sided": 0.2821469114260427
+  },
+  "randomization_sign_flip_p_two_sided": 0.2822371776282237,
+  "bootstrap_ci_95_mean_diff_s": [
+    -2.130931818181818,
+    0.4772727272727293
+  ],
+  "welch_t": {
+    "t": -0.8067388119506025,
+    "p_two_sided": 0.4294406885318002
+  },
+  "sensitivity_paired_t_to_r": {
+    "r=0.3": {
+      "sd_diff": 2.755931914659403,
+      "t": -0.9627595726044015,
+      "p_two_sided": 0.3583708162282163
+    },
+    "r=0.5": {
+      "sd_diff": 2.333938533006304,
+      "t": -1.1368336375451367,
+      "p_two_sided": 0.28211566241644637
+    },
+    "r=0.7": {
+      "sd_diff": 1.8164188485767796,
+      "t": -1.460731281424028,
+      "p_two_sided": 0.17478441556603438
+    },
+    "r=0.9": {
+      "sd_diff": 1.0730730595250113,
+      "t": -2.4726180652217495,
+      "p_two_sided": 0.03295679811808957
+    }
+  },
+  "conclusion": "Short mild warm-up (600 m) beat the long intense warm-up (1,800 m): swimmers averaged 59.38 vs 60.18 s, a 0.80 s advantage for the short warm-up, matching the paper's published inference that a long warm-up could impair performance. With n=11 and reconstructed pairing (assumed r=0.5) the conventional tests do not reach p<0.05 (paired p~0.28, Welch p~0.43); reaching significance needs r>=0.7."
+}

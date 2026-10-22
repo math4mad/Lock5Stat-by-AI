@@ -1,0 +1,109 @@
+{
+  "question": "Is there truth to the saying \"beauty sleep\"?",
+  "provenance": {
+    "citation": "Axelsson J, Sundelin T, Ingre M, Van Someren EJW, Olsson A, Lekander M. Beauty sleep: experimental study on the perceived health and attractiveness of sleep deprived people. BMJ 2010;341:c6614. doi:10.1136/bmj.c6614 (PMID 21156746, PMCID PMC3001961).",
+    "citation_note": "Some secondary sources cite 341:c6611; the correct eLocator is c6614 (verified via PubMed/bmj.com, Oct 2026).",
+    "design": "Within-participant experiment: 23 adults photographed after a normal night's sleep (8h) and after sleep deprivation (31h awake); 46 photos rated in randomised order by 65 untrained observers on 100-mm VAS for health, tiredness, attractiveness",
+    "data_source": "Reconstructed CSV (data/phase2/q9_beautysleep.csv) from the published condition means/SEs; no Lock5 dataset exists for this study (3e data page checked Oct 2026). Generation algorithm and assumptions documented in the CSV header."
+  },
+  "data": {
+    "n_participants": 23,
+    "n_observers_published": 65,
+    "scale": "0-100 mm visual analogue scale",
+    "source_csv": "data/phase2/q9_beautysleep.csv"
+  },
+  "methods": {
+    "paired_test": "scipy.stats.ttest_rel (paired t, df = 22)",
+    "randomization": "sign-flip test on differences, two-sided",
+    "bootstrap": "percentile CI of mean difference, resampling pairs",
+    "n_replicates": 100000,
+    "seed": 2026,
+    "engine": "numpy/scipy/pandas"
+  },
+  "outcomes": {
+    "health": {
+      "published": {
+        "mean_normal": 68.0,
+        "mean_deprived": 63.0,
+        "se_per_condition": 2.0,
+        "p_paper": "<0.001"
+      },
+      "reconstructed": {
+        "mean_normal": 68.0,
+        "mean_deprived": 63.00434782608696,
+        "sd_normal": 9.602982491250971,
+        "sd_deprived": 9.592159594778414,
+        "within_participant_corr": 0.9484955197608911
+      },
+      "mean_difference_deprived_minus_normal": -4.995652173913044,
+      "sd_difference": 3.0803598167731177,
+      "se_difference": 0.6422994222794048,
+      "paired_t": {
+        "t": -7.777762209694002,
+        "df": 22,
+        "p_two_sided": 9.393132376834076e-08
+      },
+      "p_signflip_randomization": 9.99990000099999e-06,
+      "ci_95_bootstrap_percentile": [
+        -6.23478260869565,
+        -3.7826086956521725
+      ]
+    },
+    "tiredness": {
+      "published": {
+        "mean_normal": 44.0,
+        "mean_deprived": 53.0,
+        "se_per_condition": 3.0,
+        "p_paper": "<0.001"
+      },
+      "reconstructed": {
+        "mean_normal": 43.99565217391305,
+        "mean_deprived": 53.0,
+        "sd_normal": 14.394016378686022,
+        "sd_deprived": 14.386072810502899,
+        "within_participant_corr": 0.9848266145545399
+      },
+      "mean_difference_deprived_minus_normal": 9.004347826086958,
+      "sd_difference": 2.506804967731846,
+      "se_difference": 0.5227049690019702,
+      "paired_t": {
+        "t": 17.226443902531603,
+        "df": 22,
+        "p_two_sided": 2.9422836023252675e-14
+      },
+      "p_signflip_randomization": 9.99990000099999e-06,
+      "ci_95_bootstrap_percentile": [
+        8.0,
+        9.991304347826086
+      ]
+    },
+    "attractiveness": {
+      "published": {
+        "mean_normal": 40.0,
+        "mean_deprived": 38.0,
+        "se_per_condition": 2.0,
+        "p_paper": "<0.001"
+      },
+      "reconstructed": {
+        "mean_normal": 40.008695652173905,
+        "mean_deprived": 37.98260869565218,
+        "sd_normal": 9.587867003452297,
+        "sd_deprived": 9.59216783602468,
+        "within_participant_corr": 0.9703594084211782
+      },
+      "mean_difference_deprived_minus_normal": -2.026086956521738,
+      "sd_difference": 2.334955205197025,
+      "se_difference": 0.4868718164611745,
+      "paired_t": {
+        "t": -4.161438160968819,
+        "df": 22,
+        "p_two_sided": 0.00040676306169515743
+      },
+      "p_signflip_randomization": 0.0003699963000369996,
+      "ci_95_bootstrap_percentile": [
+        -2.9695652173913043,
+        -1.1130434782608682
+      ]
+    }
+  }
+}

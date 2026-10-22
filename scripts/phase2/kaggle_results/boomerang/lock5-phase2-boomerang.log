@@ -1,0 +1,55 @@
+[{"stream_name":"stdout","time":4.108460241,"data":"Question: What percent of young adults in the US move back in with their parents?\n"}
+,{"stream_name":"stdout","time":4.108523683,"data":"Outcome: share of 18- to 29-year-olds residing with at least one parent\n"}
+,{"stream_name":"stdout","time":4.108530244,"data":"\n"}
+,{"stream_name":"stdout","time":4.108534436,"data":"Reconstructed counts (data/phase2/q10_boomerang.csv):\n"}
+,{"stream_name":"stdout","time":4.117545329,"data":"response            with_parent  not_with_parent\n"}
+,{"stream_name":"stdout","time":4.11758751,"data":"group     period                                \n"}
+,{"stream_name":"stdout","time":4.117594037,"data":"age_18_24 jul_2020     20306000          8294000\n"}
+,{"stream_name":"stdout","time":4.11759914,"data":"age_25_29 jul_2020      6328000         16272000\n"}
+,{"stream_name":"stdout","time":4.117603927,"data":"men       jul_2020     14080000         11520000\n"}
+,{"stream_name":"stdout","time":4.117608825,"data":"overall   feb_2020     24060000         27140000\n"}
+,{"stream_name":"stdout","time":4.117613737,"data":"          jul_2020     26624000         24576000\n"}
+,{"stream_name":"stdout","time":4.117618776,"data":"women     jul_2020     12544000         13056000 \n"}
+,{"stream_name":"stdout","time":4.117623917,"data":"\n"}
+,{"stream_name":"stdout","time":4.118066195,"data":"--- Baseline (descriptive): overall, feb_2020 (pre-pandemic): 24,060,000/51,200,000 = 0.470\n"}
+,{"stream_name":"stdout","time":4.118083569,"data":"\n"}
+,{"stream_name":"stdout","time":4.139437685,"data":"--- All 18- to 29-year-olds, jul_2020: 26,624,000/51,200,000 = 0.520\n"}
+,{"stream_name":"stdout","time":4.139477656,"data":"    95% CI (Wald):        (0.5199, 0.5201)\n"}
+,{"stream_name":"stdout","time":4.13948313,"data":"    95% CI (bootstrap):   (0.5199, 0.5201)\n"}
+,{"stream_name":"stdout","time":4.139488453,"data":"    Test H0 p=0.47 (Feb 2020 pre-pandemic baseline): z=716.83, normal p=0.00e+00, randomization p=0.00e+00 (100000 shuffles)\n"}
+,{"stream_name":"stdout","time":4.139494194,"data":"\n"}
+,{"stream_name":"stdout","time":4.157420627,"data":"--- All 18- to 29-year-olds, jul_2020: 26,624,000/51,200,000 = 0.520\n"}
+,{"stream_name":"stdout","time":4.157452189,"data":"    95% CI (Wald):        (0.5199, 0.5201)\n"}
+,{"stream_name":"stdout","time":4.157457833,"data":"    95% CI (bootstrap):   (0.5199, 0.5201)\n"}
+,{"stream_name":"stdout","time":4.157463119,"data":"    Test H0 p=0.48 (1940 census, previous all-time high): z=572.89, normal p=0.00e+00, randomization p=0.00e+00 (100000 shuffles)\n"}
+,{"stream_name":"stdout","time":4.157468638,"data":"\n"}
+,{"stream_name":"stdout","time":4.157656378,"data":"--- Two-proportion comparisons, July 2020 (difference in share living with a parent)\n"}
+,{"stream_name":"stdout","time":4.212345912,"data":"--- Men 18-29 (0.550) vs Women 18-29 (0.490)\n"}
+,{"stream_name":"stdout","time":4.21238398,"data":"    diff = 0.0600\n"}
+,{"stream_name":"stdout","time":4.212389938,"data":"    95% CI (Wald):      (0.0597, 0.0603)\n"}
+,{"stream_name":"stdout","time":4.212394652,"data":"    95% CI (bootstrap): (0.0597, 0.0603)\n"}
+,{"stream_name":"stdout","time":4.212399538,"data":"    z=429.67, normal p=0.00e+00, randomization p=0.00e+00, Fisher exact p=0.00e+00\n"}
+,{"stream_name":"stdout","time":4.212404569,"data":"\n"}
+,{"stream_name":"stdout","time":4.255721076,"data":"--- Ages 18-24 (0.710) vs Ages 25-29 (0.280)\n"}
+,{"stream_name":"stdout","time":4.255758398,"data":"    diff = 0.4300\n"}
+,{"stream_name":"stdout","time":4.255764426,"data":"    95% CI (Wald):      (0.4298, 0.4302)\n"}
+,{"stream_name":"stdout","time":4.255792368,"data":"    95% CI (bootstrap): (0.4297, 0.4302)\n"}
+,{"stream_name":"stdout","time":4.255798021,"data":"    z=3058.13, normal p=0.00e+00, randomization p=0.00e+00, Fisher exact p=0.00e+00\n"}
+,{"stream_name":"stdout","time":4.25580324,"data":"\n"}
+,{"stream_name":"stdout","time":4.256974704,"data":"Conclusion:\n"}
+,{"stream_name":"stdout","time":4.256999284,"data":"  In July 2020, 52% of U.S. 18- to 29-year-olds lived with a\n"}
+,{"stream_name":"stdout","time":4.257005253,"data":"  parent (26.6 million) -- the first majority since the Great Depression era,\n"}
+,{"stream_name":"stdout","time":4.25701066,"data":"  exceeding even the 1940 record of 48% and the Feb 2020 pre-pandemic share of\n"}
+,{"stream_name":"stdout","time":4.257015738,"data":"  47%. With n = 51.2 million, both nulls are rejected overwhelmingly\n"}
+,{"stream_name":"stdout","time":4.257021285,"data":"  (p \u003c 1e-15). Young men exceed young women (55% vs 49%) and the youngest\n"}
+,{"stream_name":"stdout","time":4.257027277,"data":"  adults dominate the increase (ages 18-24: 71% vs 28% for ages 25-29), all\n"}
+,{"stream_name":"stdout","time":4.257032545,"data":"  differences significant at any conventional level.\n"}
+,{"stream_name":"stdout","time":4.257037797,"data":"\n"}
+,{"stream_name":"stdout","time":4.257042645,"data":"Saved results to /kaggle/working/scripts/phase2/out/q10_results.json\n"}
+,{"stream_name":"stderr","time":7.442714932,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":7.442748874,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":7.862779005,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":7.8628588619999995,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":9.720070892,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":11.11015572,"data":"[NbConvertApp] Writing 323593 bytes to __results__.html\n"}
+]

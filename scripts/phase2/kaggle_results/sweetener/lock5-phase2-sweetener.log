@@ -1,0 +1,40 @@
+[{"stream_name":"stdout","time":15.514648392,"data":"================================================================\n"}
+,{"stream_name":"stdout","time":15.514841079,"data":"Q15: Do artificial sweeteners cause weight gain?\n"}
+,{"stream_name":"stdout","time":15.514850401,"data":"Fowler et al. 2008, Obesity 16(8):1894-1900 - San Antonio Heart Study\n"}
+,{"stream_name":"stdout","time":15.514855033,"data":"================================================================\n"}
+,{"stream_name":"stdout","time":15.514859171,"data":"\n"}
+,{"stream_name":"stdout","time":15.514862656,"data":"Published headline statistics (adjusted models):\n"}
+,{"stream_name":"stdout","time":15.514866854,"data":"  OR overweight/obesity incidence, 22+ ASBs/wk vs none: 1.93 (1.20-3.11), P=0.007\n"}
+,{"stream_name":"stdout","time":15.514870545,"data":"  OR obesity incidence,            22+ ASBs/wk vs none: 2.03 (1.36-3.03), P=0.0005\n"}
+,{"stream_name":"stdout","time":15.514874318,"data":"  Adjusted DBMI: users +1.48 vs nonusers +1.01 kg/m2 (+47%, P\u003c0.0001)\n"}
+,{"stream_name":"stdout","time":15.514879039,"data":"\n"}
+,{"stream_name":"stdout","time":15.514882707,"data":"Part A - baseline overweight/obesity by AS use (2x2, n=3,371)\n"}
+,{"stream_name":"stdout","time":15.514886447,"data":"  nonusers: 1,064/1,767 = 60.2%   users: 1,084/1,604 = 67.6%\n"}
+,{"stream_name":"stdout","time":15.514890402,"data":"  diff = +0.0737;  z = 4.44, p(two-sided) = 8.90e-06\n"}
+,{"stream_name":"stdout","time":15.514894359,"data":"  Fisher exact p = 1.02e-05;  randomization p(two) = 0.00002, p(one) = 0.00000\n"}
+,{"stream_name":"stdout","time":15.514898573,"data":"  risk ratio = 1.122  (95% bootstrap CI 1.067 to 1.181)\n"}
+,{"stream_name":"stdout","time":15.514902505,"data":"  odds ratio = 1.377  (95% bootstrap CI 1.197 to 1.588)\n"}
+,{"stream_name":"stdout","time":15.514906159,"data":"\n"}
+,{"stream_name":"stdout","time":15.514910083,"data":"Part B - 7-8 y BMI change by baseline ASB consumption\n"}
+,{"stream_name":"stdout","time":15.514913675,"data":"  0 per week (none) n=1,819  DBMI = 1.01 kg/m2  (95% CI 0.88-1.14; SD~2.83)\n"}
+,{"stream_name":"stdout","time":15.514916087,"data":"  \u003c3 per week    n=  420  DBMI = 1.11 kg/m2  (95% CI 0.85-1.38; SD~2.77)\n"}
+,{"stream_name":"stdout","time":15.514918603,"data":"  3-10 per week  n=  422  DBMI = 1.46 kg/m2  (95% CI 1.20-1.73; SD~2.78)\n"}
+,{"stream_name":"stdout","time":15.514920994,"data":"  11-21 per week n=  401  DBMI = 1.50 kg/m2  (95% CI 1.23-1.78; SD~2.81)\n"}
+,{"stream_name":"stdout","time":15.514923305,"data":"  22+ per week   n=  403  DBMI = 1.78 kg/m2  (95% CI 1.51-2.06; SD~2.82)\n"}
+,{"stream_name":"stdout","time":15.514941679,"data":"  None vs 22+/wk: diff = +0.77 kg/m2 (76% greater than nonusers)\n"}
+,{"stream_name":"stdout","time":15.514944454,"data":"  Welch t = 4.96, df = 595, p = 9.14e-07\n"}
+,{"stream_name":"stdout","time":15.514947876,"data":"  ANOVA F(4,3460) = 9.34, p = 1.68e-07\n"}
+,{"stream_name":"stdout","time":15.514951347,"data":"  bootstrap 95% CI for diff: (0.465, 1.078)\n"}
+,{"stream_name":"stdout","time":15.514954998,"data":"  randomization p(two-sided) = 0.00000\n"}
+,{"stream_name":"stdout","time":15.514958821,"data":"  linear trend: r = 0.101, p = 2.19e-09\n"}
+,{"stream_name":"stdout","time":15.514962453,"data":"\n"}
+,{"stream_name":"stdout","time":15.514966393,"data":"  Caution: observational - association does not establish causation.\n"}
+,{"stream_name":"stdout","time":15.514970161,"data":"\n"}
+,{"stream_name":"stdout","time":15.51497392,"data":"Results JSON written to scripts/phase2/out/q15_results.json\n"}
+,{"stream_name":"stderr","time":18.588024574,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":18.58807695,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":19.037258624,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":19.037290401,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":21.031422498,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":22.409761215,"data":"[NbConvertApp] Writing 338524 bytes to __results__.html\n"}
+]

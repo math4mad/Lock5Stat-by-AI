@@ -1,0 +1,183 @@
+{
+  "question": "Does eating organic food improve your health?",
+  "provenance": {
+    "dataset": "Lock5Data: OrganicEffect (160 obs, 6 vars) - real Lock5 dataset",
+    "data_source": "Downloaded verbatim from https://www.lock5stat.com/datasets3e/OrganicEffect.csv to data/phase2/q17_organic.csv (Lock5 3e/4e data pages checked Oct 2026; no dataset named 'OrganicFood' exists).",
+    "citation": "Magner J, Wallberg P, Sandberg J, Cousins AP (2015). Human exposure to pesticides from food: A pilot study (Report U 5080). IVL Swedish Environmental Research Institute, for Coop Sverige AB, January 2015.",
+    "report_url": "https://www.coop.se/PageFiles/429812/Coop%20Ekoeffekten_Report%20ENG.pdf",
+    "design": "Within-family before/after pilot: Swedish family of five (2 adults, 3 children) ate a conventional diet, then only organic food for two weeks; 8 pesticides measured in morning urine (micrograms/g creatinine) on 4 days per diet -> 5 x 8 x 4 = 160 paired observations",
+    "endpoint_note": "Endpoint is urinary pesticide concentration - a health-relevant exposure biomarker, not a clinical health outcome. Smith-Spangler et al. 2012 (Ann Intern Med 157:348-366) and the Norwegian MoBa cohort (Torjusen et al. 2012, BMC Public Health 12:612) have no Lock5 dataset.",
+    "caution": "Single family (n=5); diet order not randomized; repeated days within person x pesticide are not fully independent; reduced exposure does not by itself establish a health benefit (measured levels were below the ADI)."
+  },
+  "published_headlines": {
+    "ivl_report": {
+      "statement": "Urinary pesticide-residue concentrations decreased on average by a factor of 6.7 on the organic diet",
+      "extra": "Children in particular had lower concentrations; levels of most, but not all, pesticides fell in adults; measured levels estimated below the ADI by a good margin."
+    }
+  },
+  "methods": {
+    "n_bootstrap": 100000,
+    "n_randomization": 100000,
+    "seed": 2026,
+    "engine": "numpy/scipy/pandas"
+  },
+  "part_paired": {
+    "endpoint": "urinary pesticide concentration (micrograms/g creatinine); d = NonOrganic - Organic per person x pesticide x day",
+    "data": {
+      "n_pairs": 160,
+      "n_subjects": 5,
+      "n_pesticides": 8,
+      "mean_nonorganic": 38.761250000000004,
+      "mean_organic": 2.826875,
+      "mean_diff": 35.934375,
+      "sd_diff": 96.4387536908446,
+      "median_diff": 6.5
+    },
+    "effect_size": {
+      "mean_diff_units_ug_per_g_creatinine": 35.934375,
+      "percent_reduction": 92.7069560450192,
+      "ratio_of_means_non_over_org": 13.71169577713907,
+      "cohens_d": 0.37261343209800757
+    },
+    "paired_t_test": {
+      "t": 4.713228528808786,
+      "df": 159,
+      "p_two_sided": 5.290796635732305e-06,
+      "p_one_sided_organic_lower": 2.6453983178661524e-06,
+      "ci95_theory_mean_diff": [
+        20.876701878675114,
+        50.99204812132489
+      ]
+    },
+    "wilcoxon_signed_rank": {
+      "statistic": 551.5,
+      "p_two_sided": 3.6604968702467756e-22
+    },
+    "randomization": {
+      "p_two_sided": 0.0,
+      "p_one_sided_organic_lower": 0.0
+    },
+    "bootstrap": {
+      "ci95_mean_diff": [
+        22.409375,
+        52.08878124999998
+      ],
+      "ci95_percent_reduction": [
+        88.4925235374891,
+        95.14408192559927
+      ],
+      "ci95_cohens_d": [
+        0.3220639985957368,
+        0.4549326032400925
+      ]
+    },
+    "by_person": [
+      {
+        "person": "Father",
+        "mean_nonorganic": 6.46875,
+        "mean_organic": 3.5,
+        "mean_diff": 2.96875,
+        "percent_reduction": 45.893719806763286,
+        "n": 32
+      },
+      {
+        "person": "Mother",
+        "mean_nonorganic": 50.887499999999996,
+        "mean_organic": 3.28125,
+        "mean_diff": 47.606249999999996,
+        "percent_reduction": 93.55195283714075,
+        "n": 32
+      },
+      {
+        "person": "GirlA",
+        "mean_nonorganic": 43.0125,
+        "mean_organic": 1.934375,
+        "mean_diff": 41.078125,
+        "percent_reduction": 95.50276082534147,
+        "n": 32
+      },
+      {
+        "person": "GirlB",
+        "mean_nonorganic": 8.18125,
+        "mean_organic": 1.553125,
+        "mean_diff": 6.628125,
+        "percent_reduction": 81.01604278074866,
+        "n": 32
+      },
+      {
+        "person": "Boy",
+        "mean_nonorganic": 85.25625000000001,
+        "mean_organic": 3.865625,
+        "mean_diff": 81.390625,
+        "percent_reduction": 95.46587493585514,
+        "n": 32
+      }
+    ],
+    "by_pesticide": [
+      {
+        "pesticide": "24D",
+        "mean_nonorganic": 6.455,
+        "mean_organic": 0.9399999999999998,
+        "mean_diff": 5.515,
+        "percent_reduction": 85.43764523625097,
+        "n": 20
+      },
+      {
+        "pesticide": "3-PBA",
+        "mean_nonorganic": 27.054999999999996,
+        "mean_organic": 2.535,
+        "mean_diff": 24.520000000000003,
+        "percent_reduction": 90.63019774533358,
+        "n": 20
+      },
+      {
+        "pesticide": "35DC",
+        "mean_nonorganic": 19.119999999999997,
+        "mean_organic": 0.9700000000000001,
+        "mean_diff": 18.15,
+        "percent_reduction": 94.92677824267783,
+        "n": 20
+      },
+      {
+        "pesticide": "CCC",
+        "mean_nonorganic": 179.425,
+        "mean_organic": 3.675,
+        "mean_diff": 175.75,
+        "percent_reduction": 97.95179044168873,
+        "n": 20
+      },
+      {
+        "pesticide": "ETU",
+        "mean_nonorganic": 2.905,
+        "mean_organic": 1.2,
+        "mean_diff": 1.7049999999999996,
+        "percent_reduction": 58.691910499139425,
+        "n": 20
+      },
+      {
+        "pesticide": "Mepiquat",
+        "mean_nonorganic": 34.195,
+        "mean_organic": 5.575,
+        "mean_diff": 28.619999999999997,
+        "percent_reduction": 83.69644684895452,
+        "n": 20
+      },
+      {
+        "pesticide": "Propamocarb",
+        "mean_nonorganic": 2.105,
+        "mean_organic": 0.24,
+        "mean_diff": 1.8650000000000002,
+        "percent_reduction": 88.59857482185274,
+        "n": 20
+      },
+      {
+        "pesticide": "TCP",
+        "mean_nonorganic": 38.83,
+        "mean_organic": 7.480000000000001,
+        "mean_diff": 31.35,
+        "percent_reduction": 80.73654390934844,
+        "n": 20
+      }
+    ]
+  }
+}

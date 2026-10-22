@@ -1,0 +1,57 @@
+# Q6 (Phase 2) - Do teams whose players give more high fives/touches win more?
+# Study: Kraus, M. W., Huang, C., & Keltner, D. (2010). Tactile communication,
+#   cooperation, and performance: An ethological study of the NBA.
+#   Emotion, 10(5), 745-749. doi:10.1037/a0019382 (PMID 21038960)
+# Design: ethological observation - two independent coder teams (>80 pct agreement)
+#   coded celebratory teammate touch (12 types incl. high fives, fist bumps, chest
+#   bumps, hugs, huddles) for 294 players from all 30 NBA teams, one game per team
+#   within the first 2 months of the 2008-09 season. Early-season touch predicted
+#   season performance even after controlling for salary, preseason expectations,
+#   and early-season performance; coded cooperation explained the link.
+# PROVENANCE / RECONSTRUCTION DISCLOSURE:
+#   win_pct = ACTUAL final 2008-09 NBA regular-season standings (public record;
+#             82 games per team; wins sum to 1230 across the 30 teams).
+#   touch_sec_per_player = RECONSTRUCTED, NOT observed. Per-team touch rates were
+#   never published. Generated (numpy seed 2026) as touch = 1.80 + 0.90*z where
+#   z = 0.70*z_win + sqrt(1-0.70^2)*noise, z_win = standardized win_pct, noise ~
+#   N(0,1). The 1.80 s mean matches the published player-level mean touch per
+#   game (player-level SD 2.05 s; the 0.90 s team-level SD is a documented
+#   modeling choice, since team means of a player-level SD-2.05 variable are less
+#   dispersed). rho = 0.70 encodes the strong positive association reported.
+#   Anchored so Boston Celtics and Los Angeles Lakers are the two touchiest
+#   teams, per press coverage of the study (NYT 2010-02-22; FOX Sports 2011-06-09:
+#   "the two touchiest teams in the study - the Boston Celtics and Los Angeles
+#   Lakers - finished the season with two of the NBA's top three records").
+#   Resulting Pearson r at generation time = 0.7497.
+# Do not treat touch values as raw observations.
+team,touch_sec_per_player,win_pct
+Boston Celtics,3.515,0.7561
+Los Angeles Lakers,3.044,0.7927
+Cleveland Cavaliers,1.716,0.8049
+Orlando Magic,2.244,0.7195
+Denver Nuggets,2.801,0.6585
+San Antonio Spurs,2.203,0.6585
+Portland Trail Blazers,2.190,0.6585
+Houston Rockets,2.540,0.6463
+Dallas Mavericks,2.037,0.6098
+New Orleans Hornets,2.018,0.5976
+Utah Jazz,2.581,0.5854
+Atlanta Hawks,2.403,0.5732
+Phoenix Suns,1.986,0.5610
+Miami Heat,1.836,0.5244
+Philadelphia 76ers,1.903,0.5000
+Chicago Bulls,1.405,0.5000
+Detroit Pistons,1.450,0.4756
+Indiana Pacers,1.925,0.4390
+Charlotte Bobcats,1.444,0.4268
+New Jersey Nets,0.599,0.4146
+Milwaukee Bucks,1.175,0.4146
+Toronto Raptors,1.859,0.4024
+New York Knicks,1.242,0.3902
+Golden State Warriors,1.159,0.3537
+Minnesota Timberwolves,1.441,0.2927
+Memphis Grizzlies,2.201,0.2927
+Oklahoma City Thunder,0.524,0.2805
+Los Angeles Clippers,1.667,0.2317
+Washington Wizards,0.010,0.2317
+Sacramento Kings,0.823,0.2073

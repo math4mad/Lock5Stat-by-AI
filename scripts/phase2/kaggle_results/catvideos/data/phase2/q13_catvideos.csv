@@ -1,0 +1,41 @@
+# data/phase2/q13_catvideos.csv
+# Lock5 Phase 2, Q13: "Does watching cat videos improve mood?"
+#
+# Citation: Myrick, J. G. (2015). Emotion regulation, procrastination, and watching
+#   cat videos online: Who watches Internet cats, why, and to what effect?
+#   Computers in Human Behavior, 52, 168-176.
+#   https://doi.org/10.1016/j.chb.2015.06.001
+#
+# Design: online Qualtrics survey (snowball sample recruited via Facebook/Twitter and
+#   Lil BUB's social channels) of Internet users who view cat videos/photos online;
+#   final N = 6,795 (11,083 began, 6,827 completed, 32 removed). 88.4% female; mean
+#   age 38.74 (SD = 14.07). Retrospective paired measures: respondents rated 24
+#   discrete emotions on a 1 ("not at all") to 7 ("very much") scale recalling how
+#   they felt BEFORE and AFTER their most recent online cat video/photo viewing.
+#   Caveat: within-subject retrospective survey comparison, not a randomized
+#   experiment; snowball sample skews female.
+#
+# Lock5 3e ships no dataset for this question (checked lock5stat.com/datapage3e.html),
+# so this file reconstructs the published AGGREGATE summary statistics from paper
+# Table 2 (p. 172). These are NOT raw respondent records. Columns:
+#   variable                  short key used by the analysis script
+#   label                     human-readable outcome
+#   items                     adjective items averaged into the scale
+#   n                         analytic n (published paired-t df + 1)
+#   mean_prior, sd_prior      pre-viewing mean and SD (1-7 scale)
+#   mean_after, sd_after      post-viewing mean and SD (1-7 scale)
+#   r_prior_after             within-person pre/post correlation (Table 2)
+#   t_published, df_published paired t as printed in Table 2; direction is
+#                             PRIOR minus AFTER, so positive t = emotion DECREASED
+variable,label,items,n,mean_prior,sd_prior,mean_after,sd_after,r_prior_after,t_published,df_published
+depleted,"Depleted (arousal)","depleted, drained, tired",6628,3.43,1.72,2.05,1.29,0.58,78.83,6627
+energetic,"Energetic (arousal)","energized, motivated, excited",6616,3.27,1.43,3.78,1.59,0.60,-30.93,6615
+anxious,"Anxious","anxious, uneasy, nervous",6629,2.28,1.47,1.52,0.94,0.60,52.37,6628
+annoyed,"Annoyed","annoyed, aggravated, irritated",6623,2.34,1.53,1.43,0.89,0.48,54.62,6622
+sad,"Sad","sad, gloomy, depressed",6623,2.52,1.62,1.57,1.00,0.57,57.87,6622
+guilty,"Guilty","guilty, remorseful, ashamed",6623,1.62,1.08,1.34,0.82,0.62,26.66,6622
+negative_combined,"Negative emotions (composite)","anxious + annoyed + sad + guilty",6594,2.19,1.24,1.46,0.82,0.60,58.95,6593
+hopeful,"Hopeful","hopeful, inspired, optimistic",6629,3.67,1.44,4.21,1.59,0.60,-32.39,6628
+happy,"Happy","happy, cheerful, jolly",6627,4.08,1.53,5.22,1.43,0.53,-64.79,6626
+content,"Content","content, tranquil, relaxed",6629,4.23,1.45,4.85,1.40,0.51,-35.46,6628
+positive_combined,"Positive emotions (composite)","hopeful + happy + content",6605,3.99,1.34,4.76,1.31,0.58,-51.27,6604
