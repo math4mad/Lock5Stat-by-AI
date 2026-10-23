@@ -132,7 +132,10 @@ Preface cases · Phase 2 (Q1–Q17)
 
 ::: {.toc-unit-body}
 ::: {.toc-card}
-[**Preface — pipeline validation**](preface/index.qmd){.card-title}
+<div class="card-head">
+[🚀 Preface — pipeline validation](preface/index.qmd){.card-title}
+<span class="card-badge">3 cases</span>
+</div>
 
 Three case studies that established the note template.
 
@@ -142,7 +145,10 @@ Three case studies that established the note template.
 :::
 
 ::: {.toc-card}
-[**Phase 2 — Ford Mobile Lines**](phase2/index.qmd){.card-title}
+<div class="card-head">
+[🏭 Phase 2 — Ford Mobile Lines](phase2/index.qmd){.card-title}
+<span class="card-badge">17 questions</span>
+</div>
 
 17 Lock⁵ questions researched, run on Kaggle in parallel, and verified.
 
@@ -165,7 +171,10 @@ Exercises 1.1 – 4.147
 
 ::: {.toc-unit-body}
 ::: {.toc-card}
-[**Chapter 1 — Case studies & study design**](chapters/ch01/s1-1.qmd){.card-title}
+<div class="card-head">
+[📖 Chapter 1 — Case studies & study design](chapters/ch01/s1-1.qmd){.card-title}
+<span class="card-badge">102 exercises</span>
+</div>
 
 Sampling, experiments, observational studies.
 
@@ -175,7 +184,10 @@ Sampling, experiments, observational studies.
 :::
 
 ::: {.toc-card}
-[**Chapter 2 — Describing data**](chapters/ch02/s2-1.qmd){.card-title}
+<div class="card-head">
+[📊 Chapter 2 — Describing data](chapters/ch02/s2-1.qmd){.card-title}
+<span class="card-badge">215 exercises</span>
+</div>
 
 Categorical & numerical summaries, boxplots, measures of spread.
 
@@ -185,7 +197,10 @@ Categorical & numerical summaries, boxplots, measures of spread.
 :::
 
 ::: {.toc-card}
-[**Chapter 3 — Confidence intervals**](chapters/ch03/s3-1.qmd){.card-title}
+<div class="card-head">
+[📏 Chapter 3 — Confidence intervals](chapters/ch03/s3-1.qmd){.card-title}
+<span class="card-badge">101 exercises</span>
+</div>
 
 Bootstrapping for means and proportions.
 
@@ -195,7 +210,10 @@ Bootstrapping for means and proportions.
 :::
 
 ::: {.toc-card}
-[**Chapter 4 — Hypothesis tests**](chapters/ch04/s4-1.qmd){.card-title}
+<div class="card-head">
+[🧪 Chapter 4 — Hypothesis tests](chapters/ch04/s4-1.qmd){.card-title}
+<span class="card-badge">147 exercises</span>
+</div>
 
 Randomization tests for means, proportions and differences.
 
@@ -218,7 +236,10 @@ Exercises 5.1 – 6.176 · Synthesis B.1–B.82
 
 ::: {.toc-unit-body}
 ::: {.toc-card}
-[**Chapter 5 — Normal distributions**](chapters/ch05/s5-1.qmd){.card-title}
+<div class="card-head">
+[🔔 Chapter 5 — Normal distributions](chapters/ch05/s5-1.qmd){.card-title}
+<span class="card-badge">101 exercises</span>
+</div>
 
 Density curves, z-scores, normal probabilities.
 
@@ -228,7 +249,10 @@ Density curves, z-scores, normal probabilities.
 :::
 
 ::: {.toc-card}
-[**Chapter 6 — Inference for means & proportions**](chapters/ch06/s6-1.qmd){.card-title}
+<div class="card-head">
+[⚖️ Chapter 6 — Inference for means & proportions](chapters/ch06/s6-1.qmd){.card-title}
+<span class="card-badge">176 exercises</span>
+</div>
 
 t-tests, z-tests for proportions, two-sample inference.
 
@@ -238,7 +262,10 @@ t-tests, z-tests for proportions, two-sample inference.
 :::
 
 ::: {.toc-card}
-[**Unit B synthesis — a full case**](chapters/synthesis/unit-b-1.qmd){.card-title}
+<div class="card-head">
+[🧩 Unit B synthesis — a full case](chapters/synthesis/unit-b-1.qmd){.card-title}
+<span class="card-badge">82 exercises</span>
+</div>
 
 One research question (Doctor's visits?) through every Unit B method.
 
@@ -261,7 +288,10 @@ Synthesis C.1–C.130
 
 ::: {.toc-unit-body}
 ::: {.toc-card}
-[**Unit C synthesis — ACS survey**](chapters/synthesis/unit-c-1.qmd){.card-title}
+<div class="card-head">
+[🧩 Unit C synthesis — ACS survey](chapters/synthesis/unit-c-1.qmd){.card-title}
+<span class="card-badge">130 exercises</span>
+</div>
 
 CIs and tests for means/proportions across 130 exercises on the American Community Survey and friends.
 
@@ -284,7 +314,10 @@ Exercises 7.1 – 10.196 · Synthesis D.1–D.53
 
 ::: {.toc-unit-body}
 ::: {.toc-card}
-[**Chapter 7 — Chi-square tests**](chapters/ch07/s7-1.qmd){.card-title}
+<div class="card-head">
+[🧾 Chapter 7 — Chi-square tests](chapters/ch07/s7-1.qmd){.card-title}
+<span class="card-badge">113 exercises</span>
+</div>
 
 Goodness of fit and association for categorical variables.
 
@@ -294,7 +327,10 @@ Goodness of fit and association for categorical variables.
 :::
 
 ::: {.toc-card}
-[**Chapter 8 — ANOVA**](chapters/ch08/s8-1.qmd){.card-title}
+<div class="card-head">
+[📐 Chapter 8 — ANOVA](chapters/ch08/s8-1.qmd){.card-title}
+<span class="card-badge">68 exercises</span>
+</div>
 
 Comparing means, pairwise comparisons, Fisher's LSD.
 
@@ -304,7 +340,10 @@ Comparing means, pairwise comparisons, Fisher's LSD.
 :::
 
 ::: {.toc-card}
-[**Chapter 9 — Inference for regression**](chapters/ch09/s9-1.qmd){.card-title}
+<div class="card-head">
+[📈 Chapter 9 — Inference for regression](chapters/ch09/s9-1.qmd){.card-title}
+<span class="card-badge">82 exercises</span>
+</div>
 
 Slopes, ANOVA F, prediction intervals.
 
@@ -314,7 +353,10 @@ Slopes, ANOVA F, prediction intervals.
 :::
 
 ::: {.toc-card}
-[**Chapter 10 — Multiple regression**](chapters/ch10/s10-1.qmd){.card-title}
+<div class="card-head">
+[🌐 Chapter 10 — Multiple regression](chapters/ch10/s10-1.qmd){.card-title}
+<span class="card-badge">196 exercises</span>
+</div>
 
 Multiple predictors, conditions, variable selection, big-picture cautions.
 
@@ -324,7 +366,10 @@ Multiple predictors, conditions, variable selection, big-picture cautions.
 :::
 
 ::: {.toc-card}
-[**Unit D synthesis — Restaurant Tips**](chapters/synthesis/unit-d-1.qmd){.card-title}
+<div class="card-head">
+[🧩 Unit D synthesis — Restaurant Tips](chapters/synthesis/unit-d-1.qmd){.card-title}
+<span class="card-badge">53 exercises</span>
+</div>
 
 One dataset through every Unit D method: chi-square, ANOVA, regression.
 
@@ -347,7 +392,10 @@ E.1–E.10 · P.1–P.169
 
 ::: {.toc-unit-body}
 ::: {.toc-card}
-[**Big Picture synthesis**](chapters/synthesis/big-picture.qmd){.card-title}
+<div class="card-head">
+[🌟 Big Picture synthesis](chapters/synthesis/big-picture.qmd){.card-title}
+<span class="card-badge">10 exercises</span>
+</div>
 
 The full inferential toolkit applied to one ACS survey (n = 2000).
 
@@ -357,7 +405,10 @@ The full inferential toolkit applied to one ACS survey (n = 2000).
 :::
 
 ::: {.toc-card}
-[**Chapter P — Probability basics**](chapters/chapters-p/p-1.qmd){.card-title}
+<div class="card-head">
+[🎲 Chapter P — Probability basics](chapters/chapters-p/p-1.qmd){.card-title}
+<span class="card-badge">169 exercises</span>
+</div>
 
 Probability rules, trees & Bayes; random variables, binomial, normal.
 

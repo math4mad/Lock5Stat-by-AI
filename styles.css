@@ -133,6 +133,7 @@
 }
 
 .toc-card {
+  position: relative;
   display: block;
   padding: 0.75rem 0.9rem;
   background: #fff;
@@ -141,6 +142,26 @@
   color: inherit;
   text-decoration: none;
   transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+}
+
+.toc-card .card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-right: 0.1rem;
+}
+
+.toc-card .card-badge {
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 0.14rem 0.5rem;
+  border-radius: 999px;
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--unit-color, #4c72b0) 14%, white);
+  color: var(--unit-color, #4c72b0);
 }
 
 .toc-card:hover {
