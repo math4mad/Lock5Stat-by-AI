@@ -1,11 +1,175 @@
-/* --- homepage hero + stat cards --- */
-.hero-banner {
-  padding: 1.6rem 1.8rem;
-  margin: 1rem 0 1.5rem;
-  border-left: 5px solid #4c72b0;
-  background: linear-gradient(135deg, #f2f6fb 0%, #fdfefe 100%);
-  border-radius: 0.5rem;
-  font-size: 1.06rem;
+/* --- homepage hero --- */
+.hero {
+  margin: 1rem 0 1.8rem;
+  padding: 2.6rem 2.2rem 2.2rem;
+  border-radius: 1rem;
+  color: #eef2f8;
+  background:
+    radial-gradient(1100px 420px at 85% -10%, rgba(129, 114, 179, 0.55), transparent 60%),
+    radial-gradient(900px 380px at -10% 110%, rgba(85, 168, 104, 0.35), transparent 55%),
+    linear-gradient(135deg, #1f2a44 0%, #27365c 55%, #2c3e6e 100%);
+  box-shadow: 0 12px 32px rgba(23, 34, 56, 0.28);
+}
+
+.hero-kicker {
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.28rem 0.8rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  margin-bottom: 1rem;
+}
+
+.hero-title {
+  color: #fff;
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1.22;
+  margin: 0 0 0.9rem;
+  max-width: 42rem;
+}
+
+.hero-accent {
+  background: linear-gradient(90deg, #9fc2f5, #b9a9ec);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.hero-sub {
+  font-size: 1.02rem;
+  line-height: 1.6;
+  max-width: 40rem;
+  color: #cdd7e8;
+  margin-bottom: 1.4rem;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin-bottom: 1.6rem;
+}
+
+.hero-btn {
+  display: inline-block;
+  padding: 0.55rem 1.25rem;
+  border-radius: 0.55rem;
+  font-weight: 650;
+  font-size: 0.95rem;
+  text-decoration: none;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+}
+
+.hero-btn-primary {
+  color: #1f2a44;
+  background: linear-gradient(90deg, #a7c6f2, #9db9f0);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.hero-btn-primary:hover {
+  transform: translateY(-2px);
+  color: #1f2a44;
+  text-decoration: none;
+  box-shadow: 0 7px 18px rgba(0, 0, 0, 0.32);
+}
+
+.hero-btn-ghost {
+  color: #eef2f8;
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
+}
+
+.hero-btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  text-decoration: none;
+}
+
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.8rem;
+  max-width: 44rem;
+}
+
+.hero-stat {
+  text-align: center;
+  padding: 0.7rem 0.4rem;
+  border-radius: 0.6rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.hero-stat .stat-num {
+  font-size: 1.7rem;
+  font-weight: 750;
+  color: #fff;
+  line-height: 1.1;
+}
+
+.hero-stat .stat-label {
+  font-size: 0.78rem;
+  color: #b9c6dc;
+  margin-top: 0.15rem;
+}
+
+@media (max-width: 720px) {
+  .hero { padding: 1.8rem 1.3rem 1.6rem; }
+  .hero-title { font-size: 1.5rem; }
+  .hero-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* navbar group separators inside dropdown menus */
+.navbar .dropdown-menu li.nav-header,
+.navbar .dropdown-menu .dropdown-item-text {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #8a94a6;
+  padding: 0.55rem 1.1rem 0.2rem;
+  white-space: nowrap;
+}
+
+/* --- method cards --- */
+.method-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+  margin: 1.1rem 0 0.5rem;
+}
+
+.method-card {
+  padding: 1.1rem 1.2rem;
+  background: #fff;
+  border: 1px solid #e9edf3;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px rgba(30, 45, 70, 0.05);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  font-size: 0.9rem;
+  color: #55606e;
+  line-height: 1.5;
+}
+
+.method-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 18px rgba(30, 45, 70, 0.10);
+}
+
+.method-icon {
+  font-size: 1.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.method-name {
+  font-weight: 700;
+  font-size: 1rem;
+  color: #2c3e50;
+  margin-bottom: 0.35rem;
 }
 
 .stat-card {

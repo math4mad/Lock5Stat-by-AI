@@ -12,17 +12,19 @@ website:
     left:
       - href: index.qmd
         text: "Home"
+      - href: contents.qmd
+        text: "Contents"
       - text: "Preface"
         menu:
           - href: preface/index.qmd
             text: "Overview"
           - href: preface/sprinting_gene.qmd
-            text: "Sprinting Gene"
+            text: "Case · Sprinting Gene"
           - href: preface/penguin_tagging.qmd
-            text: "Penguin Tagging"
+            text: "Case · Penguin Tagging"
           - href: preface/pheromones.qmd
-            text: "Pheromones"
-      - text: "Phase 2 · Ford Mobile Lines"
+            text: "Case · Pheromones"
+      - text: "Phase 2"
         menu:
           - href: phase2/index.qmd
             text: "Overview (Q1–Q17)"
@@ -60,98 +62,118 @@ website:
             text: "Q16 · Late-Night Eating"
           - href: phase2/q17-organic.qmd
             text: "Q17 · Organic Food"
-      - text: "Chapters"
+      - text: "Unit A"
         menu:
+          - text: "── Ch. 1 · Case studies & design ──"
           - href: chapters/ch01/s1-1.qmd
-            text: "Ch. 1 · Section 1.1"
+            text: "1.1 · Hot dog calibration"
           - href: chapters/ch01/s1-2.qmd
-            text: "Ch. 1 · Section 1.2"
+            text: "1.2 · Sampling"
           - href: chapters/ch01/s1-3.qmd
-            text: "Ch. 1 · Section 1.3"
+            text: "1.3 · Experiments & obs. studies"
+          - text: "── Ch. 2 · Describing data ──"
           - href: chapters/ch02/s2-1.qmd
-            text: "Ch. 2 · Section 2.1"
+            text: "2.1 · Categorical data"
           - href: chapters/ch02/s2-2.qmd
-            text: "Ch. 2 · Section 2.2"
+            text: "2.2 · One categorical variable"
           - href: chapters/ch02/s2-3.qmd
-            text: "Ch. 2 · Section 2.3"
+            text: "2.3 · Two categorical variables"
           - href: chapters/ch02/s2-4.qmd
-            text: "Ch. 2 · Section 2.4"
+            text: "2.4 · One quantitative variable"
           - href: chapters/ch02/s2-5.qmd
-            text: "Ch. 2 · Section 2.5"
+            text: "2.5 · Measures of center"
           - href: chapters/ch02/s2-6.qmd
-            text: "Ch. 2 · Section 2.6"
+            text: "2.6 · Measures of spread"
           - href: chapters/ch02/s2-7.qmd
-            text: "Ch. 2 · Section 2.7"
+            text: "2.7 · Outliers & boxplots"
+          - text: "── Ch. 3 · Confidence intervals ──"
           - href: chapters/ch03/s3-1.qmd
-            text: "Ch. 3 · Section 3.1"
+            text: "3.1 · Bootstrapping for means"
           - href: chapters/ch03/s3-2.qmd
-            text: "Ch. 3 · Section 3.2"
+            text: "3.2 · Bootstrap proportions"
           - href: chapters/ch03/s3-3.qmd
-            text: "Ch. 3 · Section 3.3"
+            text: "3.3 · Other statistics"
           - href: chapters/ch03/s3-4.qmd
-            text: "Ch. 3 · Section 3.4"
+            text: "3.4 · Bootstrap considerations"
+          - text: "── Ch. 4 · Hypothesis tests ──"
           - href: chapters/ch04/s4-1.qmd
-            text: "Ch. 4 · Section 4.1"
+            text: "4.1 · Randomization for a mean"
           - href: chapters/ch04/s4-2.qmd
-            text: "Ch. 4 · Section 4.2"
+            text: "4.2 · Randomization for a proportion"
           - href: chapters/ch04/s4-3.qmd
-            text: "Ch. 4 · Section 4.3"
+            text: "4.3 · Two proportions"
           - href: chapters/ch04/s4-4.qmd
-            text: "Ch. 4 · Section 4.4"
+            text: "4.4 · Two means"
           - href: chapters/ch04/s4-5.qmd
-            text: "Ch. 4 · Section 4.5"
-          - href: chapters/synthesis/unit-c-1.qmd
-            text: "Unit C · Synthesis (C.1–C.65)"
-          - href: chapters/synthesis/unit-c-2.qmd
-            text: "Unit C · Synthesis (C.66–C.130)"
-          - href: chapters/synthesis/unit-b-1.qmd
-            text: "Unit B · Synthesis (B.1–B.44)"
-          - href: chapters/synthesis/unit-b-2.qmd
-            text: "Unit B · Synthesis (B.45–B.82)"
+            text: "4.5 · Other statistics"
+      - text: "Unit B"
+        menu:
+          - text: "── Ch. 5 · Normal distributions ──"
           - href: chapters/ch05/s5-1.qmd
-            text: "Ch. 5 · Section 5.1"
+            text: "5.1 · Density curves & normal"
           - href: chapters/ch05/s5-2.qmd
-            text: "Ch. 5 · Section 5.2"
+            text: "5.2 · Normal computations"
+          - text: "── Ch. 6 · Inference for means & proportions ──"
           - href: chapters/ch06/s6-1.qmd
-            text: "Ch. 6 · Section 6.1"
+            text: "6.1 · Inference for a mean (t)"
           - href: chapters/ch06/s6-2.qmd
-            text: "Ch. 6 · Section 6.2"
+            text: "6.2 · Inference for a proportion"
           - href: chapters/ch06/s6-3.qmd
-            text: "Ch. 6 · Section 6.3"
+            text: "6.3 · Two means"
           - href: chapters/ch06/s6-4.qmd
-            text: "Ch. 6 · Section 6.4"
+            text: "6.4 · Two proportions"
           - href: chapters/ch06/s6-5.qmd
-            text: "Ch. 6 · Section 6.5"
+            text: "6.5 · CI & test decisions"
+          - text: "── Synthesis ──"
+          - href: chapters/synthesis/unit-b-1.qmd
+            text: "Unit B · B.1–B.44"
+          - href: chapters/synthesis/unit-b-2.qmd
+            text: "Unit B · B.45–B.82"
+      - text: "Unit C"
+        menu:
+          - href: chapters/synthesis/unit-c-1.qmd
+            text: "Synthesis · C.1–C.65"
+          - href: chapters/synthesis/unit-c-2.qmd
+            text: "Synthesis · C.66–C.130"
+      - text: "Unit D"
+        menu:
+          - text: "── Ch. 7 · Chi-square tests ──"
           - href: chapters/ch07/s7-1.qmd
-            text: "Ch. 7 · Section 7.1"
+            text: "7.1 · Goodness of fit"
           - href: chapters/ch07/s7-2.qmd
-            text: "Ch. 7 · Section 7.2"
+            text: "7.2 · Testing for association"
+          - text: "── Ch. 8 · ANOVA ──"
           - href: chapters/ch08/s8-1.qmd
-            text: "Ch. 8 · Section 8.1"
+            text: "8.1 · Analysis of variance"
           - href: chapters/ch08/s8-2.qmd
-            text: "Ch. 8 · Section 8.2"
+            text: "8.2 · Pairwise comparisons"
+          - text: "── Ch. 9 · Inference for regression ──"
           - href: chapters/ch09/s9-1.qmd
-            text: "Ch. 9 · Section 9.1"
+            text: "9.1 · Slope & correlation (t)"
           - href: chapters/ch09/s9-2.qmd
-            text: "Ch. 9 · Section 9.2"
+            text: "9.2 · ANOVA for regression"
           - href: chapters/ch09/s9-3.qmd
-            text: "Ch. 9 · Section 9.3"
+            text: "9.3 · CI vs prediction intervals"
+          - text: "── Ch. 10 · Multiple regression ──"
           - href: chapters/ch10/s10-1.qmd
-            text: "Ch. 10 · Section 10.1"
+            text: "10.1 · Multiple predictors"
           - href: chapters/ch10/s10-2.qmd
-            text: "Ch. 10 · Section 10.2"
+            text: "10.2 · Checking conditions"
           - href: chapters/ch10/s10-3.qmd
-            text: "Ch. 10 · Section 10.3"
+            text: "10.3 · Applications & cautions"
+          - text: "── Synthesis ──"
           - href: chapters/synthesis/unit-d-1.qmd
-            text: "Unit D · Synthesis (D.1–D.27)"
+            text: "Unit D · D.1–D.27"
           - href: chapters/synthesis/unit-d-2.qmd
-            text: "Unit D · Synthesis (D.28–D.53)"
+            text: "Unit D · D.28–D.53"
           - href: chapters/synthesis/big-picture.qmd
-            text: "The Big Picture · Synthesis (E.1–E.10)"
+            text: "Big Picture · E.1–E.10"
+      - text: "Chapter P"
+        menu:
           - href: chapters/chapters-p/p-1.qmd
-            text: "Ch. P · Sections P.1–P.2"
+            text: "P.1–P.2 · Probability rules"
           - href: chapters/chapters-p/p-2.qmd
-            text: "Ch. P · Sections P.3–P.5"
+            text: "P.3–P.5 · Random variables"
 
 format:
   html:
