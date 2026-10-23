@@ -15,6 +15,19 @@
   border: 1px solid #e9edf3;
   border-radius: 0.6rem;
   height: 100%;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-3px);
+  border-color: #4c72b0;
+  box-shadow: 0 6px 14px rgba(30, 45, 70, 0.10);
+}
+
+.stat-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+  margin-bottom: 0.35rem;
 }
 
 .stat-num {
@@ -28,6 +41,57 @@
   font-size: 0.86rem;
   color: #667085;
   margin-top: 0.3rem;
+}
+
+/* --- project timeline --- */
+.timeline {
+  position: relative;
+  margin: 1.2rem 0 0.4rem;
+  padding-left: 1.6rem;
+}
+
+.timeline::before {
+  content: "";
+  position: absolute;
+  left: 0.48rem;
+  top: 0.4rem;
+  bottom: 0.4rem;
+  width: 2px;
+  background: linear-gradient(#4c72b0, #8172b3);
+  opacity: 0.45;
+}
+
+.tl-item {
+  position: relative;
+  padding: 0 0 1.05rem;
+}
+
+.tl-item:last-child {
+  padding-bottom: 0.1rem;
+}
+
+.tl-dot {
+  position: absolute;
+  left: -1.6rem;
+  top: 0.28rem;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: #4c72b0;
+  border: 2.5px solid #fff;
+  box-shadow: 0 0 0 2px rgba(76, 114, 176, 0.45);
+}
+
+.tl-item .tl-title {
+  font-size: 0.98rem;
+  margin-bottom: 0.1rem;
+}
+
+.tl-item .tl-body {
+  font-size: 0.87rem;
+  color: #55606e;
+  line-height: 1.45;
+  max-width: 46rem;
 }
 
 /* --- TOC cards --- */

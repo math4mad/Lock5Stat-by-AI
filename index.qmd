@@ -16,10 +16,10 @@ and a published Quarto notebook.
 
 ```{=html}
 <div class="row g-3 my-2">
-  <div class="col-md-3"><div class="stat-card"><div class="stat-num">10</div><div class="stat-label">Chapters (1–10)</div></div></div>
-  <div class="col-md-3"><div class="stat-card"><div class="stat-num">7</div><div class="stat-label">Synthesis notebooks (A–D + Big Picture)</div></div></div>
-  <div class="col-md-3"><div class="stat-card"><div class="stat-num">169</div><div class="stat-label">Probability exercises (Ch. P)</div></div></div>
-  <div class="col-md-3"><div class="stat-card"><div class="stat-num">1,200+</div><div class="stat-label">Exercises solved</div></div></div>
+  <div class="col-md-3"><div class="stat-card"><div class="stat-icon">📚</div><div class="stat-num">10</div><div class="stat-label">Chapters (1–10)</div></div></div>
+  <div class="col-md-3"><div class="stat-card"><div class="stat-icon">🧩</div><div class="stat-num">7</div><div class="stat-label">Synthesis notebooks (A–D + Big Picture)</div></div></div>
+  <div class="col-md-3"><div class="stat-card"><div class="stat-icon">🎲</div><div class="stat-num">169</div><div class="stat-label">Probability exercises (Ch. P)</div></div></div>
+  <div class="col-md-3"><div class="stat-card"><div class="stat-icon">✅</div><div class="stat-num">1,200+</div><div class="stat-label">Exercises solved</div></div></div>
 </div>
 ```
 
@@ -39,6 +39,84 @@ Each notebook follows the same discipline, established in the
   the reconstruction is documented.
 - **Rendered automatically** on every push via GitHub Pages, powered by
   Quarto and Jupyter.
+
+## Project timeline {.unnumbered}
+
+::: {.timeline}
+::: {.tl-item .done}
+::: {.tl-dot}
+:::
+::: {.tl-body}
+**Phase 1 — pipeline validation** {.tl-title}
+
+Three Lock⁵ case studies (sprinting gene, penguin tagging, pheromones)
+established the note template: EDA → parametric + randomization → decision.
+:::
+:::
+
+::: {.tl-item .done}
+::: {.tl-dot}
+:::
+::: {.tl-body}
+**Phase 2 — 17 questions on Kaggle** {.tl-title}
+
+The Ford Mobile Lines questions researched, scripted, and run as parallel
+Kaggle kernels, then verified against local smoke tests.
+:::
+:::
+
+::: {.tl-item .done}
+::: {.tl-dot}
+:::
+::: {.tl-body}
+**Unit A — Chapters 1–4** {.tl-title}
+
+Data description, bootstrapped CIs, randomization tests (766 exercises).
+:::
+:::
+
+::: {.tl-item .done}
+::: {.tl-dot}
+:::
+::: {.tl-body}
+**Unit B — Chapters 5–6** {.tl-title}
+
+Normal and t-based inference, plus a B.1–B.82 synthesis case.
+:::
+:::
+
+::: {.tl-item .done}
+::: {.tl-dot}
+:::
+::: {.tl-body}
+**Unit C — synthesis C.1–C.130** {.tl-title}
+
+Confidence intervals and tests for means/proportions woven together.
+:::
+:::
+
+::: {.tl-item .done}
+::: {.tl-dot}
+:::
+::: {.tl-body}
+**Unit D — Chapters 7–10** {.tl-title}
+
+Chi-square, ANOVA, regression and multiple regression (459 exercises),
+plus the D.1–D.53 Restaurant Tips synthesis.
+:::
+:::
+
+::: {.tl-item .done}
+::: {.tl-dot}
+:::
+::: {.tl-body}
+**Big Picture & Chapter P — complete** {.tl-title}
+
+The E.1–E.10 ACS capstone and all 169 probability exercises. The book is
+fully worked.
+:::
+:::
+:::
 
 ## Contents {.unnumbered}
 
