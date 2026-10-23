@@ -29,3 +29,104 @@
   color: #667085;
   margin-top: 0.3rem;
 }
+
+/* --- TOC cards --- */
+.toc-unit {
+  margin: 1.6rem 0;
+  border: 1px solid #e9edf3;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(30, 45, 70, 0.06);
+}
+
+.toc-unit-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+  padding: 0.85rem 1.2rem;
+  color: #fff;
+  background: var(--unit-color, #4c72b0);
+}
+
+.toc-unit-header .unit-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.toc-unit-header .unit-range {
+  font-size: 0.82rem;
+  opacity: 0.85;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.toc-unit-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.8rem;
+  padding: 0.9rem;
+  background: #fcfdfe;
+}
+
+.toc-card {
+  display: block;
+  padding: 0.75rem 0.9rem;
+  background: #fff;
+  border: 1px solid #e9edf3;
+  border-radius: 0.5rem;
+  color: inherit;
+  text-decoration: none;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+}
+
+.toc-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--unit-color, #4c72b0);
+  box-shadow: 0 4px 10px rgba(30, 45, 70, 0.10);
+  color: inherit;
+  text-decoration: none;
+}
+
+.toc-card .card-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #2c3e50;
+  margin-bottom: 0.25rem;
+}
+
+.toc-card .card-topic {
+  font-size: 0.82rem;
+  color: #667085;
+  line-height: 1.35;
+}
+
+.toc-card .card-links {
+  margin-top: 0.45rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.toc-card .card-links a {
+  display: inline-block;
+  font-size: 0.75rem;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--unit-color, #4c72b0) 12%, white);
+  color: var(--unit-color, #4c72b0);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.toc-card .card-links a:hover {
+  background: var(--unit-color, #4c72b0);
+  color: #fff;
+}
+
+.unit-a { --unit-color: #4c72b0; }
+.unit-b { --unit-color: #dd8452; }
+.unit-c { --unit-color: #55a868; }
+.unit-d { --unit-color: #c44e52; }
+.unit-p { --unit-color: #8172b3; }
+.unit-start { --unit-color: #4d8ab5; }
+
