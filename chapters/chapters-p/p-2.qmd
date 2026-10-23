@@ -1,0 +1,2008 @@
+---
+execute-dir: project
+title: "Chapter P · Sections P.3–P.5"
+subtitle: "Random variables, binomial probabilities, and the normal distribution — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Section P.3 gives a random variable a **probability function** $p(x)$ — every
+value gets a probability between 0 and 1, and the probabilities **sum to 1** —
+from which the **mean** (expected value) and **standard deviation** follow by
+exactly weighted averaging,
+$$\mu=\sum x\cdot p(x)\qquad\text{and}\qquad\sigma^2=\sum(x-\mu)^2\cdot p(x).$$
+Section P.4 shortcuts one whole family of discrete random variables: when $n$
+trials are **fixed in advance**, **independent**, and each has the **same
+probability of success** $p$, the count of successes is **binomial** with
+$$P(X=k)=\binom{n}{k}p^k(1-p)^{n-k},\qquad \mu=np,\qquad \sigma=\sqrt{np(1-p)}.$$
+Section P.5 turns to **continuous** random variables, whose probabilities are
+**areas under a density curve** — total area 1 — and develops the most
+important density of all, the **normal curve** $N(\mu,\sigma)$: bell-shaped,
+centered at $\mu$, with 95% of the area within $\mu\pm2\sigma$. Any normal
+question becomes a standard-normal question through the z-score
+$z=(x-\mu)/\sigma$, and percentiles go back the other way via
+$x=\mu+z\,\sigma$. Below we compute every probability-function statistic
+exactly, every binomial probability with `scipy.stats.binom` (cross-checking
+the applied exercises with **100000-rep simulations, seed 2026**), and every
+normal area/endpoint with `scipy.stats.norm.cdf/ppf`, shading the relevant
+regions on density-curve figures throughout. The exercises are from
+*Statistics: Unlocking the Power of Data* (Lock⁵, 3rd ed., pp. 760–782): the
+P.3 applied set works household sizes, fruit-fly lifetimes, used-car sales,
+life insurance, ISP pricing, Benford's law, and a board-game die; the P.4
+set runs from factorials to airline overbooking; and the P.5 set moves from
+standard-normal areas to SAT scores, growth charts, GPA quartiles, bootstrap
+means, and grade curving. Every exercise here is computation-from-description, so no datasets
+are needed.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+from scipy import stats
+sns.set_theme(style="whitegrid")
+
+BLUE, RED, ORANGE = "#4c72b0", "#c44e52", "#dd8452"
+
+def pfun(values, probs, solve_at=None):
+    """Probability function as a Series; `solve_at` solves the missing '?' entry."""
+    p = list(probs)
+    if solve_at is not None:
+        p[solve_at] = 1 - sum(v for i, v in enumerate(p) if i != solve_at)
+    return pd.Series(p, index=list(values), name="p(x)").round(6)
+
+def disc_stats(values, probs):
+    """Exact mean, variance and standard deviation of a discrete random variable."""
+    x = np.asarray(values, float); p = np.asarray(probs, float)
+    mu = float((x * p).sum())
+    var = float(((x - mu) ** 2 * p).sum())
+    return pd.Series({"Mean": mu, "Variance": var,
+                      "Std. dev.": round(float(np.sqrt(var)), 4)})
+
+def pmf_bar(s, highlight=None, xlabel="x", figsize=(5, 2.5), title=None):
+    """Bar plot of a probability function; optionally highlight one value."""
+    fig, ax = plt.subplots(figsize=figsize)
+    colors = [RED if highlight is not None and v == highlight else BLUE
+              for v in s.index]
+    ax.bar([str(v) for v in s.index], s.values, color=colors)
+    ax.set_ylabel("p(x)"); ax.set_xlabel(xlabel)
+    if title:
+        ax.set_title(title, fontsize=10)
+    plt.tight_layout(); plt.show()
+
+def binom_tab(n, p):
+    """Full binomial probability function for k = 0..n."""
+    ks = np.arange(n + 1)
+    return pd.DataFrame({"p(k)": np.round(stats.binom.pmf(ks, n, p), 6)},
+                        index=ks, columns=["p(k)"]).rename_axis("k")
+
+def binom_sim(n, p, event, reps=100000, seed=2026):
+    """Fraction of `reps` simulated B(n, p) counts satisfying `event`."""
+    sims = np.random.default_rng(seed).binomial(n, p, reps)
+    return float(event(sims).mean())
+
+def _shade_axis(ax, mu, sigma, a, b):
+    """Draw N(mu, sigma) on ax with the region between a and b shaded
+    (None = open tail); return the shaded area."""
+    lo, hi = mu - 4.3 * sigma, mu + 4.3 * sigma
+    pts = [v for v in (a, b) if v is not None]
+    if pts:
+        lo = min(lo, min(pts) - 0.8 * sigma)
+        hi = max(hi, max(pts) + 0.8 * sigma)
+    x = np.linspace(lo, hi, 900)
+    y = stats.norm.pdf(x, mu, sigma)
+    ax.plot(x, y, color=BLUE, lw=2)
+    aa = lo if a is None else a
+    bb = hi if b is None else b
+    m = (x >= aa) & (x <= bb)
+    ax.fill_between(x[m], y[m], color=RED, alpha=0.6)
+    for v in pts:
+        ax.axvline(v, color="black", lw=1)
+    return float(stats.norm.cdf(b if b is not None else np.inf, mu, sigma)
+                 - stats.norm.cdf(a if a is not None else -np.inf, mu, sigma))
+
+def norm_shade(mu, sigma, a=None, b=None, figsize=(6, 2.3), xlabel=None,
+               title=None):
+    """Single normal density with the region between a and b shaded."""
+    fig, ax = plt.subplots(figsize=figsize)
+    area = _shade_axis(ax, mu, sigma, a, b)
+    ax.set_ylabel("Density")
+    ax.set_xlabel(xlabel if xlabel else
+                  (f"x   N({mu:g}, {sigma:g})" if mu else "z   N(0, 1)"))
+    if title:
+        ax.set_title(title, fontsize=10)
+    plt.tight_layout(); plt.show()
+    return area
+
+def norm_pair(mu, sigma, a=None, b=None, xlab=None, figsize=(7.5, 2.6)):
+    """Interval (a, b) on N(mu, sigma) beside the matching standardized
+    region on N(0, 1), as the conversion exercises request."""
+    za = None if a is None else (a - mu) / sigma
+    zb = None if b is None else (b - mu) / sigma
+    fig, axes = plt.subplots(1, 2, figsize=figsize)
+    area = _shade_axis(axes[0], mu, sigma, a, b)
+    _shade_axis(axes[1], 0, 1, za, zb)
+    axes[0].set_xlabel(xlab if xlab else f"x   N({mu:g}, {sigma:g})")
+    axes[1].set_xlabel("z   N(0, 1)")
+    for ax in axes:
+        ax.set_ylabel("Density")
+    plt.tight_layout(); plt.show()
+    return area
+
+def norm_row(mu, sigma, regions, titles, figsize=(10.5, 2.4)):
+    """Several shaded regions of the same normal curve, side by side."""
+    fig, axes = plt.subplots(1, len(regions), figsize=figsize)
+    areas = []
+    for ax, (a, b), t in zip(np.atleast_1d(axes), regions, titles):
+        areas.append(_shade_axis(ax, mu, sigma, a, b))
+        ax.set_title(t, fontsize=9)
+        ax.set_ylabel("Density")
+    plt.tight_layout(); plt.show()
+    return areas
+
+def p13_density(x):
+    """Reproduction of Figure P.13: small bump near 15, main peak near 24.5."""
+    return 0.22 * stats.norm.pdf(x, 15, 2.1) + 0.78 * stats.norm.pdf(x, 24.5, 3.0)
+
+def p13_shade(a=None, b=None, figsize=(6.5, 2.4)):
+    """Figure P.13 with the region between a and b shaded; returns its area."""
+    fig, ax = plt.subplots(figsize=figsize)
+    x = np.linspace(4, 36, 1200)
+    y = p13_density(x)
+    ax.plot(x, y, color=BLUE, lw=2)
+    m = np.ones_like(x, dtype=bool)
+    if a is not None:
+        m &= x >= a
+    if b is not None:
+        m &= x <= b
+    ax.fill_between(x[m], y[m], color=RED, alpha=0.6)
+    for v in (a, b):
+        if v is not None:
+            ax.axvline(v, color="black", lw=1)
+    ax.set_xlabel("x"); ax.set_ylabel("Density")
+    plt.tight_layout(); plt.show()
+    return float(np.trapezoid(y[m], x[m]))
+```
+
+::: {.panel-tabset}
+
+## Exercise P.63
+
+*(Skill Builder 1)* Draw 10 cards from a deck and count the number of hearts.
+
+**Discrete** — the number of hearts is a **count** out of the 10 cards
+(possible values 0, 1, …, 10).
+
+## Exercise P.64
+
+*(Skill Builder 1)* Draw 10 cards from a deck and find the proportion that
+are hearts.
+
+**Discrete** — the proportion is a count divided by 10, so it can only take
+the 11 values 0, 0.1, 0.2, …, 1.
+
+## Exercise P.65
+
+*(Skill Builder 1)* Deal cards one at a time from a deck, stopping when an
+ace first appears, and count the total number of cards dealt.
+
+**Discrete** — the total number of cards dealt is a **count** (possible
+values 1, 2, 3, …).
+
+## Exercise P.66
+
+*(Skill Builder 1)* Draw one M&M from a bag and observe whether it is blue,
+green, brown, orange, red, or yellow.
+
+**Not a random variable** — the outcome is a **color**, a category rather
+than a number, so there is no numeric value to assign a probability to.
+
+## Exercise P.67
+
+*(Skill Builder 1)* Observe the average weight, in pounds, of everything you
+catch during a day of fishing.
+
+**Continuous** — an average weight can be **any value in an interval**
+(weight is measured, not counted).
+
+## Exercise P.68
+
+*(Skill Builder 2)* Table P.10 gives a probability function for a random
+variable $X$ taking the values 1–4. Verify that it meets the conditions for
+being a probability function.
+
+```{python}
+#| echo: false
+t10 = pfun([1, 2, 3, 4], [0.4, 0.3, 0.2, 0.1])
+t10.to_string()
+```
+
+Every $p(x)$ is between 0 and 1, and the probabilities **sum to exactly 1**
+($0.4+0.3+0.2+0.1=1.0$) — both conditions hold, so Table P.10 is a valid
+probability function.
+
+## Exercise P.69
+
+*(Skill Builder 2)* Using Table P.10 ($p$: 0.4, 0.3, 0.2, 0.1 for
+$x=1,\dots,4$), find $P(X=3\text{ or }X=4)$.
+
+$$P(X=3\text{ or }X=4)=p(3)+p(4)=0.2+0.1=$$ **0.3**.
+
+## Exercise P.70
+
+*(Skill Builder 2)* Using Table P.10, find $P(X>1)$.
+
+$$P(X>1)=p(2)+p(3)+p(4)=0.3+0.2+0.1=$$ **0.6**.
+
+## Exercise P.71
+
+*(Skill Builder 2)* Using Table P.10, find $P(X<3)$.
+
+$$P(X<3)=p(1)+p(2)=0.4+0.3=$$ **0.7**.
+
+## Exercise P.72
+
+*(Skill Builder 2)* Using Table P.10, find $P(X\text{ is an odd number})$.
+
+$$P(\text{odd})=p(1)+p(3)=0.4+0.2=$$ **0.6**.
+
+## Exercise P.73
+
+*(Skill Builder 2)* Using Table P.10, find $P(X\text{ is an even number})$.
+
+$$P(\text{even})=p(2)+p(4)=0.3+0.1=$$ **0.4**.
+
+## Exercise P.74
+
+*(Skill Builder 3)* Fill in the ? to make $p(x)$ a probability function.
+
+```{python}
+#| echo: false
+pfun([1, 2, 3, 4], [0.1, 0.1, 0.2, None], solve_at=3).to_string()
+```
+
+The probabilities must sum to 1, so $p(4)=1-(0.1+0.1+0.2)=$ **0.6**.
+
+## Exercise P.75
+
+*(Skill Builder 3)* Fill in the ? to make $p(x)$ a probability function.
+
+```{python}
+#| echo: false
+pfun([10, 20, 30, 40], [0.2, 0.2, None, 0.2], solve_at=2).to_string()
+```
+
+$p(30)=1-(0.2+0.2+0.2)=$ **0.4**.
+
+## Exercise P.76
+
+*(Skill Builder 3)* Fill in the ? to make $p(x)$ a probability function, if
+possible.
+
+**Not possible.** The given probabilities already sum to $0.5+0.6=1.1>1$,
+and any nonnegative value for ? only makes the total larger — no choice of ?
+can make the probabilities sum to 1.
+
+## Exercise P.77
+
+*(Skill Builder 3)* Fill in the ? to make $p(x)$ a probability function, if
+possible.
+
+**Not a probability function.** The four given probabilities already sum to
+$0.3+0.3+0.3+0.3=1.2>1$ before the ? is even added — no value of ? can fix
+that (the book's answer agrees).
+
+## Exercise P.78
+
+*(Skill Builder 4)* Mean and standard deviation for the probability function
+$x=1,2,3$ with $p(x)=0.2,0.3,0.5$:
+
+```{python}
+#| echo: false
+disc_stats([1, 2, 3], [0.2, 0.3, 0.5]).to_string()
+```
+
+- **(a)** $\mu=\sum x\,p(x)=1(0.2)+2(0.3)+3(0.5)=$ **2.3**.
+- **(b)** $\sigma^2=\sum(x-\mu)^2p(x)=0.61$, so $\sigma=$ **0.781**.
+
+## Exercise P.79
+
+*(Skill Builder 4)* Mean and standard deviation for the probability function
+$x=10,20,30$ with $p(x)=0.7,0.2,0.1$:
+
+```{python}
+#| echo: false
+disc_stats([10, 20, 30], [0.7, 0.2, 0.1]).to_string()
+```
+
+- **(a)** $\mu=10(0.7)+20(0.2)+30(0.1)=$ **14**.
+- **(b)** $\sigma^2=\sum(x-\mu)^2p(x)=44$, so $\sigma\approx$ **6.633**
+  (book's answer: 6.63).
+
+## Exercise P.80
+
+*(Skill Builder 4)* Mean and standard deviation for the probability function
+$x=20,30,40,50$ with $p(x)=0.6,0.2,0.1,0.1$:
+
+```{python}
+#| echo: false
+disc_stats([20, 30, 40, 50], [0.6, 0.2, 0.1, 0.1]).to_string()
+```
+
+- **(a)** $\mu=20(0.6)+30(0.2)+40(0.1)+50(0.1)=$ **27**.
+- **(b)** $\sigma^2=\sum(x-\mu)^2p(x)=101$, so $\sigma\approx$ **10.05**.
+
+## Exercise P.81
+
+*(Skill Builder 4)* Mean and standard deviation for the probability function
+$x=10,12,14,16$ with $p(x)=0.25$ each:
+
+```{python}
+#| echo: false
+disc_stats([10, 12, 14, 16], [0.25, 0.25, 0.25, 0.25]).to_string()
+```
+
+- **(a)** $\mu=10(0.25)+12(0.25)+14(0.25)+16(0.25)=$ **13** — by symmetry,
+  the middle of the four equally likely values.
+- **(b)** $\sigma^2=\sum(x-\mu)^2p(x)=5$, so $\sigma\approx$ **2.236**
+  (book's answer: 2.236).
+
+## Exercise P.82
+
+**Owner-Occupied Household Size.** Table P.11 gives the probability function
+for the household size of an owner-occupied US housing unit:
+$p(x)=0.217, 0.363, 0.165, 0.145, 0.067, 0.026, 0.018$ for $x=1,\dots,7$.
+
+```{python}
+#| echo: false
+pown = np.array([0.217, 0.363, 0.165, 0.145, 0.067, 0.026, 0.018])
+hs_own = pfun(range(1, 8), pown)
+hs_own.to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: "Probability function for owner-occupied household size, with a 100000-rep simulation (seed 2026) of parts (b)-(d) for comparison"
+sim_own = np.random.default_rng(2026).choice(np.arange(1, 8), 100000,
+                                             p=pown / pown.sum())
+print(pd.DataFrame({"Exact": [round(pown[0] + pown[1], 3),
+                              round(pown[4:].sum(), 3),
+                              round(1 - pown[0], 3)],
+                    "Simulated": [round((sim_own <= 2).mean(), 4),
+                                  round((sim_own >= 5).mean(), 4),
+                                  round((sim_own > 1).mean(), 4)]},
+                   index=["(b) P(X <= 2)", "(c) P(X >= 5)",
+                          "(d) P(X > 1)"]).to_string())
+pmf_bar(hs_own, xlabel="Household size")
+```
+
+- **(a)** The probabilities sum to $0.217+0.363+\cdots+0.018=$ **1.001** —
+  equal to 1 up to round-off error in the published table (the simulation
+  normalizes to exactly 1).
+- **(b)** $P(X\le2)=0.217+0.363=$ **0.580** (simulation: 0.5814).
+- **(c)** $P(X\ge5)=0.067+0.026+0.018=$ **0.111** (simulation: 0.1108).
+- **(d)** $P(X>1)=1-p(1)=1-0.217=$ **0.783** (simulation: 0.7804) — most
+  owner-occupied units house more than one person.
+
+## Exercise P.83
+
+**Renter-Occupied Household Size.** Table P.12 gives the probability function
+for the household size of a renter-occupied US housing unit:
+$p(x)=0.362, 0.261, 0.153, 0.114, 0.061, 0.027, 0.022$ for $x=1,\dots,7$.
+
+```{python}
+#| echo: false
+prent = np.array([0.362, 0.261, 0.153, 0.114, 0.061, 0.027, 0.022])
+hs_rent = pfun(range(1, 8), prent)
+hs_rent.to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: "Probability function for renter-occupied household size, with a 100000-rep simulation (seed 2026) of parts (b)-(d) for comparison"
+sim_rent = np.random.default_rng(2026).choice(np.arange(1, 8), 100000,
+                                              p=prent / prent.sum())
+print(pd.DataFrame({"Exact": [round(prent[0] + prent[1], 3),
+                              round(prent[4:].sum(), 3),
+                              round(1 - prent[0], 3)],
+                    "Simulated": [round((sim_rent <= 2).mean(), 4),
+                                  round((sim_rent >= 5).mean(), 4),
+                                  round((sim_rent > 1).mean(), 4)]},
+                   index=["(b) P(X <= 2)", "(c) P(X >= 5)",
+                          "(d) P(X > 1)"]).to_string())
+pmf_bar(hs_rent, xlabel="Household size")
+```
+
+- **(a)** The probabilities sum to $0.362+0.261+\cdots+0.022=$ **1.000**.
+- **(b)** $P(X\le2)=0.362+0.261=$ **0.623** (simulation: 0.6247) — matching
+  the book's answer key.
+- **(c)** $P(X\ge5)=0.061+0.027+0.022=$ **0.110** (simulation: 0.1099).
+- **(d)** $P(X>1)=1-p(1)=1-0.362=$ **0.638** (simulation: 0.6354).
+
+## Exercise P.84
+
+**Average Household Size for Owner-Occupied Units.** Using Table P.11 in
+Exercise P.82 ($p(x)=0.217, 0.363, 0.165, 0.145, 0.067, 0.026, 0.018$ for
+$x=1,\dots,7$):
+
+```{python}
+#| echo: false
+pown = np.array([0.217, 0.363, 0.165, 0.145, 0.067, 0.026, 0.018])
+st_own = disc_stats(range(1, 8), pown)
+sim84 = np.random.default_rng(2026).choice(np.arange(1, 8), 100000,
+                                           p=pown / pown.sum())
+pd.Series({"(a) Mean": round(st_own["Mean"], 3),
+           "(b) Std. dev.": round(st_own["Std. dev."], 3),
+           "Simulated mean": round(sim84.mean(), 3),
+           "Simulated std. dev.": round(sim84.std(), 3)}).to_string()
+```
+
+- **(a)** $\mu=\sum x\,p(x)=1(0.217)+2(0.363)+\cdots+7(0.018)=$ **2.635
+  people** (simulation: 2.625).
+- **(b)** $\sigma^2=\sum(x-\mu)^2p(x)\approx2.031$, so $\sigma\approx$
+  **1.425 people** (simulation: 1.424).
+
+## Exercise P.85
+
+**Average Household Size for Renter-Occupied Units.** Using Table P.12 in
+Exercise P.83 ($p(x)=0.362, 0.261, 0.153, 0.114, 0.061, 0.027, 0.022$ for
+$x=1,\dots,7$):
+
+```{python}
+#| echo: false
+prent = np.array([0.362, 0.261, 0.153, 0.114, 0.061, 0.027, 0.022])
+st_rent = disc_stats(range(1, 8), prent)
+sim85 = np.random.default_rng(2026).choice(np.arange(1, 8), 100000,
+                                           p=prent / prent.sum())
+pd.Series({"(a) Mean": round(st_rent["Mean"], 3),
+           "(b) Std. dev.": round(st_rent["Std. dev."], 3),
+           "Simulated mean": round(sim85.mean(), 3),
+           "Simulated std. dev.": round(sim85.std(), 3)}).to_string()
+```
+
+- **(a)** $\mu=\sum x\,p(x)=1(0.362)+2(0.261)+\cdots+7(0.022)=$ **2.42
+  people** (simulation: 2.414) — matching the book's answer key.
+- **(b)** $\sigma^2=\sum(x-\mu)^2p(x)\approx2.326$, so $\sigma\approx$
+  **1.525 people** (simulation: 1.525) — also matching the key.
+
+## Exercise P.86
+
+**Fruit Fly Lifetimes.** The probability function in Table P.13 gives possible
+lifetimes (in months after emergence) for fruit flies, with one entry missing:
+$p(1)=0.30$, $p(2)=?$, $p(3)=0.20$, $p(4)=0.15$, $p(5)=0.10$, $p(6)=0.05$.
+
+```{python}
+#| echo: false
+fly = pfun([1, 2, 3, 4, 5, 6], [0.30, None, 0.20, 0.15, 0.10, 0.05], solve_at=1)
+fly.to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Fruit-fly lifetime probability function, second-month bar highlighted
+pmf_bar(fly, highlight=2, xlabel="Lifetime (months)")
+disc_stats(fly.index, fly.values).to_string()
+```
+
+- **(a)** The probabilities must sum to 1, so
+  $p(2)=1-(0.30+0.20+0.15+0.10+0.05)=$ **0.20** — **20% of fruit flies die in
+  their second month**.
+- **(b)** $P(X>4)=p(5)+p(6)=0.10+0.05=$ **0.15**.
+- **(c)** $\mu=\sum x\,p(x)=1(0.30)+2(0.20)+\cdots+6(0.05)=$ **2.7 months**.
+- **(d)** $\sigma^2=\sum(x-\mu)^2p(x)=2.31$, so $\sigma=$ **1.52 months**.
+
+## Exercise P.87
+
+**Used Car Sales.** A dealership's probability function for cars sold in a
+day: $p(0)=0.29$, $p(1)=0.30$, $p(2)=0.20$, $p(3)=0.17$, $p(4)=?$.
+
+```{python}
+#| echo: false
+cars = pfun([0, 1, 2, 3, 4], [0.29, 0.30, 0.20, 0.17, None], solve_at=4)
+cars.to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Probability function for daily used-car sales
+pmf_bar(cars, xlabel="Cars sold in a day")
+disc_stats(cars.index, cars.values).to_string()
+```
+
+- **(a)** $p(4)=1-(0.29+0.30+0.20+0.17)=$ **0.04**.
+- **(b)** $P(X<2)=p(0)+p(1)=0.29+0.30=$ **0.59**.
+- **(c)** $\mu=\sum x\,p(x)=$ **1.37 cars**.
+- **(d)** $\sigma^2=\sum(x-\mu)^2p(x)=1.3931$, so $\sigma=$ **1.180 cars**.
+
+## Exercise P.88
+
+**More Fruit Fly Lifetimes.** Using Table P.13 ($p$: 0.30, 0.20, 0.20, 0.15,
+0.10, 0.05 for $x=1,\dots,6$):
+
+- **(a)** "Died before the end of its second month" means $X\le2$, which has
+  probability $0.30+0.20=0.50$. So
+  $$P(X=1\mid X\le2)=\frac{p(1)}{p(1)+p(2)}=\frac{0.30}{0.50}=$$ **0.60**.
+- **(b)** "Makes it past its second month" means $X>2$ (probability
+  $0.20+0.15+0.10+0.05=0.50$), so
+  $$P(X>4\mid X>2)=\frac{p(5)+p(6)}{P(X>2)}=\frac{0.15}{0.50}=$$ **0.30**.
+
+## Exercise P.89
+
+**More Used Car Sales.** Probability the dealership sells **no cars on three
+consecutive days**, daily sales independent: $0.29^3$.
+
+```{python}
+#| echo: false
+pd.Series({"Exact 0.29^3": round(0.29 ** 3, 5),
+           "Simulated (100000 reps, seed 2026)":
+               round(binom_sim(3, 0.29, lambda x: x == 3), 4)}).to_string()
+```
+
+$$P(\text{no sales three days running})=0.29^3=$$ **0.0244** — the
+simulation agrees (2.4% of simulated three-day stretches had zero sales every
+day).
+
+## Exercise P.90
+
+**Stephen Curry's Free Throws.** Curry made 90.8% of free throws in 2015–16;
+assume each attempt is an independent success with $p=0.908$. Let $X$ be the
+number made in **two** attempts, so $X\sim B(2,\ 0.908)$.
+
+```{python}
+#| echo: false
+curry2 = binom_tab(2, 0.908)
+curry2.to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Probability function for free throws made in two attempts
+pmf_bar(pd.Series(curry2["p(k)"]), xlabel="Free throws made (of 2)")
+```
+
+- **(a)** The probability function is binomial, $B(2, 0.908)$:
+  $p(0)=(0.092)^2=$ **0.0085**, $p(1)=2(0.908)(0.092)=$ **0.1671**, and
+  $p(2)=(0.908)^2=$ **0.8245**.
+- **(b)** $\mu=np=2(0.908)=$ **1.816** free throws.
+
+## Exercise P.91
+
+**Life Insurance.** A non-profit sells five-year contracts to women on their
+60th birthday: yearly fee $c$, and a $\$100{,}000$ payment to the family if
+the holder dies within the five years (fees then stop). Death probabilities
+for ages 60–64: 0.00648, 0.00700, 0.00760, 0.00829, 0.00908.
+
+```{python}
+#| echo: false
+pdeath = [0.00648, 0.00700, 0.00760, 0.00829, 0.00908]
+psurv = 1 - sum(pdeath)
+ins = pd.DataFrame({
+    "Outcome": [f"Dies at {a}" for a in range(60, 65)] + ["Survives 5 years"],
+    "Profit X": [f"{k+1}c - 100000" for k in range(5)] + ["5c"],
+    "Probability": pdeath + [round(psurv, 5)]})
+ins.to_string(index=False)
+```
+
+```{python}
+#| echo: false
+fees = np.arange(1, 6)
+emu = sum((k + 1) * p for k, p in enumerate(pdeath)) + 5 * psurv
+c_be = 100000 * sum(pdeath) / emu
+pd.Series({"Expected fees collected": round(emu, 5),
+           "Expected payout": 100000 * sum(pdeath),
+           "(b) Mean of X": f"{emu:.4f}c - {100000 * sum(pdeath):.0f}",
+           "(c) Break-even fee c": round(c_be, 2)}).to_string()
+```
+
+- **(a)** A holder who dies at age $60+k$ has paid $k+1$ yearly fees (fees are
+  paid at the start of each year) before the $\$100{,}000$ payout, so $X$
+  takes values $(k+1)c-100{,}000$ with the death probabilities, and $5c$ with
+  probability $1-0.03845=0.96155$ (table above).
+- **(b)** Expected fees are
+  $c\,[5(0.96155)+1(0.00648)+2(0.00700)+3(0.00760)+4(0.00829)+5(0.00908)] =
+  4.9296\,c$, and the expected payout is $100{,}000(0.03845)=\$3845$, so
+  $$\mu= \textbf{4.9296}\,c - \textbf{3845}\ \text{dollars}.$$
+- **(c)** Break-even means $\mu=0$: $c=3845/4.9296\approx$ **\$779.98 per
+  year**.
+
+## Exercise P.92
+
+**Internet Pricing.** An ISP sells Ultra at $\$39.95$, Premium at $\$29.95$
+(twice as many customers), and Basic at $\$23.95$ (three times as many). So
+the customer mix is $1:2:3$ and $P(\text{Ultra})=1/6$,
+$P(\text{Premium})=2/6$, $P(\text{Basic})=3/6$.
+
+```{python}
+#| echo: false
+isp = pfun([23.95, 29.95, 39.95], [3/6, 2/6, 1/6])
+isp.rename(index={23.95: "Basic $23.95", 29.95: "Premium $29.95",
+                  39.95: "Ultra $39.95"}).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Probability function of the monthly fee paid by a random customer
+pmf_bar(isp, xlabel="Monthly fee ($)")
+disc_stats(isp.index, isp.values).to_string()
+```
+
+- **(a)** The probability function is $P(X=23.95)=0.5$, $P(X=29.95)=1/3$,
+  $P(X=39.95)=1/6$ (table above).
+- **(b)** $\mu=0.5(23.95)+\frac13(29.95)+\frac16(39.95)\approx$ **\$28.62**
+  per month — the average revenue per customer.
+- **(c)** $\sigma^2=\sum(x-\mu)^2p(x)\approx32.89$, so $\sigma\approx$
+  **\$5.73**.
+
+## Exercise P.93
+
+**Benford's Law.** For the leading digit $X$ of a street address,
+$P(X=k)=\log_{10}(1+1/k)$ for $k=1,\dots,9$.
+
+```{python}
+#| echo: false
+ben = pfun(range(1, 10), [np.log10(1 + 1 / k) for k in range(1, 10)])
+ben.round(4).to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: Benford's-law probability function for leading digits
+pmf_bar(ben, xlabel="Leading digit")
+```
+
+- **(a)** $p(1)=\log_{10}(2)=$ **0.301** and $p(9)=\log_{10}(10/9)\approx$
+  **0.046** — a leading 1 is about $6.6$ times as likely as a leading 9.
+- **(b)** $P(X>2)=1-\log_{10}(2)-\log_{10}(1.5)\approx$ **0.523** — more than
+  half of all street addresses start with a digit bigger than 2.
+
+## Exercise P.94
+
+**Getting to the Finish.** A player rolls a fair die until the exact needed
+value appears; the number of turns $X$ has the geometric probability function
+$P(X=k)=p(1-p)^{k-1}$ with $p=1/6$.
+
+- **(a)** Finishing on the third turn:
+  $$P(X=3)=\frac16\Bigl(\frac56\Bigr)^{2}=\frac{25}{216}\approx$$ **0.1157**.
+- **(b)** Taking **more than** three turns means the first three rolls all
+  fail: $$P(X>3)=\Bigl(\frac56\Bigr)^{3}=\frac{125}{216}\approx$$ **0.5787**.
+
+## Exercise P.95
+
+*(Skill Builder 1)* Count the number of sixes in 10 dice rolls.
+
+**Binomial** — $n=10$ fixed rolls, independent, with constant
+$p=P(\text{six})=1/6$ on every roll.
+
+## Exercise P.96
+
+*(Skill Builder 1)* Roll a die until you get 5 sixes and count the number of
+rolls required.
+
+**Not binomial** — the number of trials $n$ is **not fixed in advance** (it
+depends on how long the sixes take to arrive).
+
+## Exercise P.97
+
+*(Skill Builder 1)* Sample 50 students who have taken Intro Stats and record
+the final grade for each.
+
+**Not binomial** — a final grade is not a **success/failure** outcome
+(there are many possible grades, not two), so there is nothing to "count"
+as successes.
+
+## Exercise P.98
+
+*(Skill Builder 1)* 30% of students at a large university take Intro Stats.
+Randomly sample 75 students and count the number who have taken it.
+
+**Binomial** — $n=75$ and $p=0.30$ (the population is large, so trials are
+essentially independent).
+
+## Exercise P.99
+
+*(Skill Builder 1)* Worldwide, about 0.51 of babies are boys. Randomly sample
+100 babies born and count the number of boys.
+
+**Binomial** — $n=100$ and $p=0.51$ (births are independent and the
+population of babies is effectively unlimited).
+
+## Exercise P.100
+
+*(Skill Builder 2)* $4!$
+
+$$4!=4\times3\times2\times1=\textbf{24}$$
+
+## Exercise P.101
+
+*(Skill Builder 2)* $7!$
+
+$$7!=7\times6\times5\times4\times3\times2\times1=\textbf{5040}$$
+
+## Exercise P.102
+
+*(Skill Builder 2)* $8!$
+
+$$8!=8\times7!=\textbf{40320}$$
+
+## Exercise P.103
+
+*(Skill Builder 2)* $6!$
+
+$$6!=6\times5\times4\times3\times2\times1=\textbf{720}$$
+
+## Exercise P.104
+
+*(Skill Builder 2)* $\binom{8}{3}$
+
+$$\binom{8}{3}=\frac{8!}{3!\,5!}=\frac{8\times7\times6}{3\times2\times1}=\textbf{56}$$
+
+## Exercise P.105
+
+*(Skill Builder 2)* $\binom{5}{2}$
+
+$$\binom{5}{2}=\frac{5!}{2!\,3!}=\frac{5\times4}{2}=\textbf{10}$$
+
+## Exercise P.106
+
+*(Skill Builder 2)* $\binom{10}{8}$
+
+$$\binom{10}{8}=\binom{10}{2}=\frac{10\times9}{2}=\textbf{45}$$
+
+## Exercise P.107
+
+*(Skill Builder 2)* $\binom{6}{5}$
+
+$$\binom{6}{5}=\binom{6}{1}=\textbf{6}$$
+
+## Exercise P.108
+
+*(Skill Builder 3)* Find $P(X=2)$ if $X\sim B(6,\ 0.3)$.
+
+```{python}
+#| echo: false
+pd.Series({"P(X = 2)": round(stats.binom.pmf(2, 6, 0.3), 5)}).to_string()
+```
+
+$$P(X=2)=\binom{6}{2}(0.3)^2(0.7)^4=15(0.09)(0.2401)\approx$$ **0.3241**
+
+## Exercise P.109
+
+*(Skill Builder 3)* Find $P(X=7)$ if $X\sim B(8,\ 0.9)$.
+
+```{python}
+#| echo: false
+pd.Series({"P(X = 7)": round(stats.binom.pmf(7, 8, 0.9), 5)}).to_string()
+```
+
+$$P(X=7)=\binom{8}{7}(0.9)^7(0.1)^1=8(0.4783)(0.1)\approx$$ **0.3826**
+
+## Exercise P.110
+
+*(Skill Builder 3)* Find $P(X=3)$ if $X\sim B(10,\ 0.4)$.
+
+```{python}
+#| echo: false
+pd.Series({"P(X = 3)": round(stats.binom.pmf(3, 10, 0.4), 5)}).to_string()
+```
+
+$$P(X=3)=\binom{10}{3}(0.4)^3(0.6)^7=120(0.064)(0.02799)\approx$$ **0.2150**
+
+## Exercise P.111
+
+*(Skill Builder 3)* Find $P(X=8)$ if $X\sim B(12,\ 0.75)$.
+
+```{python}
+#| echo: false
+pd.Series({"P(X = 8)": round(stats.binom.pmf(8, 12, 0.75), 5)}).to_string()
+```
+
+$$P(X=8)=\binom{12}{8}(0.75)^8(0.25)^4=495(0.10011)(0.003906)\approx$$
+**0.1936**
+
+## Exercise P.112
+
+*(Skill Builder 4)* Binomial with $n=6$, $p=0.4$.
+
+```{python}
+#| echo: false
+pd.Series({"Mean np": 6 * 0.4,
+           "Std. dev. sqrt(np(1-p))": round(float(np.sqrt(6 * 0.4 * 0.6)), 4)}).to_string()
+```
+
+$\mu=np=6(0.4)=$ **2.4** and $\sigma=\sqrt{6(0.4)(0.6)}=\sqrt{1.44}=$
+**1.2**.
+
+## Exercise P.113
+
+*(Skill Builder 4)* Binomial with $n=10$, $p=0.8$.
+
+```{python}
+#| echo: false
+pd.Series({"Mean np": 10 * 0.8,
+           "Std. dev. sqrt(np(1-p))": round(float(np.sqrt(10 * 0.8 * 0.2)), 4)}).to_string()
+```
+
+$\mu=10(0.8)=$ **8** and $\sigma=\sqrt{10(0.8)(0.2)}=\sqrt{1.6}\approx$
+**1.265**.
+
+## Exercise P.114
+
+*(Skill Builder 4)* Binomial with $n=30$, $p=0.5$.
+
+```{python}
+#| echo: false
+pd.Series({"Mean np": 30 * 0.5,
+           "Std. dev. sqrt(np(1-p))": round(float(np.sqrt(30 * 0.5 * 0.5)), 4)}).to_string()
+```
+
+$\mu=30(0.5)=$ **15** and $\sigma=\sqrt{30(0.5)(0.5)}=\sqrt{7.5}\approx$
+**2.739**.
+
+## Exercise P.115
+
+*(Skill Builder 4)* Binomial with $n=800$, $p=0.25$.
+
+```{python}
+#| echo: false
+pd.Series({"Mean np": 800 * 0.25,
+           "Std. dev. sqrt(np(1-p))": round(float(np.sqrt(800 * 0.25 * 0.75)), 4)}).to_string()
+```
+
+$\mu=800(0.25)=$ **200** and $\sigma=\sqrt{800(0.25)(0.75)}=\sqrt{150}\approx$
+**12.25**.
+
+## Exercise P.116
+
+**Boys or Girls?** The proportion of babies who are girls is about 0.49. For
+three independent children, $X=$ number of girls $\sim B(3,\ 0.49)$.
+
+```{python}
+#| echo: false
+girls = binom_tab(3, 0.49)
+girls.to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: "Probability function for the number of girls in three children, with simulated proportions (100000 reps, seed 2026) for comparison"
+print(pd.DataFrame({"Exact p(k)": girls["p(k)"].round(4),
+                    "Simulated": [round(binom_sim(3, 0.49, lambda x, k=k: x == k), 4)
+                                  for k in range(4)]}).to_string())
+pmf_bar(pd.Series(girls["p(k)"]), xlabel="Number of girls (of 3)")
+```
+
+$$p(k)=\binom{3}{k}(0.49)^k(0.51)^{3-k}:\quad
+p(0)=0.1327,\ p(1)=0.3823,\ p(2)=0.3674,\ p(3)=0.1176$$ — the simulation
+reproduces all four probabilities to within Monte-Carlo error.
+
+## Exercise P.117
+
+**Class Year.** Undergraduates are equally divided across the four class
+years. For four randomly selected students, $X=$ number of seniors
+$\sim B(4,\ 0.25)$.
+
+```{python}
+#| echo: false
+seniors = binom_tab(4, 0.25)
+seniors.to_string()
+```
+
+```{python}
+#| echo: false
+#| fig-cap: "Probability function for the number of seniors in four students, with simulated proportions (100000 reps, seed 2026) for comparison"
+print(pd.DataFrame({"Exact p(k)": seniors["p(k)"].round(4),
+                    "Simulated": [round(binom_sim(4, 0.25, lambda x, k=k: x == k), 4)
+                                  for k in range(5)]}).to_string())
+pmf_bar(pd.Series(seniors["p(k)"]), xlabel="Number of seniors (of 4)")
+```
+
+$$p(k)=\binom{4}{k}(0.25)^k(0.75)^{4-k}:\quad
+p(0)=0.316,\ p(1)=0.422,\ p(2)=0.211,\ p(3)=0.047,\ p(4)=0.004$$
+
+## Exercise P.118
+
+**College Graduates.** 27.5% of US adults have graduated from college. In a
+random sample of 12 US adults, probability exactly 6 are college graduates?
+Here $X\sim B(12,\ 0.275)$.
+
+```{python}
+#| echo: false
+pd.Series({"Exact binomial": round(stats.binom.pmf(6, 12, 0.275), 5),
+           "Simulated (100000 reps, seed 2026)":
+               round(binom_sim(12, 0.275, lambda x: x == 6), 4)}).to_string()
+```
+
+$$P(X=6)=\binom{12}{6}(0.275)^6(0.725)^6\approx$$ **0.0580** — the
+simulation agrees (5.8%).
+
+## Exercise P.119
+
+**Senior Citizens.** 13% of US people are 65 or older. In a random sample of
+10 people ($X\sim B(10,\ 0.13)$), probability that exactly 3 are 65+?
+Exactly 4?
+
+```{python}
+#| echo: false
+pd.DataFrame({"Exact binomial": [round(stats.binom.pmf(3, 10, 0.13), 5),
+                                 round(stats.binom.pmf(4, 10, 0.13), 5)],
+              "Simulated (100000 reps, seed 2026)":
+                  [round(binom_sim(10, 0.13, lambda x: x == 3), 4),
+                   round(binom_sim(10, 0.13, lambda x: x == 4), 4)]},
+             index=["P(X = 3)", "P(X = 4)"]).to_string()
+```
+
+$$P(X=3)=\binom{10}{3}(0.13)^3(0.87)^7\approx\textbf{0.0995},\qquad
+P(X=4)=\binom{10}{4}(0.13)^4(0.87)^6\approx\textbf{0.0260}$$ — both match the
+simulation.
+
+## Exercise P.120
+
+**Owner-Occupied Housing Units.** 65% of US housing units are owner-occupied.
+For a random sample of 20 units ($X\sim B(20,\ 0.65)$):
+
+```{python}
+#| echo: false
+pd.DataFrame({"Exact binomial": [round(stats.binom.pmf(15, 20, 0.65), 5),
+                                 round(stats.binom.sf(17, 20, 0.65), 5)],
+              "Simulated (100000 reps, seed 2026)":
+                  [round(binom_sim(20, 0.65, lambda x: x == 15), 4),
+                   round(binom_sim(20, 0.65, lambda x: x >= 18), 4)]},
+             index=["(a) P(X = 15)", "(b) P(X >= 18)"]).to_string()
+```
+
+```{python}
+#| echo: false
+pd.Series({"P(X = 18)": round(stats.binom.pmf(18, 20, 0.65), 5),
+           "P(X = 19)": round(stats.binom.pmf(19, 20, 0.65), 5),
+           "P(X = 20)": round(stats.binom.pmf(20, 20, 0.65), 5)}).to_string()
+```
+
+- **(a)** $P(X=15)=\binom{20}{15}(0.65)^{15}(0.35)^5\approx$ **0.1272**
+  (simulation: 0.1289).
+- **(b)** $P(X\ge18)=p(18)+p(19)+p(20)=0.00998+0.00195+0.00018\approx$
+  **0.0121** (simulation: 0.0125) — an all-but-all-owner sample would be
+  quite unusual.
+
+## Exercise P.121
+
+**Mean and Standard Deviation of Boys or Girls.** For the number of girls in
+three babies, $X\sim B(3,\ 0.49)$.
+
+```{python}
+#| echo: false
+pd.Series({"Mean np": 3 * 0.49,
+           "Std. dev. sqrt(np(1-p))": round(float(np.sqrt(3 * 0.49 * 0.51)), 4)}).to_string()
+```
+
+$\mu=3(0.49)=$ **1.47** and $\sigma=\sqrt{3(0.49)(0.51)}=\sqrt{0.7497}\approx$
+**0.866**.
+
+## Exercise P.122
+
+**Mean and Standard Deviation of Class Year.** For the number of seniors in a
+sample of four students, $X\sim B(4,\ 0.25)$.
+
+```{python}
+#| echo: false
+pd.Series({"Mean np": 4 * 0.25,
+           "Std. dev. sqrt(np(1-p))": round(float(np.sqrt(4 * 0.25 * 0.75)), 4)}).to_string()
+```
+
+$\mu=4(0.25)=$ **1** and $\sigma=\sqrt{4(0.25)(0.75)}=\sqrt{0.75}\approx$
+**0.866**.
+
+## Exercise P.123
+
+**Mean and Standard Deviation of College Graduates.** For the number of
+college graduates in a sample of 12 adults, $X\sim B(12,\ 0.275)$.
+
+```{python}
+#| echo: false
+pd.Series({"Mean np": 12 * 0.275,
+           "Std. dev. sqrt(np(1-p))": round(float(np.sqrt(12 * 0.275 * 0.725)), 4)}).to_string()
+```
+
+$\mu=12(0.275)=$ **3.3** and $\sigma=\sqrt{12(0.275)(0.725)}=\sqrt{2.3925}\approx$
+**1.55**.
+
+## Exercise P.124
+
+**Mean and Standard Deviation of Senior Citizens.** For the number aged 65+
+in a sample of 10 people, $X\sim B(10,\ 0.13)$.
+
+```{python}
+#| echo: false
+pd.Series({"Mean np": 10 * 0.13,
+           "Std. dev. sqrt(np(1-p))": round(float(np.sqrt(10 * 0.13 * 0.87)), 4)}).to_string()
+```
+
+$\mu=10(0.13)=$ **1.3** and $\sigma=\sqrt{10(0.13)(0.87)}=\sqrt{1.131}\approx$
+**1.063**.
+
+## Exercise P.125
+
+**Mean and Standard Deviation of Owner-Occupied Housing Units.** For the
+number of owner-occupied units in a sample of 20, $X\sim B(20,\ 0.65)$.
+
+```{python}
+#| echo: false
+pd.Series({"Mean np": 20 * 0.65,
+           "Std. dev. sqrt(np(1-p))": round(float(np.sqrt(20 * 0.65 * 0.35)), 4)}).to_string()
+```
+
+$\mu=20(0.65)=$ **13.0** and $\sigma=\sqrt{20(0.65)(0.35)}=\sqrt{4.55}\approx$
+**2.13**.
+
+## Exercise P.126
+
+**Stephen Curry's Free Throws.** With $p=0.908$ and independent attempts, the
+number made is binomial.
+
+```{python}
+#| echo: false
+pd.DataFrame({
+    "Exact binomial": [round(stats.binom.sf(6, 8, 0.908), 5),
+                       round(stats.binom.sf(69, 80, 0.908), 5)],
+    "Simulated (100000 reps, seed 2026)":
+        [round(binom_sim(8, 0.908, lambda x: x >= 7), 4),
+         round(binom_sim(80, 0.908, lambda x: x >= 70), 4)]},
+    index=["(a) P(X >= 7), n = 8", "(b) P(X >= 70), n = 80"]).to_string()
+```
+
+```{python}
+#| echo: false
+pd.DataFrame({"Mean np": [8 * 0.908, 80 * 0.908],
+              "Std. dev. sqrt(np(1-p))":
+                  [round(float(np.sqrt(8 * 0.908 * 0.092)), 4),
+                   round(float(np.sqrt(80 * 0.908 * 0.092)), 4)]},
+             index=["(c) Game: n = 8", "(d) Playoffs: n = 80"]).to_string()
+```
+
+- **(a)** $P(X\ge7)=p(7)+p(8)$ for $B(8, 0.908)\approx$ **0.8366**
+  (simulation: 0.8385) — Curry is very likely to make at least 7 of 8.
+- **(b)** $P(X\ge70)$ for $B(80, 0.908)\approx$ **0.8845** (simulation:
+  0.8849).
+- **(c)** $\mu=8(0.908)=$ **7.264**, $\sigma=\sqrt{8(0.908)(0.092)}\approx$
+  **0.817**.
+- **(d)** $\mu=80(0.908)=$ **72.64**, $\sigma=\sqrt{80(0.908)(0.092)}\approx$
+  **2.585**. Note the mean scales with $n$ while the *proportion*
+  $7.264/8=72.64/80=0.908$ stays fixed — only the spread (in counts) grows.
+
+## Exercise P.127
+
+**Airline Overbooking.** A 30-seat jet sells 32 tickets; each ticketed
+passenger shows up independently with probability $0.90$ (10% no-show). The
+number who show up is $X\sim B(32,\ 0.90)$.
+
+```{python}
+#| echo: false
+pd.Series({"(a) Mean np": 32 * 0.90,
+           "P(X = 31)": round(stats.binom.pmf(31, 32, 0.9), 5),
+           "P(X = 32)": round(stats.binom.pmf(32, 32, 0.9), 5),
+           "(b) P(X <= 30) exact": round(stats.binom.cdf(30, 32, 0.9), 5),
+           "(b) Simulated (100000 reps, seed 2026)":
+               round(binom_sim(32, 0.90, lambda x: x <= 30), 4)}).to_string()
+```
+
+- **(a)** On average $\mu=32(0.90)=$ **28.8** passengers board each flight.
+- **(b)** There are enough seats unless 31 or 32 passengers show up:
+  $$P(X\le30)=1-\bigl[p(31)+p(32)\bigr]=1-(0.1222+0.0343)\approx$$ **0.8436**
+  (simulation: 0.8415) — about **84% of flights** have room for everyone who
+  shows; the other ~16% need volunteers or rebooking.
+
+## Exercise P.128
+
+**Mean and Standard Deviation of a Proportion.** If $X\sim B(n, p)$ counts
+successes, the sample proportion is $\hat p=X/n$.
+
+**Mean:** linearity of expectation gives
+$$\mu_{\hat p}=E\!\left[\frac{X}{n}\right]=\frac{1}{n}E[X]=\frac{np}{n}=p.$$
+
+**Standard deviation:** constants pull out of a square root as their absolute
+value, so
+$$\sigma_{\hat p}=\sqrt{\operatorname{Var}\!\left(\frac{X}{n}\right)}
+=\frac{1}{n}\sqrt{np(1-p)}=\sqrt{\frac{np(1-p)}{n^2}}
+=\boxed{\sqrt{\frac{p(1-p)}{n}}}.$$
+
+So a proportion is centered at the true $p$ with standard error
+$\sqrt{p(1-p)/n}$ — the same formulas used for inference on a proportion
+later in the book.
+
+## Exercise P.129
+
+*(Skill Builder 1, Figure P.13)* The percentage of the population that is
+**less than 25** is closest to: 10%, 28%, 50%, 62%, 95%.
+
+```{python}
+#| echo: false
+#| fig-cap: Reproduction of Figure P.13 with the region below 25 shaded
+a129 = p13_shade(None, 25)
+```
+
+```{python}
+#| echo: false
+pd.Series({"Area below 25 (our reproduction)": round(a129, 3)}).to_string()
+```
+
+**62%.** The main peak of this bimodal density sits just above 25 with a
+smaller bump around 15, so the area left of 25 is a bit more than half of the
+main peak plus the small bump — clearly more than 50% but far from 95%. Our
+reproduction of the curve puts the area at about 0.66, and among the five
+options **62%** is easily the closest.
+
+## Exercise P.130
+
+*(Skill Builder 1, Figure P.13)* The percentage of the population that is
+**more than 30** is closest to: 4%, 27%, 50%, 73%, 95%.
+
+```{python}
+#| echo: false
+#| fig-cap: Reproduction of Figure P.13 with the region above 30 shaded
+a130 = p13_shade(30, None)
+pd.Series({"Area above 30 (our reproduction)": round(a130, 3)}).to_string()
+```
+
+**4%.** The curve has nearly died out by 30 — only the thin right tail of the
+main peak lies beyond it. Our reproduction measures the tail at about 0.03,
+and the closest option is **4%** (27% and above would require a huge tail
+that simply is not there).
+
+## Exercise P.131
+
+*(Skill Builder 1, Figure P.13)* The percentage of the population that is
+**between 10 and 30** is closest to: 3%, 33%, 50%, 67%, 95%.
+
+```{python}
+#| echo: false
+#| fig-cap: Reproduction of Figure P.13 with the region between 10 and 30 shaded
+a131 = p13_shade(10, 30)
+pd.Series({"Area between 10 and 30 (our reproduction)": round(a131, 3)}).to_string()
+```
+
+**95%.** Almost the entire curve lives between 10 and 30: only tiny tails
+stick out below 10 and above 30. Our reproduction measures the area at about
+0.97, so **95%** is clearly the best choice (33%, 50%, and 67% would leave
+far too much area unaccounted for).
+
+## Exercise P.132
+
+*(Skill Builder 2, Figure P.14)* Two of the curves below are valid density
+curves and one is not. Identify the one that is not a density and say why.
+
+```{python}
+#| echo: false
+#| fig-cap: Reproduction of Figure P.14 — two density curves and one that isn't
+fig, ax = plt.subplots(figsize=(7.5, 2.8))
+xa = np.linspace(-2.3, -0.1, 400)
+ax.plot(xa, stats.norm.pdf(xa, -1.2, 0.266), color=BLUE, lw=2)
+xb = np.linspace(0, 7, 500)
+ax.plot(xb, 0.54 * stats.norm.pdf(xb, 0.9, 0.75)
+        + 0.46 * stats.norm.pdf(xb, 3.2, 1.2), color=BLUE, lw=2)
+xc = np.linspace(7.3, 13.9, 400)
+ax.plot(xc, 3.6 * stats.norm.pdf(xc, 10.6, 0.9), color=BLUE, lw=2)
+ax.text(-1.2, 1.53, "(a)", ha="center", fontsize=10)
+ax.text(2.2, 0.42, "(b)", ha="center", fontsize=10)
+ax.text(10.6, 1.63, "(c)", ha="center", fontsize=10)
+ax.set_ylim(0, 1.75)
+ax.set_ylabel("Density")
+plt.tight_layout(); plt.show()
+```
+
+**Curve (c) is not a density curve.** A density must have **total area 1**,
+but (c) is both tall (peak ≈ 1.6) *and* wide (spanning roughly 6 units, from
+about 7.5 to 13.5); its area is roughly $1.6\times6\times0.5\approx 4\text{–}5$,
+far more than 1. By contrast, curve (a) is tall but very narrow (a peak of
+1.5 can only span about 2 units and still enclose area 1), and the low,
+bumpy curve (b) averages just the right height (~0.2 over 5 units) to enclose
+area 1 — both are legitimate densities.
+
+## Exercise P.133
+
+*(Skill Builder 3)* Specified areas for a $N(0, 1)$ density:
+
+```{python}
+#| echo: false
+#| fig-cap: Standard normal areas for P.133 — (a) below 1.04, (b) above -1.5, (c) between 1 and 2
+a133 = norm_row(0, 1, [(None, 1.04), (-1.5, None), (1, 2)],
+                ["(a) below z = 1.04", "(b) above z = -1.5",
+                 "(c) between 1 and 2"])
+pd.Series({"(a) below 1.04": round(a133[0], 4),
+           "(b) above -1.5": round(a133[1], 4),
+           "(c) between 1 and 2": round(a133[2], 4)}).to_string()
+```
+
+- **(a)** $\Phi(1.04)\approx$ **0.8508**
+- **(b)** $1-\Phi(-1.5)=\Phi(1.5)\approx$ **0.9332**
+- **(c)** $\Phi(2)-\Phi(1)\approx0.9772-0.8413=$ **0.1359**
+
+## Exercise P.134
+
+*(Skill Builder 3)* Specified areas for a $N(0, 1)$ density:
+
+```{python}
+#| echo: false
+#| fig-cap: Standard normal areas for P.134 — (a) below 0.8, (b) above 1.2, (c) between -1.75 and -1.25
+a134 = norm_row(0, 1, [(None, 0.8), (1.2, None), (-1.75, -1.25)],
+                ["(a) below z = 0.8", "(b) above z = 1.2",
+                 "(c) between -1.75 and -1.25"])
+pd.Series({"(a) below 0.8": round(a134[0], 4),
+           "(b) above 1.2": round(a134[1], 4),
+           "(c) between -1.75 and -1.25": round(a134[2], 4)}).to_string()
+```
+
+- **(a)** $\Phi(0.8)\approx$ **0.7881**
+- **(b)** $1-\Phi(1.2)\approx$ **0.1151**
+- **(c)** $\Phi(-1.25)-\Phi(-1.75)\approx0.1056-0.0401=$ **0.0656**
+
+## Exercise P.135
+
+*(Skill Builder 3)* Specified areas for a $N(0, 1)$ density:
+
+```{python}
+#| echo: false
+#| fig-cap: Standard normal areas for P.135 — (a) above -2.10, (b) below -0.5, (c) between -1.5 and 0.5
+a135 = norm_row(0, 1, [(-2.10, None), (None, -0.5), (-1.5, 0.5)],
+                ["(a) above z = -2.10", "(b) below z = -0.5",
+                 "(c) between -1.5 and 0.5"])
+pd.Series({"(a) above -2.10": round(a135[0], 4),
+           "(b) below -0.5": round(a135[1], 4),
+           "(c) between -1.5 and 0.5": round(a135[2], 4)}).to_string()
+```
+
+- **(a)** $1-\Phi(-2.10)\approx$ **0.9821**
+- **(b)** $\Phi(-0.5)\approx$ **0.3085**
+- **(c)** $\Phi(0.5)-\Phi(-1.5)\approx0.6915-0.0668=$ **0.6247**
+
+## Exercise P.136
+
+*(Skill Builder 3)* Specified areas for a $N(0, 1)$ density:
+
+```{python}
+#| echo: false
+#| fig-cap: Standard normal areas for P.136 — (a) above 1.35, (b) below -0.8, (c) between -1.23 and 0.75
+a136 = norm_row(0, 1, [(1.35, None), (None, -0.8), (-1.23, 0.75)],
+                ["(a) above z = 1.35", "(b) below z = -0.8",
+                 "(c) between -1.23 and 0.75"])
+pd.Series({"(a) above 1.35": round(a136[0], 4),
+           "(b) below -0.8": round(a136[1], 4),
+           "(c) between -1.23 and 0.75": round(a136[2], 4)}).to_string()
+```
+
+- **(a)** $1-\Phi(1.35)\approx$ **0.0885**
+- **(b)** $\Phi(-0.8)\approx$ **0.2119**
+- **(c)** $\Phi(0.75)-\Phi(-1.23)\approx0.7734-0.1093=$ **0.6640**
+
+## Exercise P.137
+
+*(Skill Builder 4)* Endpoint(s) on a $N(0, 1)$ density:
+
+```{python}
+#| echo: false
+#| fig-cap: Standard normal endpoints for P.137 — left 10%, right 80%, middle 95%
+a137 = norm_row(0, 1, [(None, -1.28), (-0.84, None), (-1.96, 1.96)],
+                ["(a) left area 0.10", "(b) right area 0.80",
+                 "(c) middle area 0.95"])
+pd.Series({"(a) left area 0.10": round(stats.norm.ppf(0.10), 4),
+           "(b) right area 0.80": round(stats.norm.ppf(0.20), 4),
+           "(c) middle area 0.95": "+/- 1.96"}).to_string()
+```
+
+- **(a)** The 10th percentile: $z=$ **−1.28**.
+- **(b)** Right area 0.80 means left area 0.20: $z=$ **−0.84**.
+- **(c)** Middle 95% leaves 2.5% in each tail: $z=\pm$ **1.96**.
+
+## Exercise P.138
+
+*(Skill Builder 4)* Endpoint(s) on a $N(0, 1)$ density:
+
+```{python}
+#| echo: false
+#| fig-cap: Standard normal endpoints for P.138 — left 70%, right 1%, middle 90%
+a138 = norm_row(0, 1, [(None, 0.52), (2.33, None), (-1.64, 1.64)],
+                ["(a) left area 0.70", "(b) right area 0.01",
+                 "(c) middle area 0.90"])
+pd.Series({"(a) left area 0.70": round(stats.norm.ppf(0.70), 4),
+           "(b) right area 0.01": round(stats.norm.ppf(0.99), 4),
+           "(c) middle area 0.90": "+/- 1.64"}).to_string()
+```
+
+- **(a)** The 70th percentile: $z=$ **0.52**.
+- **(b)** Right area 0.01 means left area 0.99: $z=$ **2.33**.
+- **(c)** Middle 90% leaves 5% in each tail: $z=\pm$ **1.64**.
+
+## Exercise P.139
+
+*(Skill Builder 4)* Endpoint(s) on a $N(0, 1)$ density:
+
+```{python}
+#| echo: false
+#| fig-cap: Standard normal endpoints for P.139 — right 90%, left 65%
+a139 = norm_row(0, 1, [(-1.28, None), (None, 0.39)],
+                ["(a) right area 0.90", "(b) left area 0.65"],
+                figsize=(7.5, 2.4))
+pd.Series({"(a) right area 0.90": round(stats.norm.ppf(0.10), 4),
+           "(b) left area 0.65": round(stats.norm.ppf(0.65), 4)}).to_string()
+```
+
+- **(a)** Right area 0.90 means left area 0.10: $z=$ **−1.28**.
+- **(b)** The 65th percentile: $z=$ **0.39**.
+
+## Exercise P.140
+
+*(Skill Builder 4)* Endpoint(s) on a $N(0, 1)$ density:
+
+```{python}
+#| echo: false
+#| fig-cap: Standard normal endpoints for P.140 — right 2%, left 40%
+a140 = norm_row(0, 1, [(2.05, None), (None, -0.25)],
+                ["(a) right area 0.02", "(b) left area 0.40"],
+                figsize=(7.5, 2.4))
+pd.Series({"(a) right area 0.02": round(stats.norm.ppf(0.98), 4),
+           "(b) left area 0.40": round(stats.norm.ppf(0.40), 4)}).to_string()
+```
+
+- **(a)** Right area 0.02 means left area 0.98: $z=$ **2.05**.
+- **(b)** The 40th percentile: $z=$ **−0.25**.
+
+## Exercise P.141
+
+*(Skill Builder 5)* Specified areas for a normal density:
+
+```{python}
+#| echo: false
+#| fig-cap: Normal areas for P.141 — (a) below 80 on N(75, 10), (b) above 25 on N(20, 6), (c) between 11 and 14 on N(12.2, 1.6)
+a141 = norm_row(75, 10, [(None, 80)], ["(a) below 80, N(75, 10)"], figsize=(5, 2.2))
+a141 += norm_row(20, 6, [(25, None)], ["(b) above 25, N(20, 6)"], figsize=(5, 2.2))
+a141 += norm_row(12.2, 1.6, [(11, 14)], ["(c) between 11 and 14, N(12.2, 1.6)"], figsize=(5, 2.2))
+pd.Series({"(a) below 80": round(a141[0], 4),
+           "(b) above 25": round(a141[1], 4),
+           "(c) between 11 and 14": round(a141[2], 4)}).to_string()
+```
+
+- **(a)** $z=(80-75)/10=0.5$; area $=\Phi(0.5)\approx$ **0.6915**
+- **(b)** $z=(25-20)/6=0.833$; area $=1-\Phi(0.833)\approx$ **0.2023**
+- **(c)** $z=\frac{11-12.2}{1.6}=-0.75$ to $\frac{14-12.2}{1.6}=1.125$;
+  area $\approx0.8697-0.2266=$ **0.6431**
+
+## Exercise P.142
+
+*(Skill Builder 5)* Specified areas for a normal density:
+
+```{python}
+#| echo: false
+#| fig-cap: Normal areas for P.142 — (a) above 6 on N(5, 1.5), (b) below 15 on N(20, 3), (c) between 90 and 100 on N(100, 6)
+a142 = norm_row(5, 1.5, [(6, None)], ["(a) above 6, N(5, 1.5)"], figsize=(5, 2.2))
+a142 += norm_row(20, 3, [(None, 15)], ["(b) below 15, N(20, 3)"], figsize=(5, 2.2))
+a142 += norm_row(100, 6, [(90, 100)], ["(c) between 90 and 100, N(100, 6)"], figsize=(5, 2.2))
+pd.Series({"(a) above 6": round(a142[0], 4),
+           "(b) below 15": round(a142[1], 4),
+           "(c) between 90 and 100": round(a142[2], 4)}).to_string()
+```
+
+- **(a)** $z=(6-5)/1.5=0.667$; area $=1-\Phi(0.667)\approx$ **0.2525**
+- **(b)** $z=(15-20)/3=-1.667$; area $=\Phi(-1.667)\approx$ **0.0478**
+- **(c)** $z=-1.667$ to $0$; area $=0.5-0.0478=$ **0.4522**
+
+## Exercise P.143
+
+*(Skill Builder 5)* Specified areas for a normal density:
+
+```{python}
+#| echo: false
+#| fig-cap: Normal areas for P.143 — (a) above 200 on N(120, 40), (b) below 49.5 on N(50, 0.2), (c) between 0.8 and 1.5 on N(1, 0.3)
+a143 = norm_row(120, 40, [(200, None)], ["(a) above 200, N(120, 40)"], figsize=(5, 2.2))
+a143 += norm_row(50, 0.2, [(None, 49.5)], ["(b) below 49.5, N(50, 0.2)"], figsize=(5, 2.2))
+a143 += norm_row(1, 0.3, [(0.8, 1.5)], ["(c) between 0.8 and 1.5, N(1, 0.3)"], figsize=(5, 2.2))
+pd.Series({"(a) above 200": round(a143[0], 4),
+           "(b) below 49.5": round(a143[1], 4),
+           "(c) between 0.8 and 1.5": round(a143[2], 4)}).to_string()
+```
+
+- **(a)** $z=(200-120)/40=2.0$; area $=1-\Phi(2)\approx$ **0.0228**
+- **(b)** $z=(49.5-50)/0.2=-2.5$; area $=\Phi(-2.5)\approx$ **0.0062**
+- **(c)** $z=-0.667$ to $1.667$; area $\approx0.9522-0.2525=$ **0.6997**
+
+## Exercise P.144
+
+*(Skill Builder 5)* Specified areas for a normal density:
+
+```{python}
+#| echo: false
+#| fig-cap: Normal areas for P.144 — (a) below 0.21 on N(0.3, 0.04), (b) above 472 on N(500, 25), (c) between 8 and 10 on N(15, 6)
+a144 = norm_row(0.3, 0.04, [(None, 0.21)], ["(a) below 0.21, N(0.3, 0.04)"], figsize=(5, 2.2))
+a144 += norm_row(500, 25, [(472, None)], ["(b) above 472, N(500, 25)"], figsize=(5, 2.2))
+a144 += norm_row(15, 6, [(8, 10)], ["(c) between 8 and 10, N(15, 6)"], figsize=(5, 2.2))
+pd.Series({"(a) below 0.21": round(a144[0], 4),
+           "(b) above 472": round(a144[1], 4),
+           "(c) between 8 and 10": round(a144[2], 4)}).to_string()
+```
+
+- **(a)** $z=(0.21-0.3)/0.04=-2.25$; area $=\Phi(-2.25)\approx$ **0.0122**
+- **(b)** $z=(472-500)/25=-1.12$; area $=1-\Phi(-1.12)\approx$ **0.8686**
+- **(c)** $z=-1.167$ to $-0.833$; area $\approx0.2023-0.1217=$ **0.0807**
+
+## Exercise P.145
+
+*(Skill Builder 6)* Endpoint(s) on the given normal density curve:
+
+```{python}
+#| echo: false
+#| fig-cap: Normal endpoints for P.145 — right 1% on N(50, 4), left 70% on N(2, 0.05), middle 95% on N(100, 20)
+a145 = norm_row(50, 4, [(stats.norm.isf(0.01, 50, 4), None)],
+                ["(a) right area 0.01, N(50, 4)"], figsize=(5, 2.2))
+a145 += norm_row(2, 0.05, [(None, stats.norm.ppf(0.70, 2, 0.05))],
+                 ["(b) left area 0.70, N(2, 0.05)"], figsize=(5, 2.2))
+a145 += norm_row(100, 20, [(stats.norm.ppf(0.025, 100, 20),
+                            stats.norm.ppf(0.975, 100, 20))],
+                 ["(c) middle area 0.95, N(100, 20)"], figsize=(5, 2.2))
+pd.Series({"(a) right 0.01 on N(50, 4)": round(stats.norm.isf(0.01, 50, 4), 2),
+           "(b) left 0.70 on N(2, 0.05)": round(stats.norm.ppf(0.70, 2, 0.05), 3),
+           "(c) middle 0.95 on N(100, 20)": "60.8 and 139.2"}).to_string()
+```
+
+- **(a)** Right area 0.01: $x=50+2.326(4)\approx$ **59.3**
+- **(b)** Left area 0.70: $x=2+0.524(0.05)\approx$ **2.03**
+- **(c)** Middle 95%: $100\pm1.96(20)$, i.e. **60.8 and 139.2**
+
+## Exercise P.146
+
+*(Skill Builder 6)* Endpoint(s) on the given normal density curve:
+
+```{python}
+#| echo: false
+#| fig-cap: Normal endpoints for P.146 — right 25% on N(25, 8), left 2% on N(500, 80), middle 95% on N(10, 3)
+a146 = norm_row(25, 8, [(stats.norm.isf(0.25, 25, 8), None)],
+                ["(a) right area 0.25, N(25, 8)"], figsize=(5, 2.2))
+a146 += norm_row(500, 80, [(None, stats.norm.ppf(0.02, 500, 80))],
+                 ["(b) left area 0.02, N(500, 80)"], figsize=(5, 2.2))
+a146 += norm_row(10, 3, [(stats.norm.ppf(0.025, 10, 3),
+                          stats.norm.ppf(0.975, 10, 3))],
+                 ["(c) middle area 0.95, N(10, 3)"], figsize=(5, 2.2))
+pd.Series({"(a) right 0.25 on N(25, 8)": round(stats.norm.isf(0.25, 25, 8), 2),
+           "(b) left 0.02 on N(500, 80)": round(stats.norm.ppf(0.02, 500, 80), 1),
+           "(c) middle 0.95 on N(10, 3)": "4.12 and 15.88"}).to_string()
+```
+
+- **(a)** Right area 0.25: $x=25+0.674(8)\approx$ **30.4**
+- **(b)** Left area 0.02: $x=500-2.054(80)\approx$ **335.7**
+- **(c)** Middle 95%: $10\pm1.96(3)$, i.e. **4.12 and 15.88**
+
+## Exercise P.147
+
+*(Skill Builder 6)* Endpoint(s) on the given normal density curve:
+
+```{python}
+#| echo: false
+#| fig-cap: Normal endpoints for P.147 — left 75% on N(100, 15), right 3% on N(8, 1)
+a147 = norm_row(100, 15, [(None, stats.norm.ppf(0.75, 100, 15))],
+                ["(a) left area 0.75, N(100, 15)"], figsize=(5, 2.2))
+a147 += norm_row(8, 1, [(stats.norm.isf(0.03, 8, 1), None)],
+                 ["(b) right area 0.03, N(8, 1)"], figsize=(5, 2.2))
+pd.Series({"(a) left 0.75 on N(100, 15)": round(stats.norm.ppf(0.75, 100, 15), 2),
+           "(b) right 0.03 on N(8, 1)": round(stats.norm.isf(0.03, 8, 1), 2)}).to_string()
+```
+
+- **(a)** Left area 0.75 (75th percentile): $x=100+0.674(15)\approx$ **110**
+- **(b)** Right area 0.03: $x=8+1.881(1)\approx$ **9.88**
+
+## Exercise P.148
+
+*(Skill Builder 6)* Endpoint(s) on the given normal density curve:
+
+```{python}
+#| echo: false
+#| fig-cap: Normal endpoints for P.148 — left 10% on N(5, 2), right 5% on N(500, 25)
+a148 = norm_row(5, 2, [(None, stats.norm.ppf(0.10, 5, 2))],
+                ["(a) left area 0.10, N(5, 2)"], figsize=(5, 2.2))
+a148 += norm_row(500, 25, [(stats.norm.isf(0.05, 500, 25), None)],
+                 ["(b) right area 0.05, N(500, 25)"], figsize=(5, 2.2))
+pd.Series({"(a) left 0.10 on N(5, 2)": round(stats.norm.ppf(0.10, 5, 2), 3),
+           "(b) right 0.05 on N(500, 25)": round(stats.norm.isf(0.05, 500, 25), 2)}).to_string()
+```
+
+- **(a)** Left area 0.10 (10th percentile): $x=5-1.282(2)\approx$ **2.44**
+- **(b)** Right area 0.05: $x=500+1.645(25)\approx$ **541.1**
+
+## Exercise P.149
+
+*(Skill Builder 7)* Convert the **area below 40** for a $N(48, 5)$
+distribution to an equivalent area on the standard normal curve.
+
+```{python}
+#| echo: false
+#| fig-cap: P.149 — area below 40 on N(48, 5) equals the area below z = -1.6 on N(0, 1)
+a149 = norm_pair(48, 5, None, 40, xlab="x   N(48, 5)")
+pd.Series({"Endpoint x": 40, "z-score": (40 - 48) / 5,
+           "Area (both curves)": round(a149, 4)}).to_string()
+```
+
+$$z=\frac{40-48}{5}=\textbf{-1.6}$$ The area below 40 on $N(48,5)$ — about
+**0.0548** — is exactly the area below $z=-1.6$ on $N(0,1)$: the two shaded
+regions above have identical area, only the horizontal scale differs.
+
+## Exercise P.150
+
+*(Skill Builder 7)* Convert the **upper 30%** for a $N(48, 5)$ distribution to
+a standard-normal endpoint.
+
+```{python}
+#| echo: false
+#| fig-cap: P.150 — upper 30% of N(48, 5) starts where the upper 30% of N(0, 1) starts
+z150 = stats.norm.ppf(0.70)
+a150 = norm_pair(48, 5, 48 + z150 * 5, None, xlab="x   N(48, 5)")
+pd.Series({"z-score (70th pctile)": round(z150, 4),
+           "Endpoint x = 48 + z(5)": round(48 + z150 * 5, 3)}).to_string()
+```
+
+The upper 30% begins at the 70th percentile: $z=$ **0.524**, so
+$x=48+0.524(5)\approx$ **50.62** on the $N(48,5)$ scale. Both shaded regions
+above contain 30% of the area.
+
+## Exercise P.151
+
+*(Skill Builder 7)* Convert the **upper 5%** for a $N(10, 2)$ distribution to
+a standard-normal endpoint.
+
+```{python}
+#| echo: false
+#| fig-cap: P.151 — upper 5% of N(10, 2) matches the area above z = 1.645 on N(0, 1)
+z151 = stats.norm.isf(0.05)
+a151 = norm_pair(10, 2, 10 + z151 * 2, None, xlab="x   N(10, 2)")
+pd.Series({"z-score (95th pctile)": round(z151, 4),
+           "Endpoint x = 10 + z(2)": round(10 + z151 * 2, 3)}).to_string()
+```
+
+The upper 5% begins at the 95th percentile: $z=$ **1.64**, so
+$x=10+1.645(2)\approx$ **13.3** on the $N(10,2)$ scale (the book's answers:
+$x=13.3$, $z=1.64$).
+
+## Exercise P.152
+
+*(Skill Builder 7)* Convert the **area above 13.4** for a $N(10, 2)$
+distribution to a standard-normal area.
+
+```{python}
+#| echo: false
+#| fig-cap: P.152 — area above 13.4 on N(10, 2) equals the area above z = 1.7 on N(0, 1)
+a152 = norm_pair(10, 2, 13.4, None, xlab="x   N(10, 2)")
+pd.Series({"z-score": (13.4 - 10) / 2,
+           "Area (both curves)": round(a152, 4)}).to_string()
+```
+
+$$z=\frac{13.4-10}{2}=\textbf{1.7}$$ The area above 13.4 on $N(10,2)$ is
+about **0.0446**, the same as the area above $z=1.7$ on the standard normal.
+
+## Exercise P.153
+
+*(Skill Builder 7)* Convert the **lower 10%** for a standard normal
+distribution to a $N(500, 80)$ endpoint.
+
+```{python}
+#| echo: false
+#| fig-cap: P.153 — lower 10% of N(0, 1) ends at z = -1.28, i.e. x = 397.6 on N(500, 80)
+z153 = stats.norm.ppf(0.10)
+a153 = norm_pair(500, 80, None, 500 + z153 * 80, xlab="x   N(500, 80)")
+pd.Series({"z-score (10th pctile)": round(z153, 4),
+           "Endpoint x = 500 + z(80)": round(500 - 1.28 * 80, 2)}).to_string()
+```
+
+The 10th percentile of the standard normal is $z=$ **−1.28**, so on the
+$N(500,80)$ scale the lower 10% ends at $x=500-1.28(80)\approx$ **397.6**
+(the book's answers: $z=-1.28$, $x=397.6$).
+
+## Exercise P.154
+
+*(Skill Builder 7)* Convert the **area above 2.1** for a standard normal
+distribution to a $N(500, 80)$ endpoint.
+
+```{python}
+#| echo: false
+#| fig-cap: P.154 — area above z = 2.1 on N(0, 1) equals the area above x = 668 on N(500, 80)
+a154 = norm_pair(500, 80, 500 + 2.1 * 80, None, xlab="x   N(500, 80)")
+pd.Series({"Endpoint x = 500 + 2.1(80)": 500 + 2.1 * 80,
+           "Area (both curves)": round(stats.norm.sf(2.1), 4)}).to_string()
+```
+
+$x=500+2.1(80)=$ **668**: the area above $z=2.1$ (about **0.0179**) equals
+the area above 668 on the $N(500,80)$ curve.
+
+## Exercise P.155
+
+*(Skill Builder 7)* Convert the **area between 1 and 2** for a standard
+normal distribution to a $N(100, 15)$ interval.
+
+```{python}
+#| echo: false
+#| fig-cap: P.155 — area between z = 1 and 2 equals the area between 115 and 130 on N(100, 15)
+a155 = norm_pair(100, 15, 100 + 1 * 15, 100 + 2 * 15, xlab="x   N(100, 15)")
+pd.Series({"Endpoints x = 100 + z(15)": "115 and 130",
+           "Area (both curves)": round(a155, 4)}).to_string()
+```
+
+$x=100+1(15)=$ **115** and $x=100+2(15)=$ **130**: the area between
+$z=1$ and $z=2$ (about **0.1359**) equals the area between 115 and 130 on
+$N(100,15)$.
+
+## Exercise P.156
+
+*(Skill Builder 7)* Convert the **middle 80%** for a standard normal
+distribution to a $N(100, 15)$ interval.
+
+```{python}
+#| echo: false
+#| fig-cap: P.156 — middle 80% of N(0, 1) spans z = +/-1.28, i.e. 80.8 to 119.2 on N(100, 15)
+z156 = stats.norm.ppf(0.90)
+a156 = norm_pair(100, 15, 100 - z156 * 15, 100 + z156 * 15, xlab="x   N(100, 15)")
+pd.Series({"z = +/- 90th pctile": round(z156, 4),
+           "Endpoints x = 100 +/- z(15)": f"{100 - z156 * 15:.2f} and {100 + z156 * 15:.2f}",
+           "Area (both curves)": round(a156, 4)}).to_string()
+```
+
+The middle 80% of a standard normal runs from the 10th to the 90th
+percentile, $z=\pm$ **1.28**. On the $N(100,15)$ scale that is
+$100\pm1.28(15)$, i.e. from about **80.8 to 119.2**.
+
+## Exercise P.157
+
+**SAT Scores.** Scores on the Reading and Writing part of the SAT are
+modeled as normal with mean 531 and standard deviation 104 (Table P.16).
+
+```{python}
+#| echo: false
+#| fig-cap: N(531, 104) model for SAT Reading and Writing scores, labeled at mu +/- sigma and mu +/- 2 sigma
+mu, sigma = 531, 104
+fig, ax = plt.subplots(figsize=(7, 2.6))
+x = np.linspace(mu - 4.2 * sigma, mu + 4.2 * sigma, 800)
+ax.plot(x, stats.norm.pdf(x, mu, sigma), color=BLUE, lw=2)
+ticks = [mu - 2 * sigma, mu - sigma, mu, mu + sigma, mu + 2 * sigma]
+for t in ticks:
+    ax.axvline(t, color="gray", lw=0.8, ls=":")
+ax.set_xticks(ticks)
+ax.set_xlabel("Reading and Writing score")
+ax.set_ylabel("Density")
+plt.tight_layout(); plt.show()
+```
+
+The bell curve is centered at $\mu=531$ with horizontal scale set by
+$\sigma=104$; three (here five) natural labeled points are
+$\mu\pm\sigma=427$ and $635$, and $\mu\pm2\sigma=323$ and $739$ — about 95%
+of scores fall between 323 and 739.
+
+## Exercise P.158
+
+**Reading and Writing on the SAT Exam.** Scores are $N(531, 104)$.
+
+```{python}
+#| echo: false
+#| fig-cap: P.158 — (a) area below a 700 score, (b) the 30th percentile score
+fig, axes = plt.subplots(1, 2, figsize=(10.5, 2.4))
+p158a = _shade_axis(axes[0], 531, 104, None, 700)
+axes[0].set_title("(a) below 700", fontsize=9)
+p158b = _shade_axis(axes[1], 531, 104, None, stats.norm.ppf(0.30, 531, 104))
+axes[1].set_title("(b) lowest 30% of scores", fontsize=9)
+for ax in axes:
+    ax.set_ylabel("Density")
+plt.tight_layout(); plt.show()
+pd.Series({"(a) Percentile of 700": round(stats.norm.cdf(700, 531, 104), 4),
+           "(b) 30th percentile score": round(stats.norm.ppf(0.30, 531, 104), 1)}).to_string()
+```
+
+- **(a)** $z=(700-531)/104=1.625$, so the percentile is
+  $\Phi(1.625)\approx$ **0.948 — about the 95th percentile**.
+- **(b)** The 30th percentile is $x=531-0.524(104)\approx$ **476**.
+
+## Exercise P.159
+
+**Mathematics on the SAT Exam.** Scores are $N(528, 117)$.
+
+```{python}
+#| echo: false
+#| fig-cap: P.159 — (a) area below a 450 Math score, (b) the 90th percentile score
+fig, axes = plt.subplots(1, 2, figsize=(10.5, 2.4))
+p159a = _shade_axis(axes[0], 528, 117, None, 450)
+axes[0].set_title("(a) below 450", fontsize=9)
+p159b = _shade_axis(axes[1], 528, 117, None, stats.norm.ppf(0.90, 528, 117))
+axes[1].set_title("(b) lowest 90% of scores", fontsize=9)
+for ax in axes:
+    ax.set_ylabel("Density")
+plt.tight_layout(); plt.show()
+pd.Series({"(a) Percentile of 450": round(stats.norm.cdf(450, 528, 117), 4),
+           "(a) z-score": round((450 - 528) / 117, 4),
+           "(b) 90th percentile score": round(stats.norm.ppf(0.90, 528, 117), 1)}).to_string()
+```
+
+- **(a)** $z=(450-528)/117=-0.667$, so a 450 is at the
+  $\Phi(-0.667)\approx$ **0.252 — 25th percentile**. (The book's answer key
+  prints "35th percentile," but $-78/117=-0.67$ clearly gives the 25th; this
+  looks like an erratum in the key.)
+- **(b)** The 90th percentile is $x=528+1.282(117)\approx$ **678** (matching
+  the book).
+
+## Exercise P.160
+
+**Boys Heights.** Heights of 10-year-old boys are approximately
+$N(55.5,\ 2.7)$ inches.
+
+```{python}
+#| echo: false
+#| fig-cap: P.160 — (a) N(55.5, 2.7) sketch with labeled points, (b) area between 52 and 60 inches, (c) the 99th percentile
+fig, axes = plt.subplots(1, 3, figsize=(11.5, 2.4))
+x = np.linspace(55.5 - 4.2 * 2.7, 55.5 + 4.2 * 2.7, 800)
+axes[0].plot(x, stats.norm.pdf(x, 55.5, 2.7), color=BLUE, lw=2)
+for t in [55.5 - 5.4, 55.5, 55.5 + 5.4, 55.5 - 10.8, 55.5 + 10.8]:
+    axes[0].axvline(t, color="gray", lw=0.8, ls=":")
+axes[0].set_xticks([55.5 - 10.8, 55.5 - 5.4, 55.5, 55.5 + 5.4, 55.5 + 10.8])
+axes[0].set_title("(a) N(55.5, 2.7)", fontsize=9)
+p160b = _shade_axis(axes[1], 55.5, 2.7, 52, 60)
+axes[1].set_title("(b) between 52 and 60 in", fontsize=9)
+p160c = _shade_axis(axes[2], 55.5, 2.7, stats.norm.ppf(0.99, 55.5, 2.7), None)
+axes[2].set_title("(c) tallest 1% (99th pctile)", fontsize=9)
+for ax in axes:
+    ax.set_ylabel("Density")
+plt.tight_layout(); plt.show()
+pd.Series({"(b) P(52 < X < 60)": round(p160b, 4),
+           "(c) 99th percentile (inches)": round(stats.norm.ppf(0.99, 55.5, 2.7), 2)}).to_string()
+```
+
+- **(a)** The sketch above is centered at 55.5 with labeled points at
+  $\mu\pm\sigma=50.1$ and $60.9$ and $\mu\pm2\sigma=44.7$ and $66.3$.
+- **(b)** $z=-1.30$ to $+1.67$:
+  $P(52<X<60)\approx0.9522-0.0974\approx$ **0.855**.
+- **(c)** The 99th percentile is $55.5+2.326(2.7)\approx$ **61.8 inches**
+  (about 5 ft 1.8 in).
+
+## Exercise P.161
+
+**Heights of Men in the US.** Heights of adult men are approximately
+$N(70,\ 3)$ inches.
+
+```{python}
+#| echo: false
+#| fig-cap: P.161 — (a) area between 68 and 72 inches, (b) the 10th percentile height
+fig, axes = plt.subplots(1, 2, figsize=(10.5, 2.4))
+p161a = _shade_axis(axes[0], 70, 3, 68, 72)
+axes[0].set_title("(a) between 68 and 72 in", fontsize=9)
+p161b = _shade_axis(axes[1], 70, 3, None, stats.norm.ppf(0.10, 70, 3))
+axes[1].set_title("(b) shortest 10% of men", fontsize=9)
+for ax in axes:
+    ax.set_ylabel("Density")
+plt.tight_layout(); plt.show()
+pd.Series({"(a) P(68 < X < 72)": round(p161a, 4),
+           "(b) 10th percentile (inches)": round(stats.norm.ppf(0.10, 70, 3), 2)}).to_string()
+```
+
+- **(a)** $z=\pm0.667$: $P(68<X<72)=\Phi(0.667)-\Phi(-0.667)\approx$
+  $0.7475-0.2525=$ **0.495**.
+- **(b)** The 10th percentile is $70-1.282(3)\approx$ **66.2 inches**
+  (about 5 ft 6.2 in).
+
+## Exercise P.162
+
+**What Proportion Have College Degrees?** For random samples of $n=500$ US
+adults, the sample proportion with a bachelor's degree follows a
+$N(0.325,\ 0.021)$ distribution.
+
+```{python}
+#| echo: false
+#| fig-cap: N(0.325, 0.021) model for sample proportions with n = 500, labeled at mu +/- sigma and mu +/- 2 sigma
+mu, sigma = 0.325, 0.021
+fig, ax = plt.subplots(figsize=(7, 2.6))
+x = np.linspace(mu - 4.2 * sigma, mu + 4.2 * sigma, 800)
+ax.plot(x, stats.norm.pdf(x, mu, sigma), color=BLUE, lw=2)
+ticks = [mu - 2 * sigma, mu - sigma, mu, mu + sigma, mu + 2 * sigma]
+for t in ticks:
+    ax.axvline(t, color="gray", lw=0.8, ls=":")
+ax.set_xticks(ticks)
+ax.set_xlabel("Sample proportion with a college degree")
+ax.set_ylabel("Density")
+plt.tight_layout(); plt.show()
+```
+
+The bell curve is centered at $\mu=0.325$ with $\sigma=0.021$; labeled
+points: $\mu\pm\sigma=0.304$ and $0.346$, and $\mu\pm2\sigma=0.283$ and
+$0.367$ — about 95% of samples of 500 adults give $\hat p$ between 0.283 and
+0.367.
+
+## Exercise P.163
+
+**Quartiles for GPA.** GPAs of introductory-statistics students are modeled
+as $N(3.16,\ 0.40)$. Find the first and third quartiles.
+
+```{python}
+#| echo: false
+#| fig-cap: P.163 — the middle 50% of the N(3.16, 0.40) GPA distribution runs from Q1 to Q3
+q1, q3 = stats.norm.ppf(0.25, 3.16, 0.40), stats.norm.ppf(0.75, 3.16, 0.40)
+a163 = norm_shade(3.16, 0.40, q1, q3,
+                  xlabel="GPA   N(3.16, 0.40)")
+pd.Series({"Q1 (25th percentile)": round(q1, 4),
+           "Q3 (75th percentile)": round(q3, 4),
+           "Middle 50% area": round(a163, 4)}).to_string()
+```
+
+The quartiles sit $\pm0.674\sigma$ from the mean:
+$Q_1=3.16-0.674(0.40)\approx$ **2.89** and
+$Q_3=3.16+0.674(0.40)\approx$ **3.43** — the shaded middle 50% of the
+distribution (matching the book's $Q_1=2.89$, $Q_3=3.43$).
+
+## Exercise P.164
+
+**Random Samples of College Degree Proportions.** With
+$\hat p\sim N(0.325,\ 0.021)$ for samples of $n=500$, how often is
+$\hat p>0.35$?
+
+```{python}
+#| echo: false
+#| fig-cap: P.164 — area of sample proportions above 0.35 on N(0.325, 0.021)
+a164 = norm_shade(0.325, 0.021, 0.35, None,
+                  xlabel="Sample proportion   N(0.325, 0.021)")
+pd.Series({"z-score": round((0.35 - 0.325) / 0.021, 4),
+           "P(p-hat > 0.35)": round(a164, 4)}).to_string()
+```
+
+$$z=\frac{0.35-0.325}{0.021}=1.19,\qquad P(\hat p>0.35)=1-\Phi(1.19)\approx$$
+**0.117** — a bit more than 11% of samples of 500 adults would show a
+proportion above 0.35.
+
+## Exercise P.165
+
+**Commuting Times in St. Louis.** Bootstrap means for 500 St. Louis workers
+(Figure P.15) are modeled as $N(21.97,\ 0.65)$ minutes.
+
+```{python}
+#| echo: false
+#| fig-cap: P.165 — (a) above 23, (b) below 20, (c) between 21.5 and 22.5 minutes
+areas165 = norm_row(21.97, 0.65, [(23, None), (None, 20), (21.5, 22.5)],
+                    ["(a) more than 23", "(b) less than 20",
+                     "(c) between 21.5 and 22.5"])
+pd.Series({"(a) more than 23": round(areas165[0], 4),
+           "(b) less than 20": round(areas165[1], 4),
+           "(c) between 21.5 and 22.5": round(areas165[2], 4)}).to_string()
+```
+
+- **(a)** $z=(23-21.97)/0.65=1.58$: area $\approx$ **0.0565**
+- **(b)** $z=(20-21.97)/0.65=-3.03$: area $\approx$ **0.0012**
+- **(c)** $z=-0.72$ to $+0.82$: area $\approx$ **0.5578**
+
+All three match the book's answers (0.0565, 0.0012, 0.5578).
+
+## Exercise P.166
+
+**Randomization Slopes.** A randomization distribution of sample slopes
+(testing $H_0\colon\beta=0$) is modeled as $N(0,\ 2.5)$.
+
+```{python}
+#| echo: false
+#| fig-cap: P.166 — (a) N(0, 2.5) sketch, (b) area above a slope of 3.0, (c) the 5th percentile of slopes
+fig, axes = plt.subplots(1, 3, figsize=(11.5, 2.4))
+x = np.linspace(-4.2 * 2.5, 4.2 * 2.5, 800)
+axes[0].plot(x, stats.norm.pdf(x, 0, 2.5), color=BLUE, lw=2)
+for t in [-5, -2.5, 0, 2.5, 5]:
+    axes[0].axvline(t, color="gray", lw=0.8, ls=":")
+axes[0].set_xticks([-5, -2.5, 0, 2.5, 5])
+axes[0].set_title("(a) N(0, 2.5)", fontsize=9)
+p166b = _shade_axis(axes[1], 0, 2.5, 3.0, None)
+axes[1].set_title("(b) slope above 3.0", fontsize=9)
+p166c = _shade_axis(axes[2], 0, 2.5, None, stats.norm.ppf(0.05, 0, 2.5))
+axes[2].set_title("(c) lowest 5% of slopes", fontsize=9)
+for ax in axes:
+    ax.set_ylabel("Density")
+plt.tight_layout(); plt.show()
+pd.Series({"(b) P(slope > 3)": round(p166b, 4),
+           "(c) 5th percentile slope": round(stats.norm.ppf(0.05, 0, 2.5), 3)}).to_string()
+```
+
+- **(a)** The randomization distribution is a symmetric bell centered at 0;
+  labeled points at $-5,\ -2.5,\ 0,\ 2.5,\ 5$ (i.e. $\mu\pm\sigma$ and
+  $\mu\pm2\sigma$).
+- **(b)** $z=3/2.5=1.2$: $P(\text{slope}>3)=1-\Phi(1.2)\approx$ **0.115** —
+  this is (approximately) the one-sided p-value a slope of 3 would produce.
+- **(c)** The 5%-tile is $0-1.645(2.5)\approx$ **−4.11**.
+
+## Exercise P.167
+
+**Exam Grades.** Grades across all sections of intro stats are approximately
+$N(72,\ 11)$.
+
+```{python}
+#| echo: false
+#| fig-cap: P.167 — (a) above 90, (b) below 60, (c) lowest 5% cutoff, (d) top 10% cutoff
+areas167 = norm_row(72, 11, [(90, None), (None, 60),
+                             (None, stats.norm.ppf(0.05, 72, 11)),
+                             (stats.norm.isf(0.10, 72, 11), None)],
+                    ["(a) above 90", "(b) below 60",
+                     "(c) lowest 5%", "(d) highest 10%"], figsize=(12, 2.4))
+pd.Series({"(a) P(X > 90)": round(areas167[0], 4),
+           "(b) P(X < 60)": round(areas167[1], 4),
+           "(c) lowest-5% cutoff": round(stats.norm.ppf(0.05, 72, 11), 2),
+           "(d) top-10% cutoff": round(stats.norm.isf(0.10, 72, 11), 2)}).to_string()
+```
+
+- **(a)** $z=(90-72)/11=1.64$: **5.09%** scored above 90.
+- **(b)** $z=(60-72)/11=-1.09$: **13.8%** scored below 60.
+- **(c)** The lowest 5% falls below $72-1.645(11)\approx$ **53.9** — grades
+  under about 53.9 go to peer tutoring.
+- **(d)** The highest 10% scores above $72+1.282(11)\approx$ **86.1** — the
+  A cutoff.
+
+All four match the book's answers.
+
+## Exercise P.168
+
+**Curving Grades on an Exam.** The exam was designed for $N(75, 10)$ but
+came out $N(62, 18)$. The curve standardizes each score with the $N(62,18)$
+scale, then un-standardizes onto the $N(75,10)$ scale: new $=75+z\cdot10$
+with $z=(\text{old}-62)/18$.
+
+```{python}
+#| echo: false
+#| fig-cap: P.168 — original scores 47 and 90 on N(62, 18) map to 66.7 and 90.6 on N(75, 10)
+fig, axes = plt.subplots(1, 2, figsize=(10.5, 2.6))
+for ax, (m, s, pts, lab) in zip(axes, [
+        (62, 18, [47, 90], "Original   N(62, 18)"),
+        (75, 10, [66.67, 90.56], "Curved   N(75, 10)")]):
+    x = np.linspace(m - 4.2 * s, m + 4.2 * s, 800)
+    ax.plot(x, stats.norm.pdf(x, m, s), color=BLUE, lw=2)
+    for p_ in pts:
+        ax.axvline(p_, color=RED, lw=1.5)
+        ax.text(p_, ax.get_ylim()[1] * 0.02, f" {p_:g}", color=RED, fontsize=9)
+    ax.set_xlabel(lab)
+    ax.set_ylabel("Density")
+plt.tight_layout(); plt.show()
+rows = []
+for s_ in (47, 90):
+    z = (s_ - 62) / 18
+    rows.append({"Original score": s_, "z-score": round(z, 4),
+                 "Curved score = 75 + 10z": round(75 + z * 10, 2)})
+pd.DataFrame(rows).to_string(index=False)
+```
+
+- Score **47**: $z=(47-62)/18=-0.833$, so the curved grade is
+  $75-0.833(10)\approx$ **66.7**.
+- Score **90**: $z=(90-62)/18=1.556$, so the curved grade is
+  $75+1.556(10)\approx$ **90.6**.
+
+The student hurt by the fire alarm gains roughly 20 points; the student who
+finished comfortably stays about the same — the curve preserves each
+student's *relative standing* (percentile) while restoring the intended
+center and spread.
+
+## Exercise P.169
+
+**Empirical Rule for Normal Distributions.** Pick any positive $\mu$ and
+$\sigma$ — we use $N(100,\ 15)$ — and verify the empirical rule.
+
+```{python}
+#| echo: false
+#| fig-cap: P.169 — areas within one, two, and three standard deviations of the mean for N(100, 15)
+mu, sigma = 100, 15
+areas169 = norm_row(mu, sigma,
+                    [(mu - sigma, mu + sigma), (mu - 2 * sigma, mu + 2 * sigma),
+                     (mu - 3 * sigma, mu + 3 * sigma)],
+                    ["within 1 sd", "within 2 sd", "within 3 sd"])
+pd.Series({"(a) within 2 sd": round(areas169[1], 3),
+           "(b) within 1 sd": round(areas169[0], 3),
+           "(c) within 3 sd": round(areas169[2], 3)}).to_string()
+```
+
+For $N(100,\ 15)$ (any values work):
+
+- **(a)** $P(70<X<130)=P(-2<Z<2)\approx$ **0.954** — about 95% of values fall
+  within two standard deviations of the mean. ✓
+- **(b)** $P(85<X<115)=P(-1<Z<1)\approx$ **0.683** — about 68% within one
+  standard deviation.
+- **(c)** $P(55<X<145)=P(-3<Z<3)\approx$ **0.997** — about 99.7% within
+  three standard deviations.
+- **(d)** **Yes — the answers are the same for every normal distribution.**
+  If $X\sim N(\mu,\sigma)$ then $Z=(X-\mu)/\sigma\sim N(0,1)$ regardless of
+  the particular $\mu$ and $\sigma$, so every normal probability is just a
+  standard-normal area in disguise: the intervals $\mu\pm\sigma$,
+  $\mu\pm2\sigma$, $\mu\pm3\sigma$ always capture the same 68%/95%/99.7%
+  (the **empirical rule**).
+
+:::

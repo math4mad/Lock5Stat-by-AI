@@ -1,0 +1,496 @@
+---
+execute-dir: project
+title: "The Big Picture · Essential Synthesis (E.1–E.10)"
+subtitle: "The whole toolkit — proportions, means, chi-square, ANOVA, regression — on one real survey: the 2017 ACS"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+The Big Picture exercises (Lock⁵, 3rd ed., pp. 729–732) apply the entire inferential toolkit of
+the book to a single real dataset: the **American Community Survey (ACS)**, administered by the
+US Census Bureau each year to about 3.5 million households. We use `ACS`, a random sub-sample of
+$n = 2000$ residents from the 2017 survey (`data/synthesis/ACS.csv`), together with `EmployedACS`
+(`data/synthesis/EmployedACS.csv`), the $n = 1287$ employed subset. As throughout this project,
+every data-based inferential answer computed with formulas/scipy is **verified by resampling** —
+randomization distributions for tests, bootstrap distributions for intervals — using 10,000
+replicates with seed 2026.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt, seaborn as sns
+sns.set_theme(style="whitegrid")
+from scipy import stats as st
+
+acs = pd.read_csv("data/synthesis/ACS.csv")        # n = 2000, 2017 American Community Survey
+emp = pd.read_csv("data/synthesis/EmployedACS.csv")  # n = 1287, employed subset
+
+def boot_mean(x, reps=10000, seed=2026):
+    """Bootstrap: resample `x` with replacement, return each resample mean."""
+    rng = np.random.default_rng(seed)
+    n = len(x)
+    return np.array([x[rng.integers(0, n, n)].mean() for _ in range(reps)])
+
+def boot_prop(v, reps=10000, seed=2026):
+    """Bootstrap: resample a 0/1 vector, return each resample proportion."""
+    rng = np.random.default_rng(seed)
+    n = len(v)
+    return np.array([v[rng.integers(0, n, n)].mean() for _ in range(reps)])
+
+def boot_diff(x, y, reps=10000, seed=2026):
+    """Bootstrap: resample each group independently, return difference in means."""
+    rng = np.random.default_rng(seed)
+    return np.array([x[rng.integers(0, len(x), len(x))].mean()
+                     - y[rng.integers(0, len(y), len(y))].mean() for _ in range(reps)])
+
+def perm_diff(pool, n1, reps=10000, seed=2026):
+    """Randomization: shuffle `pool`, split n1 / rest, return difference in means."""
+    rng = np.random.default_rng(seed)
+    out = np.empty(reps)
+    for i in range(reps):
+        p = rng.permutation(pool)
+        out[i] = p[:n1].mean() - p[n1:].mean()
+    return out
+
+def dist_plot(boots, xlabel, obs=None, tail="two", bins=30, figsize=(6, 3)):
+    """Histogram of simulated statistics, optionally marking the observed statistic."""
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.histplot(x=boots, bins=bins, ax=ax, color="#4c72b0")
+    if obs is not None:
+        lines = (-abs(obs), abs(obs)) if tail == "two" else ((obs,) if tail == "right" else (-abs(obs),))
+        for v in lines:
+            ax.axvline(v, color="#c44e52", ls="--", lw=1)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Simulated statistics")
+    plt.tight_layout()
+    plt.show()
+```
+
+::: {.panel-tabset}
+
+## Exercise E.1
+
+**Random Sample.** *Dear Congressman Webster:*
+
+A survey is scientific precisely because of how the sample is selected — and **randomness is the
+feature, not the flaw**. Because the ACS gives every US household a known chance of selection,
+the sample is free of **sampling bias**: no region, income class, age group, or lifestyle is
+systematically over-represented, so the sample faithfully mirrors the population it is meant to
+describe. Better yet, the mathematics of randomness lets us **quantify our own uncertainty**: the
+margin of error that accompanies every ACS estimate is a direct, provable consequence of random
+selection, telling us how close the sample estimate is likely to lie to the truth.
+
+A "scientific-looking" alternative — letting people volunteer, or letting officials pick whom to
+ask — sounds appealing but produces **biased samples**: the willing, the reachable, and the
+convenient respond differently from everyone else, and no formula can repair data collected that
+way. Random sampling is what separates the ACS from an unscientific poll; eliminating it would
+destroy the very property that makes the survey's hundreds of billions of dollars in funding
+allocations defensible. *Sincerely, a statistics student.*
+
+## Exercise E.2
+
+**Margin of Error.** The multiplier 1.645 leaves 5% of the standard normal distribution in each
+tail, i.e. 90% in the middle: $\Phi(1.645) = 0.95$. So the blanks read:
+
+> Add and subtract 1.645 times the standard error of the estimate to yield the lower and upper
+> bounds of a **90%** confidence interval around the estimate (EST).
+
+```{python}
+#| echo: false
+pd.Series({"z-value with 95% below": round(st.norm.ppf(0.95), 4),
+           "Blank": "90%"}).to_string()
+```
+
+## Exercise E.3
+
+**What Percentage of Americans Have Health Insurance?** In the sample $175/2000 =
+\hat p = 0.0875$ do **not** have health insurance.
+
+```{python}
+#| echo: false
+#| fig-cap: Bootstrap distribution of the proportion without health insurance (10,000 resamples, seed 2026)
+noins = (1 - acs.HealthInsurance).to_numpy(float)
+boots3 = boot_prop(noins)
+ci3 = np.percentile(boots3, [5, 95])
+dist_plot(boots3, "Bootstrap proportion without health insurance", obs=noins.mean(), bins=22)
+se3 = np.sqrt(noins.mean() * (1 - noins.mean()) / 2000)
+pd.Series({"(a) 90% bootstrap interval": f"({ci3[0]:.4f}, {ci3[1]:.4f})",
+           "(b) SE (formula)": round(se3, 5),
+           "(b) 90% formula interval": f"({0.0875-1.645*se3:.4f}, {0.0875+1.645*se3:.4f})",
+           "(d) sample statistic / margin of error": (0.0875, round(1.645*se3, 4))}).to_string()
+```
+
+- **(a)** The 90% bootstrap interval (percentile method, 10,000 resamples) is **(0.078,
+  0.098)**.
+- **(b)** The formula interval uses $SE = \sqrt{\hat p(1-\hat p)/n} = \sqrt{0.0875(0.9125)/2000}
+  = 0.00632$: $0.0875 \pm 1.645(0.00632) = $ **(0.077, 0.098)** — essentially **identical** to
+  the bootstrap interval, as expected with $n\hat p = 175$ and $n(1-\hat p) = 1825$ both large.
+- **(c)** We are 90% confident that between about **7.7% and 9.8%** of all US residents lack
+  health insurance.
+- **(d)** Sample statistic $\hat p = 0.0875$; margin of error $1.645(0.00632) \approx$
+  **0.010**.
+- **(e)** The full ACS analyzes **millions** of people (a 1% public sample alone is about 3.5
+  million), and standard errors shrink like $1/\sqrt n$. Our $n = 2000$ gives SE ≈ 0.006; a
+  sample thousands of times larger drives the margin of error down by a factor of
+  $\sqrt{n_{\text{ACS}}/2000}$ — from about 0.010 to about **0.001** (even a bit larger than the
+  naive ratio, because the Census Bureau inflates SEs for the survey's clustered, weighted
+  design).
+- **(f)** From the full ACS: $0.087 \pm 0.001 = $ **(0.086, 0.088)** — we are 90% confident that
+  between **8.6% and 8.8%** of all US residents lack health insurance, a far tighter interval
+  than ours but centered on essentially the same value.
+
+## Exercise E.4
+
+**What Proportion of US Adults Are Married?** The sample gives $\hat p = 0.52$ married.
+
+```{python}
+#| echo: false
+mar = acs.Married.to_numpy(float)
+pm = mar.mean()
+se4 = np.sqrt(pm * (1 - pm) / 2000)
+se0 = np.sqrt(0.545 * 0.455 / 2000)
+z4 = (pm - 0.545) / se0
+rng = np.random.default_rng(2026)
+rp4 = rng.binomial(2000, 0.545, 10000) / 2000
+p_perm4 = float((np.abs(rp4 - 0.545) >= abs(pm - 0.545)).mean())
+pd.Series({"(a) 90% CI": f"({pm-1.645*se4:.4f}, {pm+1.645*se4:.4f})",
+           "(c) z-statistic": round(z4, 2),
+           "(c) two-tail p-value (formula)": round(st.norm.sf(abs(z4)) * 2, 4),
+           "(c) randomization p-value (2-tail)": round(p_perm4, 4)}).to_string()
+```
+
+- **(a)** $SE = \sqrt{0.52(0.48)/2000} = 0.0112$: 90% CI $0.52 \pm 1.645(0.0112) = $ **(0.502,
+  0.538)**. We are 90% confident that between about **50.2% and 53.8%** of US residents aged 15
+  and older are married.
+- **(b)** A 90% interval captures the true value 90% of the time, so of the 17 overlapping
+  years we'd expect about $0.90 \times 17 \approx$ **15** of the intervals to contain the census
+  proportion (roughly 15 or 16).
+- **(c)** Test $H_0: p = 0.545$ vs $H_a: p \ne 0.545$ (2000 census benchmark): $SE_0 =
+  \sqrt{0.545(0.455)/2000} = 0.0111$, so $z = \frac{0.52 - 0.545}{0.0111} = $ **−2.25, p = 0.025**
+  (randomization check with 10,000 binomial(2000, 0.545) samples: **p = 0.026**) → **reject
+  $H_0$** at the 5% level: the ACS data provide significant evidence that the proportion of US
+  adults who are married in 2017 **is lower** than the 54.5% of 2000 — marriage has declined.
+
+## Exercise E.5
+
+**Income and Sex** (`EmployedACS`, $n = 1287$ employed; Income in thousands of dollars; Sex:
+1 = male, 0 = female).
+
+```{python}
+#| echo: false
+#| fig-cap: Distribution of yearly income (left) and income by sex (right), EmployedACS
+inc = emp.Income.to_numpy(float); sex = emp.Sex.to_numpy(float)
+fig, axes = plt.subplots(1, 2, figsize=(9, 3.2))
+sns.histplot(x=inc, bins=40, ax=axes[0], color="#4c72b0")
+axes[0].set_xlabel("Income (thousands $)"); axes[0].set_title("All employed", fontsize=10)
+empS = emp.assign(SexLab = np.where(emp.Sex == 1, "Male", "Female"))
+sns.boxplot(data=empS, x="SexLab", y="Income", order=["Male", "Female"], ax=axes[1], color="#55a868")
+axes[1].set_xlabel("Sex"); axes[1].set_ylabel("Income (thousands $)")
+plt.tight_layout()
+plt.show()
+```
+
+```{python}
+#| echo: false
+mi, fi = inc[sex == 1], inc[sex == 0]
+obs5 = mi.mean() - fi.mean()
+perm5 = perm_diff(np.concatenate([mi, fi]), len(mi))
+tt5 = st.ttest_ind(mi, fi, equal_var=False)
+bd5 = boot_diff(mi, fi)
+ci5 = np.percentile(bd5, [2.5, 97.5])
+pd.Series({"(b) n, mean, sd, median, IQR, max":
+             (len(inc), round(inc.mean(), 1), round(inc.std(ddof=1), 1),
+              round(np.median(inc), 1), round(np.percentile(inc, 75) - np.percentile(inc, 25), 1),
+              round(inc.max(), 1)),
+           "(d) mean male, mean female, difference":
+             (round(mi.mean(), 1), round(fi.mean(), 1), round(obs5, 1)),
+           "(e) Welch t, p (2-tail)": (round(tt5.statistic, 2), float(tt5.pvalue)),
+           "(e) randomization p (2-tail)": float((np.abs(perm5) >= abs(obs5)).mean()),
+           "(e) bootstrap 95% CI for difference": f"({ci5[0]:.1f}, {ci5[1]:.1f})"}).to_string()
+```
+
+- **(a)** Yearly income is **heavily right-skewed**: half of employed people earn \$30,200 or
+  less (median), the middle 50% span roughly \$11,000–\$60,000, but the tail stretches to a
+  maximum of **\$566,000**, far beyond where the bulk of the data sit.
+- **(b)** Summary statistics ($n = 1287$): mean **\$44.5** thousand, median **\$30.2**, SD
+  **\$55.1**, IQR **\$49.0**, range \$0–\$566 (thousands). Mean ≫ median is the signature of the
+  skew.
+- **(c)** The side-by-side boxplots show males earning **more**, with a bigger spread and more
+  extreme high outliers; the female distribution sits visibly lower.
+- **(d)** Mean income: males **\$51.5k** ($n = 676$) vs females **\$36.8k** ($n = 611$) — a gap
+  of about **\$14.8 thousand** in favor of men.
+- **(e)** $H_0: \mu_M = \mu_F$ vs $H_a: \mu_M \ne \mu_F$. **Randomization test** (10,000
+  permutations of the 1287 incomes): the observed \$14.8k difference is far out in the tail —
+  **p < 0.0001** → **reject $H_0$**: employed males average significantly higher yearly income
+  than employed females in the US. (Welch $t = 4.92$, p < 0.0001, agrees; bootstrap 95% CI for
+  the difference: **(8.9, 20.7)** thousand dollars.)
+
+## Exercise E.6
+
+**Working Hours and Sex** (`EmployedACS`; HoursWk = usual hours per week).
+
+```{python}
+#| echo: false
+#| fig-cap: Usual weekly hours worked by sex, EmployedACS
+hw = emp.HoursWk.to_numpy(float)
+fig, ax = plt.subplots(figsize=(5, 3.2))
+sns.boxplot(data=empS, x="SexLab", y="HoursWk", order=["Male", "Female"], ax=ax, color="#8172b2")
+ax.set_xlabel("Sex"); ax.set_ylabel("Hours worked per week")
+plt.tight_layout()
+plt.show()
+```
+
+```{python}
+#| echo: false
+mh, fh = hw[sex == 1], hw[sex == 0]
+obs6 = mh.mean() - fh.mean()
+perm6 = perm_diff(np.concatenate([mh, fh]), len(mh))
+tt6 = st.ttest_ind(mh, fh, equal_var=False)
+pd.Series({"(b) mean male, sd": (round(mh.mean(), 2), round(mh.std(ddof=1), 2)),
+           "(b) mean female, sd": (round(fh.mean(), 2), round(fh.std(ddof=1), 2)),
+           "(b) difference": round(obs6, 2),
+           "(c) Welch t, one-tail p": (round(tt6.statistic, 2), float(tt6.pvalue / 2)),
+           "(c) randomization p (1-tail)": float((perm6 >= obs6).mean())}).to_string()
+```
+
+- **(a)** The boxplots show the **male** distribution shifted upward: male hours center near the
+  standard 40-hour week, while female hours are lower on average with a large fraction working
+  part-time (median below 40); the spreads are similar.
+- **(b)** Males: $\bar x = $ **40.5** hours/week ($s = 12.5$, $n = 676$); females: $\bar x = $
+  **34.9** hours/week ($s = 12.8$, $n = 611$) — a difference of about **5.6 hours/week**.
+- **(c)** $H_0: \mu_M = \mu_F$ vs $H_a: \mu_M > \mu_F$. Two-sample $t$ (Welch): $t = 7.95$,
+  **one-tailed p < 0.0001**; the randomization test (10,000 permutations) agrees: **p < 0.0001**
+  → **reject $H_0$**: strong evidence that employed males work more hours per week, on average,
+  than employed females in the US.
+
+## Exercise E.7
+
+**Health Insurance and Race** (ACS, $n = 2000$).
+
+```{python}
+#| echo: false
+#| fig-cap: Proportion with health insurance by race, ACS
+tab7 = pd.crosstab(acs.Race, acs.HealthInsurance)
+tab7.columns = ["Not insured", "Insured"]
+tab7 = tab7.loc[["white", "black", "asian", "other"]]
+prop7 = (tab7["Insured"] / tab7.sum(axis=1)).rename("prop insured")
+fig, ax = plt.subplots(figsize=(5, 3.2))
+sns.barplot(x=tab7.index, y=prop7.values, ax=ax, color="#4c72b0")
+ax.set_xlabel("Race"); ax.set_ylabel("Proportion insured"); ax.set_ylim(0, 1)
+plt.tight_layout()
+plt.show()
+```
+
+```{python}
+#| echo: false
+tab7  # (a) two-way table: health insurance status by race
+```
+
+```{python}
+#| echo: false
+ins = acs.HealthInsurance.to_numpy(); race = acs.Race.to_numpy()
+chi7, p7, dof7, _ = st.chi2_contingency(tab7.values)
+rng = np.random.default_rng(2026)
+races7 = np.unique(race)
+cnt7 = 0
+for i in range(10000):
+    pi = rng.permutation(ins)
+    t = np.array([[int(((race == r) & (pi == 1)).sum()), int(((race == r) & (pi == 0)).sum())]
+                  for r in races7])
+    if st.chi2_contingency(t)[0] >= chi7 - 1e-9:
+        cnt7 += 1
+pd.Series({"Row proportions insured": prop7.round(4).to_dict(),
+           "chi-square, df": (round(chi7, 2), dof7),
+           "chi-square p-value": float(p7),
+           "Randomization p-value": cnt7 / 10000}).to_string()
+```
+
+- **(a)** The two-way table above shows the counts (rows: race; columns: insurance status) —
+  e.g. whites 1407 insured / 113 not; other 122 insured / 30 not.
+- **(b)** The bar chart of the proportion insured by race shows **whites highest (0.926)**,
+  then Asians (0.915) and Blacks (0.895), with **"other" races clearly lowest (0.803)**.
+- **(c)** $H_0$: no association between health insurance status and race (insurance is
+  independent of race) vs $H_a$: there is an association. Chi-square test: $\chi^2 = 27.09$,
+  df = 3, **p = 0.00001**; the randomization test (10,000 shuffles of the insurance labels,
+  recomputing $\chi^2$) agrees: **p < 0.0001** → **reject $H_0$**: there is a significant
+  association between race and health insurance, driven mostly by the lower insured rate among
+  people of "other" races (about 80% vs 89–93% for the other groups).
+
+## Exercise E.8
+
+**Age and Race** (ACS, $n = 2000$).
+
+```{python}
+#| echo: false
+#| fig-cap: Age distribution overall (left) and by racial group (right), ACS
+age = acs.Age.to_numpy(float)
+fig, axes = plt.subplots(1, 2, figsize=(9, 3.2))
+sns.histplot(x=age, bins=30, ax=axes[0], color="#4c72b0")
+axes[0].set_xlabel("Age"); axes[0].set_title("All residents", fontsize=10)
+sns.boxplot(data=acs, x="Race", y="Age", order=["white", "black", "asian", "other"],
+            ax=axes[1], color="#55a868")
+axes[1].set_xlabel("Race")
+plt.tight_layout()
+plt.show()
+```
+
+```{python}
+#| echo: false
+groups8 = [acs.loc[acs.Race == r, "Age"].to_numpy(float) for r in ["white", "black", "asian", "other"]]
+F8, p8 = st.f_oneway(*groups8)
+rng = np.random.default_rng(2026)
+k8 = [len(g) for g in groups8]
+cntF = 0
+for i in range(10000):
+    p = rng.permutation(age)
+    gs, s = [], 0
+    for kk in k8:
+        gs.append(p[s:s + kk]); s += kk
+    allv = np.concatenate(gs); gm = allv.mean()
+    ssb = sum(len(g) * (g.mean() - gm) ** 2 for g in gs)
+    ssw = sum(((g - g.mean()) ** 2).sum() for g in gs)
+    if (ssb / 3) / (ssw / 1996) >= F8 - 1e-9:
+        cntF += 1
+basian = boot_mean(groups8[2])
+cib8 = np.percentile(basian, [2.5, 97.5])
+se_as = groups8[2].std(ddof=1) / np.sqrt(len(groups8[2]))
+pd.Series({"(b) mean age, sd": (round(age.mean(), 2), round(age.std(ddof=1), 2)),
+           "(b) 95% t-interval": f"({age.mean()-st.t.ppf(0.975,1999)*age.std(ddof=1)/np.sqrt(2000):.2f}, {age.mean()+st.t.ppf(0.975,1999)*age.std(ddof=1)/np.sqrt(2000):.2f})",
+           "(b) bootstrap 95% interval": f"({np.percentile(boot_mean(age),2.5):.2f}, {np.percentile(boot_mean(age),97.5):.2f})",
+           "(d) ANOVA F, p": (round(F8, 2), float(p8)),
+           "(d) permutation F p-value": cntF / 10000,
+           "(e) Asian mean, 95% t-interval": (round(groups8[2].mean(), 2),
+             f"({groups8[2].mean()-st.t.ppf(0.975,len(groups8[2])-1)*se_as:.2f}, {groups8[2].mean()+st.t.ppf(0.975,len(groups8[2])-1)*se_as:.2f})"),
+           "(e) Asian bootstrap 95% interval": f"({cib8[0]:.2f}, {cib8[1]:.2f})"}).to_string()
+```
+
+- **(a)** Ages span **16 to 95** with median 49: the distribution is fairly flat through the
+  20s–60s (a large working-age bulge), then thins out — no single dominant age, mildly left
+  shoulder in the teens (sample is 15+).
+- **(b)** $\bar x = 48.29$, $s = 19.34$: 95% t-interval $48.29 \pm 1.961(19.34/\sqrt{2000}) = $
+  **(47.4, 49.1)** (bootstrap: (47.4, 49.1)). We are 95% confident the **average US resident is
+  about 47.4 to 49.1 years old**.
+- **(c)** The boxplots by race show whites **oldest** (median 50), Blacks next (46), Asians
+  younger (41), and "other" races **youngest** (median 39) — the US White population skews older,
+  while the "other"/Asian populations skew younger.
+- **(d)** $H_0: \mu_w = \mu_b = \mu_a = \mu_o$ vs $H_a$: at least one mean differs. ANOVA:
+  $F = 15.92$, **p < 0.0001** (permutation F test: **p < 0.0001**) → **reject $H_0$**: average
+  age **does** differ by racial group in the US (whites ≈ 49.8 vs "other" ≈ 40.5).
+- **(e)** Asian residents: $\bar x = 42.97$, 95% CI **(39.9, 46.0)** (bootstrap: (40.1, 46.0)).
+  This interval lies **entirely below** the overall interval (47.4–49.1): the average Asian US
+  resident is significantly **younger** than the national average.
+
+## Exercise E.9
+
+**Income and Hours Worked** (`EmployedACS`).
+
+```{python}
+#| echo: false
+#| fig-cap: Yearly income vs usual weekly hours worked, EmployedACS (jittered), with least-squares line
+rng9 = np.random.default_rng(2026)
+jit = rng9.uniform(-1, 1, len(hw))
+fig, ax = plt.subplots(figsize=(5.5, 3.2))
+ax.scatter(hw + jit, inc, s=6, alpha=0.35, color="#4c72b0")
+xs = np.linspace(hw.min(), hw.max(), 50)
+b9 = np.polyfit(hw, inc, 1)
+ax.plot(xs, b9[0] * xs + b9[1], color="#c44e52", lw=2)
+ax.set_xlabel("Hours worked per week"); ax.set_ylabel("Income (thousands $)")
+plt.tight_layout()
+plt.show()
+```
+
+```{python}
+#| echo: false
+X9 = np.column_stack([np.ones(len(hw)), hw])
+beta9, _, _, _ = np.linalg.lstsq(X9, inc, rcond=None)
+resid9 = inc - X9 @ beta9
+s29 = (resid9 ** 2).sum() / (len(hw) - 2)
+se9 = np.sqrt(s29 * np.linalg.inv(X9.T @ X9).diagonal())
+t9 = beta9[1] / se9[1]
+r9, _ = st.pearsonr(hw, inc)
+rng = np.random.default_rng(2026)
+cntR = 0
+for i in range(10000):
+    if abs(st.pearsonr(hw, rng.permutation(inc))[0]) >= abs(r9) - 1e-12:
+        cntR += 1
+r29 = 1 - (resid9 ** 2).sum() / (((inc - inc.mean()) ** 2).sum())
+pd.Series({"(b) correlation r": round(r9, 3),
+           "(b) t for slope, p (2-tail)": (round(t9, 2), float(st.t.sf(abs(t9), len(hw) - 2) * 2)),
+           "(b) permutation p-value": cntR / 10000,
+           "(c) fitted equation": f"Income = {beta9[0]:.1f} + {beta9[1]:.3f} * HoursWk",
+           "(d) prediction at 40 hrs (thousand $)": round(beta9[0] + beta9[1] * 40, 1),
+           "(e) R-squared": round(r29, 3),
+           "(f) corr(|resid|, fitted)": round(float(np.corrcoef(np.abs(resid9), X9 @ beta9)[0, 1]), 2)}).to_string()
+```
+
+- **(a)** The scatterplot (hours jittered, since they're whole numbers) shows a **positive but
+  weak-to-moderate, fan-shaped trend**: income rises with hours worked, but the spread explodes
+  among full-time workers — some 40-hour workers earn near \$0 while others top \$500k.
+- **(b)** **Yes.** $r = 0.338$; testing $H_0: \rho = 0$ vs $H_a: \rho > 0$: $t = 12.9$,
+  **p < 0.0001** (permutation test on the correlation: **p < 0.0001**) → a **significant
+  positive association** between hours worked and yearly income.
+- **(c)** Fitted regression: $\widehat{\text{Income}} = -9.99 + 1.44 \cdot \text{HoursWk}$
+  (income in thousands; slope SE = 0.11).
+- **(d)** At 40 hours: $-9.99 + 1.44(40) = $ **\$47.6 thousand** predicted yearly salary.
+- **(e)** $R^2 = 0.115$ — only about **11%** of the variability in yearly income is explained by
+  hours worked; hours alone are a poor predictor.
+- **(f)** **Not really.** The residuals fan out as fitted values increase (visible funnel;
+  correlation of |residual| with fitted value ≈ 0.26), the response is strongly right-skewed
+  (skew 4.1), and the model absurdly predicts **negative income** for anyone working under ~7
+  hours/week. Linearity is passable and $n = 1287$ is large, but the equal-variance/normal
+  residuals conditions fail, so the p-values and intervals from the regression model are
+  approximate (the permutation test above, which needs no such conditions, confirms the
+  association itself).
+
+## Exercise E.10
+
+**Income, Hours per Week, and Sex** (`EmployedACS`).
+
+- **(a)** HoursWk is a **confounding variable** for the Income–Sex relationship because it is
+  **associated with both**: males work more hours per week on average than females (E.6: 40.5 vs
+  34.9), and people who work more hours earn more income (E.9: $r = 0.338$, slope \$1.44k per
+  hour/week). So part of the raw male–female income gap (E.5: \$14.8k) may simply reflect
+  differences in hours worked rather than sex itself — hours is a third variable entangled with
+  both the presumed cause (sex) and the response (income).
+- **(b)** Multiple regression of Income on HoursWk and Sex:
+
+```{python}
+#| echo: false
+Xm = np.column_stack([np.ones(len(hw)), hw, sex])
+betaM, _, _, _ = np.linalg.lstsq(Xm, inc, rcond=None)
+residM = inc - Xm @ betaM
+s2M = (residM ** 2).sum() / (len(hw) - 3)
+sebM = np.sqrt(s2M * np.linalg.inv(Xm.T @ Xm).diagonal())
+tM = betaM / sebM
+pM = st.t.sf(np.abs(tM), len(hw) - 3) * 2
+rng = np.random.default_rng(2026)
+cntS = 0
+for i in range(10000):
+    ps = rng.permutation(sex)
+    bp_, _, _, _ = np.linalg.lstsq(np.column_stack([np.ones(len(hw)), hw, ps]), inc, rcond=None)
+    if abs(bp_[2]) >= abs(betaM[2]) - 1e-12:
+        cntS += 1
+pd.Series({"Fitted equation": f"Income = {betaM[0]:.1f} + {betaM[1]:.3f}*HoursWk + {betaM[2]:.2f}*Sex",
+           "HoursWk coef (SE, t, p)": (round(betaM[1], 3), round(sebM[1], 3), round(tM[1], 2), float(pM[1])),
+           "Sex coef (SE, t, p)": (round(betaM[2], 2), round(sebM[2], 2), round(tM[2], 2), round(pM[2], 4)),
+           "Permutation p for Sex coefficient": cntS / 10000}).to_string()
+```
+
+  The fitted model is $\widehat{\text{Income}} = -11.45 + 1.381 \cdot \text{HoursWk} + 7.00
+  \cdot \text{Sex}$. **Sex remains a significant predictor of Income after accounting for
+  hours**: $t = 2.37$, **p = 0.018** (permutation test on the Sex coefficient: **p = 0.016**) →
+  reject $H_0: \beta_{Sex} = 0$.
+- **(c)** At 40 hours/week: male ($\text{Sex} = 1$): $-11.45 + 1.381(40) + 7.00 = $ **\$50.8
+  thousand**; female ($\text{Sex} = 0$): **\$43.8 thousand**. The predicted gap is
+  **\$7.0 thousand** — exactly the Sex coefficient. Controlling for hours cuts the raw \$14.8k
+  gap roughly in **half** (hours explains a large share of it), but a **significant residual
+  gap of about \$7,000** remains that hours worked cannot account for.
+
+:::

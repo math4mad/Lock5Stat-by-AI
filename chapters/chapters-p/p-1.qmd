@@ -1,0 +1,1258 @@
+---
+execute-dir: project
+title: "Chapter P · Sections P.1–P.2"
+subtitle: "Probability Rules + Tree Diagrams and Bayes' Rule — one tab per exercise"
+author: "Lock5Stat-by-AI"
+date: today
+jupyter: python3
+---
+
+Chapter P gathers the **probability rules** that quietly power every
+inference procedure in the rest of the book. Section P.1 works with the
+**complement rule** ($P(\text{not }A) = 1 - P(A)$), the **additive rule**
+($P(A \text{ or } B) = P(A) + P(B) - P(A \text{ and } B)$), the
+**conditional probability** $P(A \text{ if } B) = P(A \text{ and } B)/P(B)$,
+the **multiplicative rule** ($P(A \text{ and } B) = P(B)\,P(A \text{ if } B)$),
+and the two special relationships: events are **disjoint** when they cannot
+occur together ($P(A \text{ and } B) = 0$) and **independent** when one
+occurrence does not change the other's probability
+($P(A \text{ if } B) = P(A)$, equivalently $P(A \text{ and } B) = P(A)P(B)$).
+Section P.2 adds the **total probability rule** — split an event across
+disjoint cases, multiply along each branch of a **tree diagram**, and add —
+and **Bayes' rule**, which reverses the conditioning: given a positive test,
+a strike, or a spam-flag word, what is the updated ("posterior") probability
+of the underlying cause? Below, every probability is computed **exactly**
+(with the `fractions` module or explicit arithmetic, and `itertools.product`
+for dice-style sample spaces), and the applied scenarios — free throws,
+pancakes, disease screening, pitches, spam filters — each get a
+**simulation cross-check** (100000+ random repetitions, seed 2026).
+The exercises are from *Statistics: Unlocking the Power of Data* (Lock⁵,
+3rd ed., pp. 744–755): Skill Builders P.1–P.26 drill the rules from given
+probabilities and a two-way table, P.27–P.42 apply them to Skittles, rugby,
+color blindness, life tables, and the stock market; P.43–P.54 complete and
+read tree diagrams, and P.55–P.62 run trees and Bayes' rule through housing
+counts, fibromyalgia screening, mammograms, baseball pitches, and
+spam-text detection.
+
+```{python}
+#| include: false
+import os
+from pathlib import Path
+_root = Path.cwd()
+while not (_root / "_quarto.yml").exists():
+    _root = _root.parent
+os.chdir(_root)
+import numpy as np, pandas as pd
+from fractions import Fraction as F
+from itertools import product
+from scipy import stats
+
+def bayes(p_a, p_d_if_a, p_d_if_not_a):
+    """Bayes' rule, two branches: P(A if D) from P(A), P(D if A), P(D if not A)."""
+    num = p_a * p_d_if_a
+    return num / (num + (1 - p_a) * p_d_if_not_a)
+
+def total_prob(p_a, p_d_if_a, p_d_if_not_a):
+    """Total probability rule: P(D) = P(A)P(D if A) + P(not A)P(D if not A)."""
+    return p_a * p_d_if_a + (1 - p_a) * p_d_if_not_a
+
+def bayes_sim(p_a, p_d_if_a, p_d_if_not_a, reps=100000, seed=2026):
+    """Simulate the two-branch Bayes scenario: draw A, then D given A;
+    return the fraction of D-cases in which A occurred."""
+    r = np.random.default_rng(seed)
+    a = r.random(reps) < p_a
+    d = np.where(a, r.random(reps) < p_d_if_a, r.random(reps) < p_d_if_not_a)
+    return float(a[d].mean())
+```
+
+::: {.panel-tabset}
+
+## Exercise P.1
+
+*(Skill Builder 1)* With $P(A) = 0.4$, $P(B) = 0.3$, $P(A \text{ and } B) = 0.1$,
+find $P(\text{not } A)$.
+
+```{python}
+#| echo: false
+pd.Series({"P(not A)": 1 - F(2, 5)}).to_string()
+```
+
+**0.6** — the complement rule: $P(\text{not } A) = 1 - P(A) = 1 - 0.4$.
+
+## Exercise P.2
+
+*(Skill Builder 1)* Find $P(\text{not } B)$.
+
+```{python}
+#| echo: false
+pd.Series({"P(not B)": 1 - F(3, 10)}).to_string()
+```
+
+**0.7** — again the complement rule: $1 - 0.3$.
+
+## Exercise P.3
+
+*(Skill Builder 1)* Find $P(A \text{ or } B)$.
+
+```{python}
+#| echo: false
+pd.Series({"P(A or B)": F(2, 5) + F(3, 10) - F(1, 10)}).to_string()
+```
+
+**0.6** — the additive rule subtracts the overlap so it is not counted
+twice: $0.4 + 0.3 - 0.1$.
+
+## Exercise P.4
+
+*(Skill Builder 1)* Find $P(A \text{ if } B)$.
+
+```{python}
+#| echo: false
+pd.Series({"P(A if B)": F(1, 10) / F(3, 10)}).to_string()
+```
+
+$P(A \text{ if } B) = \dfrac{P(A \text{ and } B)}{P(B)} = \dfrac{0.1}{0.3} =$ **1/3 ≈ 0.333**.
+
+## Exercise P.5
+
+*(Skill Builder 1)* Find $P(B \text{ if } A)$.
+
+```{python}
+#| echo: false
+pd.Series({"P(B if A)": F(1, 10) / F(2, 5)}).to_string()
+```
+
+$P(B \text{ if } A) = \dfrac{0.1}{0.4} =$ **0.25**.
+
+## Exercise P.6
+
+*(Skill Builder 1)* Are events $A$ and $B$ disjoint?
+
+```{python}
+#| echo: false
+pd.Series({"P(A and B)": 0.1, "Disjoint requires": 0.0}).to_string()
+```
+
+**No.** Disjoint events cannot occur together, but here
+$P(A \text{ and } B) = 0.1 \ne 0$ — the events overlap.
+
+## Exercise P.7
+
+*(Skill Builder 1)* Are events $A$ and $B$ independent?
+
+```{python}
+#| echo: false
+pa, pb, pab = F(2, 5), F(3, 10), F(1, 10)
+pd.Series({"P(A)·P(B)": float(pa * pb), "P(A and B)": float(pab)}).to_string()
+```
+
+**No.** Independence requires $P(A \text{ and } B) = P(A)P(B)$, but
+$0.1 \ne 0.4 \times 0.3 = 0.12$. Indeed, knowing $B$ occurs changes
+$P(A \text{ if } B)$ to $1/3 \approx 0.333$, not 0.4 — the events are
+dependent.
+
+## Exercise P.8
+
+*(Skill Builder 2)* With $P(A) = 0.8$, $P(B) = 0.4$, $P(A \text{ and } B) = 0.25$,
+find $P(\text{not } A)$.
+
+```{python}
+#| echo: false
+pd.Series({"P(not A)": 1 - F(4, 5)}).to_string()
+```
+
+**0.2** — complement rule.
+
+## Exercise P.9
+
+*(Skill Builder 2)* Find $P(\text{not } B)$.
+
+```{python}
+#| echo: false
+pd.Series({"P(not B)": 1 - F(2, 5)}).to_string()
+```
+
+**0.6** — complement rule.
+
+## Exercise P.10
+
+*(Skill Builder 2)* Find $P(A \text{ or } B)$.
+
+```{python}
+#| echo: false
+pd.Series({"P(A or B)": F(4, 5) + F(2, 5) - F(1, 4)}).to_string()
+```
+
+**0.95** — additive rule: $0.8 + 0.4 - 0.25$.
+
+## Exercise P.11
+
+*(Skill Builder 2)* Find $P(A \text{ if } B)$.
+
+```{python}
+#| echo: false
+pd.Series({"P(A if B)": F(1, 4) / F(2, 5)}).to_string()
+```
+
+$P(A \text{ if } B) = \dfrac{0.25}{0.4} =$ **0.625**.
+
+## Exercise P.12
+
+*(Skill Builder 2)* Find $P(B \text{ if } A)$.
+
+```{python}
+#| echo: false
+pd.Series({"P(B if A)": F(1, 4) / F(4, 5)}).to_string()
+```
+
+$P(B \text{ if } A) = \dfrac{0.25}{0.8} =$ **0.3125**.
+
+## Exercise P.13
+
+*(Skill Builder 2)* Are events $A$ and $B$ disjoint?
+
+```{python}
+#| echo: false
+pd.Series({"P(A and B)": 0.25, "Disjoint requires": 0.0}).to_string()
+```
+
+**No** — $P(A \text{ and } B) = 0.25 \ne 0$, so the events can occur together.
+
+## Exercise P.14
+
+*(Skill Builder 2)* Are events $A$ and $B$ independent?
+
+```{python}
+#| echo: false
+pa, pb, pab = F(4, 5), F(2, 5), F(1, 4)
+pd.Series({"P(A)·P(B)": float(pa * pb), "P(A and B)": float(pab)}).to_string()
+```
+
+**No** — $P(A)P(B) = 0.32$ but $P(A \text{ and } B) = 0.25$; the equality
+required for independence fails.
+
+## Exercise P.15
+
+*(Skill Builder 3)* $A$ and $B$ are **independent** with $P(A) = 0.7$ and
+$P(B) = 0.6$. Find $P(A \text{ if } B)$.
+
+```{python}
+#| echo: false
+pd.Series({"P(A if B)": 0.7}).to_string()
+```
+
+**0.7** — independence means $B$ gives no information about $A$:
+$P(A \text{ if } B) = P(A)$.
+
+## Exercise P.16
+
+*(Skill Builder 3)* Find $P(B \text{ if } A)$.
+
+```{python}
+#| echo: false
+pd.Series({"P(B if A)": 0.6}).to_string()
+```
+
+**0.6** — symmetrically, $P(B \text{ if } A) = P(B)$ under independence.
+
+## Exercise P.17
+
+*(Skill Builder 3)* Find $P(A \text{ and } B)$.
+
+```{python}
+#| echo: false
+pd.Series({"P(A and B)": F(7, 10) * F(3, 5)}).to_string()
+```
+
+**0.42** — the multiplicative rule for independent events:
+$P(A)P(B) = 0.7 \times 0.6$.
+
+## Exercise P.18
+
+*(Skill Builder 3)* Find $P(A \text{ or } B)$.
+
+```{python}
+#| echo: false
+pd.Series({"P(A or B)": F(7, 10) + F(3, 5) - F(7, 10) * F(3, 5)}).to_string()
+```
+
+**0.88** — additive rule with the independent-event joint:
+$0.7 + 0.6 - 0.42$.
+
+## Exercise P.19
+
+*(Skill Builder 4)* Table P.3 gives the joint probabilities for $A$, $B$ and
+their complements: $P(A \text{ and } B) = 0.2$,
+$P(\text{not } A \text{ and } B) = 0.4$, $P(A \text{ and not } B) = 0.1$,
+$P(\text{not } A \text{ and not } B) = 0.3$. Find $P(A)$.
+
+```{python}
+#| echo: false
+tabP3 = pd.DataFrame({"B": [0.2, 0.4], "not B": [0.1, 0.3]},
+                     index=["A", "not A"])
+tabP3.to_string()
+```
+
+```{python}
+#| echo: false
+pd.Series({"P(A)": F(1, 5) + F(1, 10)}).to_string()
+```
+
+**0.3** — sum the $A$ row: $0.2 + 0.1$.
+
+## Exercise P.20
+
+*(Skill Builder 4)* Find $P(\text{not } B)$.
+
+```{python}
+#| echo: false
+pd.Series({"P(not B)": F(1, 10) + F(3, 10)}).to_string()
+```
+
+**0.4** — sum the "not $B$" column: $0.1 + 0.3$.
+
+## Exercise P.21
+
+*(Skill Builder 4)* Find $P(A \text{ and } B)$.
+
+```{python}
+#| echo: false
+pd.Series({"P(A and B)": F(1, 5)}).to_string()
+```
+
+**0.2** — read directly from the cell where row $A$ meets column $B$.
+
+## Exercise P.22
+
+*(Skill Builder 4)* Find $P(A \text{ or } B)$.
+
+```{python}
+#| echo: false
+pd.Series({"P(A or B)": F(1, 5) + F(2, 5) + F(1, 10)}).to_string()
+```
+
+**0.7** — add every cell in the $A$ row or $B$ column:
+$0.2 + 0.4 + 0.1$ (equivalently $0.3 + 0.6 - 0.2$).
+
+## Exercise P.23
+
+*(Skill Builder 4)* Find $P(A \text{ if } B)$.
+
+```{python}
+#| echo: false
+pd.Series({"P(A if B)": (F(1, 5)) / (F(1, 5) + F(2, 5))}).to_string()
+```
+
+$P(A \text{ if } B) = \dfrac{0.2}{0.2 + 0.4} = \dfrac{0.2}{0.6} =$ **1/3 ≈ 0.333** —
+restrict to the $B$ column, then take the $A$ share of it.
+
+## Exercise P.24
+
+*(Skill Builder 4)* Find $P(B \text{ if } A)$.
+
+```{python}
+#| echo: false
+pd.Series({"P(B if A)": (F(1, 5)) / (F(1, 5) + F(1, 10))}).to_string()
+```
+
+$P(B \text{ if } A) = \dfrac{0.2}{0.3} =$ **2/3 ≈ 0.667**.
+
+## Exercise P.25
+
+*(Skill Builder 4)* Are events $A$ and $B$ disjoint?
+
+```{python}
+#| echo: false
+pd.Series({"P(A and B)": 0.2, "Disjoint requires": 0.0}).to_string()
+```
+
+**No** — the table's corner cell $P(A \text{ and } B) = 0.2 \ne 0$.
+
+## Exercise P.26
+
+*(Skill Builder 4)* Are events $A$ and $B$ independent?
+
+```{python}
+#| echo: false
+pab, pa, pb = F(1, 5), F(3, 10), F(3, 5)
+pd.Series({"P(A)·P(B)": float(pa * pb), "P(A and B)": float(pab)}).to_string()
+```
+
+**No** — $P(A)P(B) = 0.3 \times 0.6 = 0.18 \ne 0.2$; the small mismatch
+between 0.18 and 0.2 is enough to break independence.
+
+## Exercise P.27
+
+**Skittles.** Draw three Skittles (colors yellow, green, red, purple,
+orange). Let $A$ = "all three are green" and $B$ = "at least one is red."
+
+```{python}
+#| echo: false
+pd.Series({"A and B together": "impossible", "A plus B covers all outcomes": "no"}).to_string()
+```
+
+**Disjoint only.** A triple that is all green cannot contain a red Skittle,
+so $P(A \text{ and } B) = 0$ — the events are **disjoint**. They are **not
+complements**: many draws (say, two greens and a yellow) are in neither
+event. And disjoint events with nonzero probabilities can never be
+independent ($0 \ne P(A)P(B)$), so they are not independent either.
+
+## Exercise P.28
+
+**Rugby final.** South Africa plays Australia (no ties allowed). $A$ =
+"Australia wins", $B$ = "South Africa wins".
+
+**Disjoint and complements.** Exactly one of the two teams wins, so the
+events cannot occur together (disjoint) and one of them **must** occur
+($P(A \text{ or } B) = 1$) — each is the other's complement. They are
+therefore not independent.
+
+## Exercise P.29
+
+**Rugby + chess.** Australia plays South Africa in rugby while Poland plays
+Russia in chess. $A$ = "Australia wins rugby", $B$ = "Poland wins chess".
+
+**Independent only.** The matches have nothing to do with each other, so
+$P(A \text{ if } B) = P(A)$ — the events are **independent**. They are not
+disjoint (both can happen) and not complements (both can fail: draws or
+other results in one match don't force anything about the other).
+
+## Exercise P.30
+
+**Two dice.** Roll two six-sided dice. $A$ = "first die is a 3",
+$B$ = "the sum is 8".
+
+```{python}
+#| echo: false
+pairs = list(product(range(1, 7), repeat=2))
+A = [p for p in pairs if p[0] == 3]
+B = [p for p in pairs if sum(p) == 8]
+AB = [p for p in pairs if p[0] == 3 and sum(p) == 8]
+r = np.random.default_rng(2026)
+d = r.integers(1, 7, size=(100000, 2))
+a = d[:, 0] == 3
+b = d.sum(axis=1) == 8
+pd.Series({"P(A)": float(F(len(A), 36)), "P(B)": float(F(len(B), 36)),
+           "P(A and B)": float(F(len(AB), 36)),
+           "P(A)·P(B)": float(F(len(A), 36) * F(len(B), 36)),
+           "Sim P(A and B) (100000 rolls)": float((a & b).mean())}).to_string()
+```
+
+**Not disjoint, not independent, not complements.** The outcome $(3, 5)$
+satisfies both events, so $P(A \text{ and } B) = 1/36 \ne 0$ — not disjoint
+(and hence not complements, either). But
+$P(A)P(B) = \frac{1}{6}\cdot\frac{5}{36} = \frac{5}{216} \approx 0.0231$
+while $P(A \text{ and } B) = 1/36 \approx 0.0278$, so the independence
+equality fails: knowing the first die is a 3 raises the chance of a sum of
+8 from 5/36 to 1/6. The 100000-roll simulation above agrees.
+
+## Exercise P.31
+
+**Explain What Is Wrong.**
+
+- **(a)** "10% of adults are left-handed, so in an SRS of 10 adults, 1 will
+  be left-handed." **Wrong:** probability is a long-run proportion, not a
+  guarantee — a particular sample of 10 could have 0, 1, 2, … left-handers;
+  only the *average* over many samples is about 1.
+- **(b)** "A pitch can be a ball, a strike, or hit by the batter — three
+  outcomes, so each has probability 1/3." **Wrong:** the three outcomes are
+  **not equally likely**; the "equal outcomes ⇒ equal probabilities" shortcut
+  only works for a fair mechanism.
+- **(c)** "Two consecutive rolls both land 1 with probability
+  $1/6 + 1/6 = 1/3$." **Wrong:** independent events **multiply**, they don't
+  add: $\frac{1}{6}\cdot\frac{1}{6} = \frac{1}{36}$.
+- **(d)** "The probability of surviving a heart attack is 2.35."
+  **Wrong:** a probability can never exceed **1** (nor be negative); 2.35 is
+  not a valid probability — perhaps it is an *odds* or a rate ratio.
+
+## Exercise P.32
+
+**Studio and Genre of Movies.** About 20% of Hollywood movies are comedies,
+Warner Bros produces about 10.5% of recent movies, and about 2.5% are
+Warner Bros comedies. Let $C$ = comedy, $W$ = Warner Bros.
+
+```{python}
+#| echo: false
+C, W, CW = F(1, 5), F(21, 200), F(1, 40)
+pd.Series({"(b) P(C or W)": float(C + W - CW),
+           "(c) P(C if W)": float(CW / W),
+           "(d) P(W if C)": float(CW / C),
+           "(e) P(not C)": float(1 - C)}).to_string()
+```
+
+- **(a)** $P(C) = 0.20$, $\ P(W) = 0.105$, $\ P(C \text{ and } W) = 0.025$.
+- **(b)** $P(C \text{ or } W) = 0.20 + 0.105 - 0.025 =$ **0.28**.
+- **(c)** $P(C \text{ if } W) = 0.025/0.105 \approx$ **0.238**.
+- **(d)** $P(W \text{ if } C) = 0.025/0.20 =$ **0.125**.
+- **(e)** $P(\text{not } C) = 1 - 0.20 =$ **0.80**.
+- **(f)** "$C$ and $W$ disjoint" would mean **no movie is both a comedy and a
+  Warner Bros movie**. They are **not** disjoint: 2.5% of movies are both.
+- **(g)** "$C$ and $W$ independent" would mean a Warner Bros movie is a
+  comedy at the same 20% rate as movies in general. They are **not**
+  independent: $P(C \text{ if } W) = 0.238 \ne 0.20$ — Warner Bros releases
+  comedies at a higher-than-average rate.
+
+## Exercise P.33
+
+**Rock and Roll Hall of Fame.** Of 329 inductees (founding–2019), by female
+members and performer status (dataset `RockandRoll2019`):
+
+```{python}
+#| echo: false
+rr = pd.DataFrame({"Female members": [43, 9, 52],
+                   "No female members": [187, 90, 277],
+                   "Total": [230, 99, 329]},
+                  index=["Performer", "Not performer", "Total"])
+rr.to_string()
+```
+
+```{python}
+#| echo: false
+pd.Series({
+    "(a) P(MP)": float(F(230, 329)),
+    "(b) P(not F)": float(F(277, 329)),
+    "(c) P(F if MP)": float(F(43, 230)),
+    "(d) P(not MP if not F)": float(F(90, 277)),
+    "(e) P(MP and not F)": float(F(187, 329)),
+    "(f) P(not MP or F)": float(F(142, 329)),
+}).to_string()
+```
+
+- **(a)** $P(MP) = 230/329 \approx$ **0.699**.
+- **(b)** $P(\text{not } F) = 277/329 \approx$ **0.842**.
+- **(c)** $P(F \text{ if } MP) = 43/230 \approx$ **0.187**.
+- **(d)** $P(\text{not } MP \text{ if not } F) = 90/277 \approx$ **0.325**.
+- **(e)** $P(MP \text{ and not } F) = 187/329 \approx$ **0.568**.
+- **(f)** $P(\text{not } MP \text{ or } F) = (99 + 43)/329 = 142/329 \approx$
+  **0.432**.
+
+## Exercise P.34
+
+**Hockey Hall of Fame.** Of 281 player inductees (founding–2019), by place
+of birth and position:
+
+```{python}
+#| echo: false
+hh = pd.DataFrame({"Offense": [133, 8, 13, 2, 156],
+                   "Defense": [75, 5, 6, 1, 87],
+                   "Goal": [34, 1, 3, 0, 38],
+                   "Total": [242, 14, 22, 3, 281]},
+                  index=["Canada", "USA", "Europe", "Other", "Total"])
+hh.to_string()
+```
+
+```{python}
+#| echo: false
+pd.Series({
+    "(a) P(C)": float(F(242, 281)),
+    "(b) P(not D)": float(F(194, 281)),
+    "(c) P(D and C)": float(F(75, 281)),
+    "(d) P(C or D)": float(F(254, 281)),
+    "(e) P(D if C)": float(F(75, 242)),
+    "(f) P(C if D)": float(F(75, 87)),
+}).to_string()
+```
+
+With $C$ = born in Canada and $D$ = defenseman:
+
+- **(a)** $P(C) = 242/281 \approx$ **0.861**.
+- **(b)** $P(\text{not } D) = (281 - 87)/281 = 194/281 \approx$ **0.690**.
+- **(c)** $P(D \text{ and } C) = 75/281 \approx$ **0.267**.
+- **(d)** $P(C \text{ or } D) = (242 + 87 - 75)/281 = 254/281 \approx$ **0.904**.
+- **(e)** $P(D \text{ if } C) = 75/242 \approx$ **0.310**.
+- **(f)** $P(C \text{ if } D) = 75/87 \approx$ **0.862**.
+
+## Exercise P.35
+
+**Peanut M&M's.** A bag has 80 pieces: 11 red, 12 orange, 20 blue, 11 green,
+18 yellow, 8 brown, all equally likely to be picked.
+
+```{python}
+#| echo: false
+pd.Series({
+    "(a) P(red)": float(F(11, 80)),
+    "(b) P(not blue)": float(F(60, 80)),
+    "(c) P(red or orange)": float(F(23, 80)),
+    "(d) P(both blue, with replacement)": float(F(20, 80) ** 2),
+    "(e) P(red 1st, green 2nd, no replacement)": float(F(11, 80) * F(11, 79)),
+}).to_string()
+```
+
+- **(a)** $11/80 =$ **0.1375**.
+- **(b)** $1 - 20/80 =$ **0.75**.
+- **(c)** $(11 + 12)/80 =$ **0.2875** (red and orange are disjoint).
+- **(d)** With replacement the picks are independent:
+  $\frac{20}{80}\cdot\frac{20}{80} =$ **0.0625**.
+- **(e)** Without replacement:
+  $\frac{11}{80}\cdot\frac{11}{79} = \frac{121}{6320} \approx$ **0.0191**.
+  (The book's answer key prints 0.191 — a dropped zero; the exact value is
+  0.0191.)
+
+## Exercise P.36
+
+**More Peanut M&M's.** Same bag: 11 red, 12 orange, 20 blue, 11 green,
+18 yellow, 8 brown among 80.
+
+```{python}
+#| echo: false
+pd.Series({
+    "(a) P(yellow)": float(F(18, 80)),
+    "(b) P(not brown)": float(F(72, 80)),
+    "(c) P(blue or green)": float(F(31, 80)),
+    "(d) P(both red, with replacement)": float(F(11, 80) ** 2),
+    "(e) P(yellow 1st, blue 2nd, no replacement)": float(F(18, 80) * F(20, 79)),
+}).to_string()
+```
+
+- **(a)** $18/80 =$ **0.225**.
+- **(b)** $1 - 8/80 =$ **0.90**.
+- **(c)** $(20 + 11)/80 =$ **0.3875**.
+- **(d)** $\frac{11}{80}\cdot\frac{11}{80} = \frac{121}{6400} \approx$ **0.0189**.
+- **(e)** $\frac{18}{80}\cdot\frac{20}{79} = \frac{360}{6320} \approx$ **0.0570**.
+
+## Exercise P.37
+
+**Free Throws.** Stephen Curry made 90.8% of free throws in 2015–16; assume
+shots are independent with $P(\text{make}) = 0.908$.
+
+```{python}
+#| echo: false
+p = F(908, 1000)
+q = 1 - p
+r = np.random.default_rng(2026)
+shots = r.random((100000, 2)) < 0.908
+pd.Series({
+    "(a) P(make both)": float(p * p),
+    "(b) P(miss both)": float(q * q),
+    "(c) P(exactly one)": float(2 * p * q),
+    "Sim (a)": float((shots.sum(axis=1) == 2).mean()),
+    "Sim (b)": float((shots.sum(axis=1) == 0).mean()),
+    "Sim (c)": float((shots.sum(axis=1) == 1).mean()),
+}).to_string()
+```
+
+- **(a)** $0.908^2 \approx$ **0.824**.
+- **(b)** $(1 - 0.908)^2 = 0.092^2 \approx$ **0.008**.
+- **(c)** $2(0.908)(0.092) \approx$ **0.167** — either make-then-miss or
+  miss-then-make. The 100000-pair simulation above matches all three.
+
+## Exercise P.38
+
+**Color Blindness in Men and Women.** About 7% of American men and 0.4% of
+American women are red-green color-blind.
+
+```{python}
+#| echo: false
+pm, pw = F(7, 100), F(4, 1000)
+pd.Series({
+    "(a) P(man color-blind)": float(pm),
+    "(b) P(woman NOT color-blind)": float(1 - pw),
+    "(c) P(neither is color-blind)": float((1 - pm) * (1 - pw)),
+    "(d) P(at least one is color-blind)": float(1 - (1 - pm) * (1 - pw)),
+}).to_string()
+```
+
+- **(a)** **0.07** — given directly.
+- **(b)** $1 - 0.004 =$ **0.996**.
+- **(c)** $(0.93)(0.996) \approx$ **0.9263** — a man and a woman are
+  independent, so multiply.
+- **(d)** $1 - 0.9263 \approx$ **0.0737** — the complement of "neither."
+
+## Exercise P.39
+
+**More Color Blindness.** A class has 15 men and 25 women; still
+$P(\text{color-blind}) = 0.07$ (men) and $0.004$ (women), independently
+across students.
+
+```{python}
+#| echo: false
+r = np.random.default_rng(2026)
+men = r.random((100000, 15)) < 0.07
+wom = r.random((100000, 25)) < 0.004
+none = (~men).all(axis=1) & (~wom).all(axis=1)
+pd.Series({
+    "(a) P(nobody color-blind)": float(0.93 ** 15 * 0.996 ** 25),
+    "Sim (a)": float(none.mean()),
+    "(b) P(at least one)": float(1 - 0.93 ** 15 * 0.996 ** 25),
+    "Sim (b)": float(1 - none.mean()),
+    "(c) P(random student is color-blind)": float((15 * 0.07 + 25 * 0.004) / 40),
+}).to_string()
+```
+
+- **(a)** $0.93^{15} \times 0.996^{25} \approx$ **0.305** — independence lets
+  us multiply all 40 complements.
+- **(b)** $1 - 0.305 \approx$ **0.695** — despite the tiny per-person rates,
+  at least one color-blind student is more likely than not. The simulation
+  (100000 classes) agrees.
+- **(c)** $\dfrac{15(0.07) + 25(0.004)}{40} = \dfrac{1.15}{40} \approx$
+  **0.029**.
+
+## Exercise P.40
+
+**Probabilities of Death.** US life table for males (2011): of 100000 men
+born alive, the number living to ages 60, 70, 80, 90, 91 is 85995, 73548,
+50344, 17429, 14493.
+
+```{python}
+#| echo: false
+l = {60: 85995, 70: 73548, 80: 50344, 90: 17429, 91: 14493}
+pd.Series({
+    "(a) P(live to 60)": float(F(l[60], 100000)),
+    "(b) P(die before 70)": float(F(100000 - l[70], 100000)),
+    "(c) P(die at age 90)": float(F(l[90] - l[91], 100000)),
+    "(d) P(die at 90 | live to 90)": float(F(l[90] - l[91], l[90])),
+    "(e) P(die at 90 | live to 80)": float(F(l[90] - l[91], l[80])),
+    "(f) P(die between 60 and 89)": float(F(l[60] - l[90], 100000)),
+    "(g) P(live to 90+ | live to 60)": float(F(l[90], l[60])),
+}).to_string()
+```
+
+- **(a)** $85995/100000 \approx$ **0.860**.
+- **(b)** $1 - 73548/100000 \approx$ **0.265**.
+- **(c)** $(17429 - 14493)/100000 = 2936/100000 \approx$ **0.029**.
+- **(d)** $2936/17429 \approx$ **0.168**.
+- **(e)** $2936/50344 \approx$ **0.058**.
+- **(f)** $(85995 - 17429)/100000 \approx$ **0.686**.
+- **(g)** $17429/85995 \approx$ **0.203**.
+
+## Exercise P.41
+
+**Is the Stock Market Independent?** Between Jan 1, 2009 and Jan 1, 2012 the
+S&P 500 rose on 423 of 756 market days; it rose on two consecutive days 234
+times out of 755 possible consecutive pairs.
+
+```{python}
+#| echo: false
+p_up = F(423, 756)
+p_consec = F(234, 755)
+pd.Series({
+    "(a) P(up)": float(p_up),
+    "(b) P(two consecutive, if independent)": float(p_up ** 2),
+    "(b) P(up if up the day before, if independent)": float(p_up),
+    "(c) P(two consecutive, observed)": float(p_consec),
+    "(c) P(up if up the day before, observed)": float(p_consec / p_up),
+    "(d) Expected consecutive-up pairs if independent": float(755 * p_up ** 2),
+    "(d) Binomial P(X <= 234) under independence": float(
+        stats.binom.cdf(234, 755, float(p_up ** 2))),
+}).to_string()
+```
+
+- **(a)** $423/756 \approx$ **0.5595**.
+- **(b)** Assuming independence:
+  $P(\text{two consecutive up}) = 0.5595^2 \approx$ **0.3131**, and
+  $P(\text{up if up yesterday}) = P(\text{up}) \approx$ **0.5595**.
+- **(c)** From the data: $234/755 \approx$ **0.3099**, and
+  $P(\text{up if up yesterday}) = (234/755)/(423/756) \approx$ **0.5539**.
+- **(d)** **No** — the observed 0.5539 is barely below the independence
+  value 0.5595: 234 consecutive-up pairs against 236.4 expected, well within
+  chance variation (binomial tail probability ≈ 0.44). This analysis provides
+  no real evidence that daily changes are dependent — it certainly does not
+  *prove* dependence. (A rule of thumb: randomness is messy enough that
+  near-misses of the independence assumption are common in short samples.)
+
+## Exercise P.42
+
+**Pancakes.** Three pancakes: one burned on both sides, one burned on one
+side, one burned on neither. The side facing you is burned. What is the
+probability the other side is burned?
+
+```{python}
+#| echo: false
+# Six pancake sides are equally likely to face you; the burned-facing cases
+# are the 2 sides of the both-burned pancake plus the 1 burned side of the
+# one-sided pancake.
+r = np.random.default_rng(2026)
+pancake = r.integers(0, 3, 100000)          # 0 = both burned, 1 = one side, 2 = none
+face = r.random(100000) < 0.5               # which side faces you
+facing_burned = (pancake == 0) | ((pancake == 1) & face)
+other_burned = (pancake == 0) | ((pancake == 1) & (~face))
+pd.Series({
+    "Exact P(other burned | facing burned)": float(F(2, 3)),
+    "Simulation (100000 servings)": float(other_burned[facing_burned].mean()),
+}).to_string()
+```
+
+**2/3 ≈ 0.667.** Condition on what you see: among the three burned *sides*
+you could be looking at, two belong to the both-burned pancake and one to
+the singly-burned pancake, so
+$P(\text{other side burned} \mid \text{facing side burned}) = \frac{2}{3}$.
+The simulation — serve a random pancake, look at a random side, keep only
+the burned-facing servings — agrees.
+
+## Exercise P.43
+
+*(Skill Builder 1)* Complete the tree: first-level branches Case I (?),
+Case II (0.43), Case III (0.31); second level Case I → A 0.23 / B 0.77,
+Case II → A ? / B 0.24, Case III → A 0.80 / B 0.20; joints 0.0598, 0.2002,
+0.3268, ?, ?, 0.062.
+
+```{python}
+#| echo: false
+pd.Series({
+    "P(I)   [was ?]": float(F(26, 100)),
+    "P(A if II)   [was ?]": float(F(76, 100)),
+    "P(II and B)   [was ?]": float(F(43, 100) * F(24, 100)),
+    "P(III and A)   [was ?]": float(F(31, 100) * F(80, 100)),
+    "check: all six joints sum to 1": float(0.0598 + 0.2002 + 0.3268
+                                            + 0.1032 + 0.248 + 0.062),
+}).to_string()
+```
+
+- First-level branches must sum to 1: $P(I) = 1 - 0.43 - 0.31 =$ **0.26**
+  (check: $0.26 \times 0.23 = 0.0598$ ✓).
+- Second-level branches sum to 1: $P(A \text{ if II}) = 1 - 0.24 =$ **0.76**
+  (check: $0.43 \times 0.76 = 0.3268$ ✓).
+- Missing joints come from multiplying along the branches:
+  $P(\text{II and } B) = 0.43 \times 0.24 =$ **0.1032** and
+  $P(\text{III and } A) = 0.31 \times 0.80 =$ **0.248**.
+
+## Exercise P.44
+
+*(Skill Builder 1)* Complete the tree: Case I 0.18 → A ? (joint 0.09) /
+B ?; Case II ? → A ? / B 0.45; Case III ? → A 0.67 (joint 0.268) / B ?.
+
+```{python}
+#| echo: false
+III = F(268, 1000) / F(67, 100)          # P(III) from its joint with A
+II = 1 - F(18, 100) - III                # first level sums to 1
+pd.Series({
+    "P(A if I)   [was ?]": float(F(9, 100) / F(18, 100)),
+    "P(B if I)   [was ?]": float(1 - F(9, 100) / F(18, 100)),
+    "P(I and B)   [was ?]": float(F(18, 100) * F(1, 2)),
+    "P(III)   [was ?]": float(III),
+    "P(II)   [was ?]": float(II),
+    "P(A if II)   [was ?]": float(1 - F(45, 100)),
+    "P(II and A)   [was ?]": float(II * F(55, 100)),
+    "P(II and B)   [was ?]": float(II * F(45, 100)),
+    "P(B if III)   [was ?]": float(1 - F(67, 100)),
+    "P(III and B)   [was ?]": float(III * F(33, 100)),
+    "check: joints sum to 1": float(0.09 + 0.09 + 0.231 + 0.189 + 0.268 + 0.132),
+}).to_string()
+```
+
+- $P(A \text{ if } I) = 0.09/0.18 =$ **0.50**, so $P(B \text{ if } I) = $ **0.50**
+  and $P(\text{I and } B) = 0.18 \times 0.50 =$ **0.09**.
+- $P(III) = 0.268/0.67 =$ **0.40**, so $P(II) = 1 - 0.18 - 0.40 =$ **0.42**.
+- $P(A \text{ if } II) = 1 - 0.45 =$ **0.55**, giving joints
+  $P(\text{II and } A) = 0.42 \times 0.55 =$ **0.231** and
+  $P(\text{II and } B) = 0.42 \times 0.45 =$ **0.189**.
+- $P(B \text{ if } III) = 1 - 0.67 =$ **0.33**, so
+  $P(\text{III and } B) = 0.40 \times 0.33 =$ **0.132**.
+  All six joints sum to 1 ✓.
+
+## Exercise P.45
+
+*(Skill Builder 1)* Complete the tree: Case I ? → A ? / B ? / C ?; Case II ?
+→ A ? / B ? / C ?; joints ?, 0.225, 0.16, 0.45, 0.025, 0.025.
+
+```{python}
+#| echo: false
+I_and_A = 1 - (F(225, 1000) + F(16, 100) + F(45, 100) + F(25, 1000) + F(25, 1000))
+P_I = I_and_A + F(225, 1000) + F(16, 100)
+pd.Series({
+    "P(I and A)   [was ?]": float(I_and_A),
+    "P(I)   [was ?]": float(P_I),
+    "P(II)   [was ?]": float(1 - P_I),
+    "P(A if I)   [was ?]": float(I_and_A / P_I),
+    "P(B if I)   [was ?]": float(F(225, 1000) / P_I),
+    "P(C if I)   [was ?]": float(F(16, 100) / P_I),
+    "P(A if II)   [was ?]": float(F(45, 100) / (1 - P_I)),
+    "P(B if II)   [was ?]": float(F(25, 1000) / (1 - P_I)),
+    "P(C if II)   [was ?]": float(F(25, 1000) / (1 - P_I)),
+}).to_string()
+```
+
+- The six joints must sum to 1, so $P(\text{I and } A) = 1 - 0.87 =$ **0.115**.
+- Row sums give the first-level branches:
+  $P(I) = 0.115 + 0.225 + 0.16 =$ **0.5** and $P(II) =$ **0.5**.
+- Dividing each joint by its case probability fills the conditionals:
+  $P(A \text{ if } I) = 0.115/0.5 =$ **0.23**, $P(B \text{ if } I) =$ **0.45**,
+  $P(C \text{ if } I) =$ **0.32**, $P(A \text{ if } II) = 0.45/0.5 =$ **0.90**,
+  and $P(B \text{ if } II) = P(C \text{ if } II) =$ **0.05**.
+
+## Exercise P.46
+
+*(Skill Builder 1)* Complete the tree: Case I 0.38 → A 0.00 / B 0.19 /
+C ?; Case II ? → A 0.56 / B ? / C ?; joints ?, ?, ?, ?, ?, 0.00 (the joint
+for Case II and C).
+
+```{python}
+#| echo: false
+II = 1 - F(38, 100)
+pd.Series({
+    "P(II)   [was ?]": float(II),
+    "P(C if I)   [was ?]": float(1 - F(19, 100)),
+    "P(I and A)   [was ?]": float(F(38, 100) * 0),
+    "P(I and B)   [was ?]": float(F(38, 100) * F(19, 100)),
+    "P(I and C)   [was ?]": float(F(38, 100) * F(81, 100)),
+    "P(C if II)   [joint was 0.00]": float(0.0),
+    "P(B if II)   [was ?]": float(1 - F(56, 100)),
+    "P(II and A)   [was ?]": float(II * F(56, 100)),
+    "P(II and B)   [was ?]": float(II * F(44, 100)),
+    "check: joints sum to 1": float(0.0722 + 0.3078 + 0.3472 + 0.2728),
+}).to_string()
+```
+
+- $P(II) = 1 - 0.38 =$ **0.62**.
+- $P(C \text{ if } I) = 1 - 0.00 - 0.19 =$ **0.81**, with joints
+  $P(\text{I and } A) =$ **0.00**, $P(\text{I and } B) = 0.38 \times 0.19 =$ **0.0722**,
+  $P(\text{I and } C) = 0.38 \times 0.81 =$ **0.3078**.
+- The zero joint forces $P(C \text{ if } II) =$ **0.00**, so
+  $P(B \text{ if } II) = 1 - 0.56 =$ **0.44**, with joints
+  $P(\text{II and } A) = 0.62 \times 0.56 =$ **0.3472** and
+  $P(\text{II and } B) = 0.62 \times 0.44 =$ **0.2728** (sums check ✓).
+
+## Exercise P.47
+
+*(Skill Builder 2)* From Figure P.4 — $P(A) = 0.6$ with branches
+$R$ (0.9) and $S$ (0.1); $P(B) = 0.4$ with branches $R$ (0.2) and $S$ (0.8) —
+find $P(B \text{ and } R)$.
+
+```{python}
+#| echo: false
+pd.Series({"P(B and R)": F(4, 10) * F(2, 10)}).to_string()
+```
+
+$P(B \text{ and } R) = P(B)\,P(R \text{ if } B) = 0.4 \times 0.2 =$ **0.08** —
+multiply along the $B \to R$ branches.
+
+## Exercise P.48
+
+*(Skill Builder 2)* Find $P(A \text{ and } S)$.
+
+```{python}
+#| echo: false
+pd.Series({"P(A and S)": F(6, 10) * F(1, 10)}).to_string()
+```
+
+$P(A \text{ and } S) = 0.6 \times 0.1 =$ **0.06**.
+
+## Exercise P.49
+
+*(Skill Builder 2)* Find $P(R \text{ if } A)$.
+
+```{python}
+#| echo: false
+pd.Series({"P(R if A)": F(9, 10)}).to_string()
+```
+
+**0.9** — read straight off the $A \to R$ branch label.
+
+## Exercise P.50
+
+*(Skill Builder 2)* Find $P(S \text{ if } B)$.
+
+```{python}
+#| echo: false
+pd.Series({"P(S if B)": F(8, 10)}).to_string()
+```
+
+**0.8** — the $B \to S$ branch label.
+
+## Exercise P.51
+
+*(Skill Builder 2)* Find $P(R)$.
+
+```{python}
+#| echo: false
+P_R = F(6, 10) * F(9, 10) + F(4, 10) * F(2, 10)
+pd.Series({"P(A and R)": float(F(6, 10) * F(9, 10)),
+           "P(B and R)": float(F(4, 10) * F(2, 10)),
+           "P(R) = total probability": float(P_R)}).to_string()
+```
+
+**0.62** — total probability rule: arrive at $R$ through either first-level
+branch, $0.6(0.9) + 0.4(0.2) = 0.54 + 0.08$.
+
+## Exercise P.52
+
+*(Skill Builder 2)* Find $P(S)$.
+
+```{python}
+#| echo: false
+P_S = F(6, 10) * F(1, 10) + F(4, 10) * F(8, 10)
+pd.Series({"P(S)": float(P_S), "check P(R) + P(S)": float(P_R + P_S)}).to_string()
+```
+
+**0.38** — $0.6(0.1) + 0.4(0.8) = 0.06 + 0.32$; indeed $P(R) + P(S) = 1$.
+
+## Exercise P.53
+
+*(Skill Builder 2)* Find $P(A \text{ if } S)$.
+
+```{python}
+#| echo: false
+pd.Series({"P(A if S)": (F(6, 10) * F(1, 10)) / P_S}).to_string()
+```
+
+$P(A \text{ if } S) = \dfrac{P(A \text{ and } S)}{P(S)} = \dfrac{0.06}{0.38} \approx$
+**0.158** — reverse the tree: $A$'s share of all $S$ outcomes.
+
+## Exercise P.54
+
+*(Skill Builder 2)* Find $P(B \text{ if } R)$.
+
+```{python}
+#| echo: false
+pd.Series({"P(B if R)": (F(4, 10) * F(2, 10)) / P_R}).to_string()
+```
+
+$P(B \text{ if } R) = \dfrac{0.08}{0.62} \approx$ **0.129** — Bayes' rule on
+the tree: $B$'s share of the $R$ branch tips.
+
+## Exercise P.55
+
+**Housing Units in the US.** 65% of US housing units are owner-occupied,
+35% renter-occupied. Conditional probabilities of the number of occupants:
+
+```{python}
+#| echo: false
+occ = pd.DataFrame({"1": [0.217, 0.362], "2": [0.363, 0.261],
+                    "3 or more": [0.420, 0.377]},
+                   index=["Owner-occupied", "Renter-occupied"])
+occ.to_string()
+```
+
+```{python}
+#| echo: false
+own, rent = F(65, 100), F(35, 100)
+p_rent2 = rent * F(261, 1000)
+p_three = own * F(420, 1000) + rent * F(377, 1000)
+p_one = own * F(217, 1000) + rent * F(362, 1000)
+pd.Series({
+    "(a) P(rented and exactly 2 occupants)": float(p_rent2),
+    "(b) P(3 or more occupants)": float(p_three),
+    "(c) P(rented | 1 occupant)": float(rent * F(362, 1000) / p_one),
+}).to_string()
+```
+
+- **(a)** $P(\text{renter} \text{ and } 2) = 0.35 \times 0.261 \approx$
+  **0.091** — multiply along the renter → 2-occupant branches.
+- **(b)** $P(\text{3 or more}) = 0.65(0.420) + 0.35(0.377) \approx$ **0.405** —
+  total probability across both tenure types.
+- **(c)** $P(\text{rented} \mid 1) = \dfrac{0.35(0.362)}{0.65(0.217) + 0.35(0.362)}
+  = \dfrac{0.1267}{0.26775} \approx$ **0.474** — among one-person units,
+  renters slightly outnumber the 35% baseline share.
+
+## Exercise P.56
+
+**Restless Leg Syndrome and Fibromyalgia.** $P(\text{RLS if fibromyalgia}) = 0.33$,
+$P(\text{RLS if no fibromyalgia}) = 0.03$, and 2% of the population has
+fibromyalgia. Find $P(\text{fibromyalgia if RLS})$.
+
+```{python}
+#| echo: false
+post = bayes(0.02, 0.33, 0.03)
+sim = bayes_sim(0.02, 0.33, 0.03, reps=1000000)
+pd.Series({
+    "P(F and RLS)": 0.02 * 0.33,
+    "P(not F and RLS)": 0.98 * 0.03,
+    "P(RLS) (total probability)": total_prob(0.02, 0.33, 0.03),
+    "P(F if RLS) (Bayes)": float(post),
+    "Simulation (1000000 people)": sim,
+}).to_string()
+```
+
+**0.183.** Tree: $P(F \text{ and } RLS) = 0.02 \times 0.33 = 0.0066$ while
+$P(\text{not } F \text{ and } RLS) = 0.98 \times 0.03 = 0.0294$, so
+$P(F \text{ if } RLS) = \dfrac{0.0066}{0.0066 + 0.0294} = \dfrac{0.0066}{0.036} \approx$
+**0.183**. Even though fibromyalgia raises the RLS rate more than
+tenfold, RLS is still so common in the general population that only about
+18% of RLS sufferers have fibromyalgia — the 1M-person simulation agrees.
+
+## Exercise P.57
+
+**Mammograms and Breast Cancer.** For women 50–59: 86.6 per 1000 without
+cancer get a false positive, 1.1 per 1000 with cancer are missed (false
+negative), and 1 in 38 women in this age group develops breast cancer. Find
+$P(\text{cancer if positive mammogram})$.
+
+```{python}
+#| echo: false
+p_c = F(1, 38)
+post = bayes(float(p_c), 1 - 0.0011, 0.0866)
+sim = bayes_sim(float(p_c), 1 - 0.0011, 0.0866, reps=1000000)
+pd.Series({
+    "P(cancer and positive)": float(p_c * (1 - F(11, 10000))),
+    "P(no cancer and positive)": float((1 - p_c) * F(866, 10000)),
+    "P(positive)": float(p_c * (1 - F(11, 10000)) + (1 - p_c) * F(866, 10000)),
+    "P(cancer if positive) (Bayes)": float(post),
+    "Simulation (1000000 women)": sim,
+}).to_string()
+```
+
+$P(\text{cancer} \mid +) = \dfrac{(1/38)(0.9989)}{(1/38)(0.9989) + (37/38)(0.0866)}
+\approx$ **0.238** (the book's key rounds to 0.2375).
+
+Despite a test with ~99% sensitivity and ~91% specificity, only about **24%
+of positive mammograms correspond to actual cancer**: the 1-in-38 prior is
+so low that false positives (37/38 of women × 8.66%) swamp true positives.
+The 1M-woman simulation confirms.
+
+## Exercise P.58
+
+**What's the Pitch?** Slippery Elum throws 60% fastballs, 25% curveballs,
+15% spitballs; 70% of fastballs, 50% of curveballs, and 30% of spitballs
+are strikes. His last pitch was a strike — what's the probability it was a
+curveball?
+
+```{python}
+#| echo: false
+branches = pd.DataFrame({
+    "Pitch": ["Fastball", "Curveball", "Spitball"],
+    "P(pitch)": [0.60, 0.25, 0.15],
+    "P(strike if pitch)": [0.70, 0.50, 0.30],
+})
+branches["P(pitch and strike)"] = branches["P(pitch)"] * branches["P(strike if pitch)"]
+branches.to_string(index=False)
+```
+
+```{python}
+#| echo: false
+p_strike = float((branches["P(pitch)"] * branches["P(strike if pitch)"]).sum())
+r = np.random.default_rng(2026)
+pitch = r.choice(3, 100000, p=[0.6, 0.25, 0.15])
+strike = r.random(100000) < np.array([0.7, 0.5, 0.3])[pitch]
+pd.Series({
+    "P(strike) (total probability)": p_strike,
+    "P(curveball if strike)": float(0.25 * 0.50 / p_strike),
+    "Simulation (100000 pitches)": float((pitch[strike] == 1).mean()),
+}).to_string()
+```
+
+**0.212.** The three pitch types partition the sample space, so
+$P(\text{strike}) = 0.60(0.70) + 0.25(0.50) + 0.15(0.30) = 0.59$, and
+$P(\text{curveball} \mid \text{strike}) = \dfrac{0.125}{0.59} \approx$ **0.212** —
+a strike slightly favors "curveball" over its 25% prior, but fastballs
+still supply most strikes. Simulation agrees.
+
+## Exercise P.59
+
+**Identifying Spam Text Messages.** Of 5574 real SMS messages, 747 (13.40%)
+are spam. The word "free" appears in 4.75% of all messages, and 3.57% of
+all messages are both "free" and spam.
+
+```{python}
+#| echo: false
+P_spam = F(747, 5574)
+P_free = F(475, 10000)
+P_free_spam = F(357, 10000)
+r = np.random.default_rng(2026)
+spam = r.random(1000000) < float(P_spam)
+free = np.where(spam, r.random(1000000) < float(P_free_spam / P_spam),
+                r.random(1000000) < float((P_free - P_free_spam) / (1 - P_spam)))
+pd.Series({
+    "P(spam)": float(P_spam),
+    "(a) P(free if spam) = P(free and spam)/P(spam)": float(P_free_spam / P_spam),
+    "Sim (a) (1000000 messages)": float(free[spam].mean()),
+    "(b) P(spam if free) = P(free and spam)/P(free)": float(P_free_spam / P_free),
+    "Sim (b) (1000000 messages)": float(spam[free].mean()),
+}).to_string()
+```
+
+- **(a)** $P(\text{free} \mid \text{spam}) = \dfrac{0.0357}{0.1340} \approx$
+  **0.266** — over a quarter of spam messages contain "free."
+- **(b)** $P(\text{spam} \mid \text{free}) = \dfrac{0.0357}{0.0475} \approx$
+  **0.752** — flipping the conditioning (Bayes): among messages containing
+  "free," about 75% are spam. The simulation agrees with both.
+
+## Exercise P.60
+
+**Identifying Spam (2).** The word "text" (or "txt") appears in 7.01% of all
+messages and in 38.55% of all spam messages. Find
+$P(\text{spam} \mid \text{text})$.
+
+```{python}
+#| echo: false
+P_spam = float(F(747, 5574))
+p_text = 0.0701
+p_text_if_spam = 0.3855
+p_text_if_not = (p_text - p_text_if_spam * P_spam) / (1 - P_spam)
+r = np.random.default_rng(2026)
+spam = r.random(1000000) < P_spam
+text = np.where(spam, r.random(1000000) < p_text_if_spam,
+                r.random(1000000) < p_text_if_not)
+pd.Series({
+    "P(text if spam)": p_text_if_spam,
+    "P(text if not spam) (implied)": p_text_if_not,
+    "P(spam if text) (Bayes)": float(p_text_if_spam * P_spam / p_text),
+    "Simulation (1000000 messages)": float(spam[text].mean()),
+}).to_string()
+```
+
+$P(\text{spam} \mid \text{text}) = \dfrac{P(\text{text} \mid \text{spam})\,P(\text{spam})}{P(\text{text})}
+= \dfrac{0.3855 \times 0.1340}{0.0701} \approx$ **0.737** — Bayes' rule with
+the total probability denominator. Seeing "text" (or "txt") jumps the spam
+probability from 13.4% to about 74%; the simulation agrees.
+
+## Exercise P.61
+
+**Identifying Spam (3).** 17.00% of spam messages contain both "free" and
+"text"; only 0.06% of non-spam messages do. Given a message contains both
+words, what is the probability it is spam?
+
+```{python}
+#| echo: false
+P_spam = float(F(747, 5574))
+p_ft_s, p_ft_n = 0.17, 0.0006
+post = bayes(P_spam, p_ft_s, p_ft_n)
+r = np.random.default_rng(2026)
+spam = r.random(1000000) < P_spam
+free = np.where(spam, r.random(1000000) < 0.0357 / P_spam,
+                r.random(1000000) < (0.0475 - 0.0357) / (1 - P_spam))
+p_tx_s = p_ft_s / (0.0357 / P_spam)
+p_tx_n = p_ft_n / ((0.0475 - 0.0357) / (1 - P_spam))
+text = np.where(spam, r.random(1000000) < p_tx_s, r.random(1000000) < p_tx_n)
+both = free & text
+pd.Series({
+    "P(spam and free and text)": float(P_spam * p_ft_s),
+    "P(not spam and free and text)": float((1 - P_spam) * p_ft_n),
+    "P(spam if free and text) (Bayes)": float(post),
+    "Simulation (1000000 messages)": float(spam[both].mean()),
+}).to_string()
+```
+
+$P(\text{spam} \mid \text{free and text}) =
+\dfrac{0.1340 \times 0.17}{0.1340 \times 0.17 + 0.8660 \times 0.0006} \approx$
+**0.978** — the two words together are almost a spam signature: spam is
+283 times more likely to pair them than legitimate mail, so only about 2%
+of such messages are legitimate. The 1M-message simulation agrees.
+
+## Exercise P.62
+
+**Identifying Spam (4).** Given a message contains "free" but **not**
+"text", what is the probability it is spam? (Use P.59–P.61.)
+
+```{python}
+#| echo: false
+P_spam = float(F(747, 5574))
+p_free_s = 0.0357 / P_spam                  # P(free | spam), from P.59
+p_free_n = (0.0475 - 0.0357) / (1 - P_spam) # P(free | not spam), from P.59
+p_ft_s, p_ft_n = 0.17, 0.0006               # P(free and text | spam / not spam), P.61
+p_fnt_s = p_free_s - p_ft_s                 # P(free and NOT text | spam)
+p_fnt_n = p_free_n - p_ft_n                 # P(free and NOT text | not spam)
+post = (P_spam * p_fnt_s) / (P_spam * p_fnt_s + (1 - P_spam) * p_fnt_n)
+r = np.random.default_rng(2026)
+spam = r.random(1000000) < P_spam
+free = np.where(spam, r.random(1000000) < p_free_s, r.random(1000000) < p_free_n)
+p_tx_s = p_ft_s / p_free_s
+p_tx_n = p_ft_n / p_free_n
+text = np.where(spam, r.random(1000000) < p_tx_s, r.random(1000000) < p_tx_n)
+fnt = free & (~text)
+pd.Series({
+    "P(free and not text | spam)": p_fnt_s,
+    "P(free and not text | not spam)": p_fnt_n,
+    "P(spam if free and not text) (Bayes)": float(post),
+    "Simulation (1000000 messages)": float(spam[fnt].mean()),
+}).to_string()
+```
+
+**0.534.** Subtract the "free and text" slice from each "free" branch:
+$P(\text{free, not text} \mid \text{spam}) = 0.2664 - 0.17 = 0.0964$ and
+$P(\text{free, not text} \mid \text{not spam}) = 0.01363 - 0.0006 = 0.01303$.
+Bayes' rule then gives
+$\dfrac{0.1340 \times 0.0964}{0.1340 \times 0.0964 + 0.8660 \times 0.01303} \approx$
+**0.534** — a bare "free" without "txt" is a much weaker spam signal than
+the pair (compare P.61's 0.978). The 1M-message simulation agrees.
+
+:::

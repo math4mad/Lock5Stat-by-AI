@@ -139,6 +139,12 @@ website:
             text: "Unit D · Synthesis (D.1–D.27)"
           - href: chapters/synthesis/unit-d-2.qmd
             text: "Unit D · Synthesis (D.28–D.53)"
+          - href: chapters/synthesis/big-picture.qmd
+            text: "The Big Picture · Synthesis (E.1–E.10)"
+          - href: chapters/chapters-p/p-1.qmd
+            text: "Ch. P · Sections P.1–P.2"
+          - href: chapters/chapters-p/p-2.qmd
+            text: "Ch. P · Sections P.3–P.5"
 
 format:
   html:
