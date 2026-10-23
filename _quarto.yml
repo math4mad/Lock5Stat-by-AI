@@ -3,8 +3,15 @@ project:
 
 website:
   title: "Lock5Stat-by-AI"
+  site-url: https://math4mad.github.io/Lock5Stat-by-AI/
+  repo-url: https://github.com/math4mad/Lock5Stat-by-AI
+  repo-actions: [edit, issue]
+  page-footer:
+    center: "Built with [Quarto](https://quarto.org/) · exercises from Lock⁵, *Statistics: Unlocking the Power of Data*, 3rd ed. · [GitHub](https://github.com/math4mad/Lock5Stat-by-AI)"
   navbar:
     left:
+      - href: index.qmd
+        text: "Home"
       - text: "Preface"
         menu:
           - href: preface/index.qmd
@@ -149,5 +156,6 @@ website:
 format:
   html:
     theme: cosmo
+    css: styles.css
     toc: true
     toc-depth: 3
