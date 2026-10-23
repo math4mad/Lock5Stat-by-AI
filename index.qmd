@@ -47,7 +47,7 @@ Each notebook follows the same discipline, established in the
 ::: {.tl-dot}
 :::
 ::: {.tl-body}
-**Phase 1 — pipeline validation** {.tl-title}
+<div class="tl-title">Phase 1 — pipeline validation</div>
 
 Three Lock⁵ case studies (sprinting gene, penguin tagging, pheromones)
 established the note template: EDA → parametric + randomization → decision.
@@ -58,7 +58,7 @@ established the note template: EDA → parametric + randomization → decision.
 ::: {.tl-dot}
 :::
 ::: {.tl-body}
-**Phase 2 — 17 questions on Kaggle** {.tl-title}
+<div class="tl-title">Phase 2 — 17 questions on Kaggle</div>
 
 The Ford Mobile Lines questions researched, scripted, and run as parallel
 Kaggle kernels, then verified against local smoke tests.
@@ -69,7 +69,7 @@ Kaggle kernels, then verified against local smoke tests.
 ::: {.tl-dot}
 :::
 ::: {.tl-body}
-**Unit A — Chapters 1–4** {.tl-title}
+<div class="tl-title">Unit A — Chapters 1–4</div>
 
 Data description, bootstrapped CIs, randomization tests (766 exercises).
 :::
@@ -79,7 +79,7 @@ Data description, bootstrapped CIs, randomization tests (766 exercises).
 ::: {.tl-dot}
 :::
 ::: {.tl-body}
-**Unit B — Chapters 5–6** {.tl-title}
+<div class="tl-title">Unit B — Chapters 5–6</div>
 
 Normal and t-based inference, plus a B.1–B.82 synthesis case.
 :::
@@ -89,7 +89,7 @@ Normal and t-based inference, plus a B.1–B.82 synthesis case.
 ::: {.tl-dot}
 :::
 ::: {.tl-body}
-**Unit C — synthesis C.1–C.130** {.tl-title}
+<div class="tl-title">Unit C — synthesis C.1–C.130</div>
 
 Confidence intervals and tests for means/proportions woven together.
 :::
@@ -99,7 +99,7 @@ Confidence intervals and tests for means/proportions woven together.
 ::: {.tl-dot}
 :::
 ::: {.tl-body}
-**Unit D — Chapters 7–10** {.tl-title}
+<div class="tl-title">Unit D — Chapters 7–10</div>
 
 Chi-square, ANOVA, regression and multiple regression (459 exercises),
 plus the D.1–D.53 Restaurant Tips synthesis.
@@ -110,7 +110,7 @@ plus the D.1–D.53 Restaurant Tips synthesis.
 ::: {.tl-dot}
 :::
 ::: {.tl-body}
-**Big Picture & Chapter P — complete** {.tl-title}
+<div class="tl-title">Big Picture & Chapter P — complete</div>
 
 The E.1–E.10 ACS capstone and all 169 probability exercises. The book is
 fully worked.

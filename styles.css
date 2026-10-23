@@ -84,7 +84,9 @@
 
 .tl-item .tl-title {
   font-size: 0.98rem;
-  margin-bottom: 0.1rem;
+  font-weight: 650;
+  color: #2c3e50;
+  margin-bottom: 0.15rem;
 }
 
 .tl-item .tl-body {
